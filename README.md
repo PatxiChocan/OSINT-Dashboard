@@ -23,3 +23,16 @@ Clonar repositorio:
 ```bash
 git clone https://github.com/PatxiChocan/OSINT-Dashboard.git
 cd OSINT-Dashboard
+
+Instalar dependencias:
+
+pip install flask
+Ejecutar
+python3 app.py
+
+Abrir navegador:
+
+http://127.0.0.1:5000
+Requisitos
+
+Kali Linux con herramientas OSINT instaladas.
