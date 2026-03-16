@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>OSINT Arsenal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --bg2: #ffffff;
+    --bg3: #f0f1f4;
+    --border: #e2e4e9;
+    --text: #1a1d23;
+    --text2: #5a6070;
+    --text3: #9099a8;
+    --accent: #3b6fe0;
+    --accent2: #2952b3;
+    --green: #1a7f4b;
+    --green-bg: #edf7f2;
+    --amber: #b45309;
+    --amber-bg: #fef3e2;
+    --red: #c0392b;
+    --red-bg: #fdecea;
+    --blue-bg: #eef3fd;
+    --sidebar: #1e2130;
+    --sidebar-text: #a8b0c0;
+    --sidebar-active: #ffffff;
+    --sidebar-hover: #2a2f45;
+    --shadow: 0 1px 4px rgba(0,0,0,0.08);
+    --shadow2: 0 4px 16px rgba(0,0,0,0.10);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; font-size:14px; }
+
+  /* LAYOUT */
+  .layout { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+
+  /* SIDEBAR */
+  .sidebar { background:var(--sidebar); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; }
+  .sidebar-logo { padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,0.07); }
+  .logo-title { font-size:1rem; font-weight:700; color:#fff; letter-spacing:.5px; }
+  .logo-sub { font-size:.68rem; color:var(--sidebar-text); margin-top:2px; letter-spacing:1px; text-transform:uppercase; }
+  .sidebar-section { padding:16px 12px 4px; font-size:.6rem; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.25); font-weight:600; }
+  .nav-btn { display:flex; align-items:center; gap:10px; width:100%; padding:9px 12px; background:none; border:none; border-radius:8px; color:var(--sidebar-text); font-family:'Inter',sans-serif; font-size:.82rem; cursor:pointer; text-align:left; transition:all .15s; margin-bottom:2px; }
+  .nav-btn:hover { background:var(--sidebar-hover); color:#fff; }
+  .nav-btn.active { background:rgba(59,111,224,0.2); color:var(--sidebar-active); font-weight:500; }
+  .nav-btn .icon { font-size:1rem; width:20px; text-align:center; flex-shrink:0; }
+  .nav-divider { height:1px; background:rgba(255,255,255,0.07); margin:8px 12px; }
+  .sidebar-status { margin-top:auto; padding:14px 16px; border-top:1px solid rgba(255,255,255,0.07); font-size:.68rem; color:rgba(255,255,255,0.3); }
+  .status-dot { width:6px; height:6px; border-radius:50%; background:#22c55e; display:inline-block; margin-right:5px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* MAIN */
+  .main { display:flex; flex-direction:column; min-height:100vh; }
+
+  /* TOPBAR */
+  .topbar { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 24px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:50; box-shadow:var(--shadow); }
+  .topbar-label { font-size:.72rem; color:var(--text3); white-space:nowrap; font-weight:500; }
+  .target-input { flex:1; max-width:360px; background:var(--bg3); border:1.5px solid var(--border); border-radius:8px; padding:8px 14px; font-family:'Inter',sans-serif; font-size:.85rem; color:var(--text); outline:none; transition:border-color .15s; }
+  .target-input:focus { border-color:var(--accent); background:#fff; }
+  .target-input::placeholder { color:var(--text3); }
+  .topbar-right { margin-left:auto; font-size:.72rem; color:var(--text3); display:flex; gap:16px; align-items:center; }
+  .target-chip { background:var(--blue-bg); color:var(--accent); border:1px solid #c7d8f8; border-radius:20px; padding:3px 10px; font-size:.7rem; font-weight:500; display:none; }
+
+  /* CONTENT */
+  .content { flex:1; padding:24px; overflow-y:auto; }
+
+  /* PANEL */
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  /* PAGE HEADER */
+  .page-header { margin-bottom:20px; }
+  .page-title { font-size:1.3rem; font-weight:700; color:var(--text); margin-bottom:4px; display:flex; align-items:center; gap:10px; }
+  .page-desc { font-size:.82rem; color:var(--text2); line-height:1.6; }
+
+  /* TAGS */
+  .tag { display:inline-block; font-size:.62rem; padding:2px 8px; border-radius:20px; font-weight:600; letter-spacing:.3px; margin-right:4px; }
+  .tag-mit { background:#e8f5e9; color:#2e7d32; }
+  .tag-apache { background:#e3f2fd; color:#1565c0; }
+  .tag-gpl { background:#fff8e1; color:#f57f17; }
+  .tag-npsl { background:#fce4ec; color:#c62828; }
+
+  /* SUBTOOL GRID */
+  .subtool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-bottom:20px; }
+  .subtool-card { background:var(--bg2); border:1.5px solid var(--border); border-radius:10px; padding:14px; cursor:pointer; transition:all .15s; }
+  .subtool-card:hover { border-color:#c7d8f8; box-shadow:var(--shadow2); transform:translateY(-1px); }
+  .subtool-card.selected { border-color:var(--accent); background:var(--blue-bg); box-shadow:0 0 0 3px rgba(59,111,224,0.1); }
+  .sc-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px; }
+  .sc-name { font-size:.82rem; font-weight:600; color:var(--text); }
+  .sc-func { font-size:.72rem; color:var(--text2); line-height:1.5; }
+  .alert-badge { font-size:.58rem; font-weight:700; padding:2px 7px; border-radius:20px; white-space:nowrap; }
+  .al-none { background:var(--green-bg); color:var(--green); }
+  .al-low { background:#e3f2fd; color:#1565c0; }
+  .al-med { background:var(--amber-bg); color:var(--amber); }
+  .al-high { background:var(--red-bg); color:var(--red); }
+
+  /* CMD PREVIEW */
+  .cmd-preview { background:#1e2130; border-radius:10px; padding:14px 16px; margin-bottom:16px; display:none; }
+  .cmd-preview.show { display:block; }
+  .cmd-label { font-size:.62rem; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px; font-weight:600; }
+  .cmd-code { font-family:'JetBrains Mono',monospace; font-size:.8rem; color:#a8d8a8; line-height:1.6; word-break:break-all; }
+  .cmd-prompt { color:rgba(255,255,255,0.3); }
+
+  /* ACTIONS ROW */
+  .actions-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+  .extra-input { flex:1; min-width:200px; background:var(--bg2); border:1.5px solid var(--border); border-radius:8px; padding:8px 14px; font-family:'Inter',sans-serif; font-size:.82rem; color:var(--text); outline:none; transition:border-color .15s; }
+  .extra-input:focus { border-color:var(--accent); }
+  .extra-input::placeholder { color:var(--text3); }
+  .run-btn { background:var(--accent); border:none; color:#fff; font-family:'Inter',sans-serif; font-size:.82rem; font-weight:600; padding:9px 22px; border-radius:8px; cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:6px; }
+  .run-btn:hover { background:var(--accent2); box-shadow:0 4px 12px rgba(59,111,224,0.3); }
+  .run-btn:disabled { opacity:.4; cursor:not-allowed; }
+  .stop-btn { background:#fff; border:1.5px solid var(--red); color:var(--red); font-family:'Inter',sans-serif; font-size:.82rem; font-weight:600; padding:9px 22px; border-radius:8px; cursor:pointer; transition:all .15s; display:none; }
+  .stop-btn:hover { background:var(--red); color:#fff; }
+
+  /* OUTPUT */
+  .output-section { background:var(--bg2); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+  .output-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg3); }
+  .output-title { font-size:.78rem; font-weight:600; color:var(--text); }
+  .output-actions { display:flex; gap:8px; }
+  .clr-btn { background:none; border:1px solid var(--border); color:var(--text2); font-family:'Inter',sans-serif; font-size:.7rem; padding:4px 10px; border-radius:6px; cursor:pointer; transition:all .15s; }
+  .clr-btn:hover { border-color:var(--red); color:var(--red); }
+
+  /* RESULTS */
+  .results-area { padding:16px; min-height:200px; }
+  .result-group { margin-bottom:20px; }
+  .result-group:last-child { margin-bottom:0; }
+  .rg-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text3); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+  .rg-count { background:var(--accent); color:#fff; font-size:.6rem; padding:1px 7px; border-radius:20px; font-weight:700; }
+  .result-items { display:flex; flex-direction:column; gap:4px; }
+  .result-item { background:var(--bg3); border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace; font-size:.76rem; color:var(--text); display:flex; align-items:center; gap:8px; word-break:break-all; }
+  .result-item .ri-icon { font-size:.85rem; flex-shrink:0; }
+  .result-item.email { border-left:3px solid var(--accent); }
+  .result-item.host { border-left:3px solid var(--green); }
+  .result-item.ip { border-left:3px solid var(--amber); }
+  .result-item.url { border-left:3px solid #7c3aed; }
+  .result-item.generic { border-left:3px solid var(--border); }
+
+  /* RAW OUTPUT */
+  .raw-output { font-family:'JetBrains Mono',monospace; font-size:.73rem; color:var(--text2); line-height:1.8; white-space:pre-wrap; word-break:break-all; padding:16px; min-height:200px; max-height:500px; overflow-y:auto; }
+  .raw-output::-webkit-scrollbar { width:4px; }
+  .raw-output::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+  /* OUTPUT TABS */
+  .out-tabs { display:flex; gap:2px; padding:0 16px; border-bottom:1px solid var(--border); background:var(--bg2); }
+  .out-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--text3); font-family:'Inter',sans-serif; font-size:.75rem; font-weight:500; padding:10px 14px; cursor:pointer; transition:all .15s; margin-bottom:-1px; }
+  .out-tab:hover { color:var(--text); }
+  .out-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .out-tab-content { display:none; }
+  .out-tab-content.active { display:block; }
+
+  /* STATUS BAR */
+  .status-bar { padding:10px 16px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; font-size:.7rem; color:var(--text3); background:var(--bg3); }
+  .status-running { color:#f59e0b; display:none; align-items:center; gap:6px; }
+  .spinner { width:12px; height:12px; border:2px solid #f59e0b; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .status-done { color:var(--green); display:none; }
+
+  /* HOME */
+  .home-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-top:20px; }
+  .home-card { background:var(--bg2); border:1.5px solid var(--border); border-radius:12px; padding:20px; cursor:pointer; transition:all .15s; }
+  .home-card:hover { border-color:#c7d8f8; box-shadow:var(--shadow2); transform:translateY(-2px); }
+  .home-card-icon { font-size:1.8rem; margin-bottom:10px; }
+  .home-card-name { font-size:.9rem; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .home-card-desc { font-size:.74rem; color:var(--text2); line-height:1.5; }
+  .home-card-tag { margin-top:10px; }
+  .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px; }
+  .stat-card { background:var(--bg2); border:1.5px solid var(--border); border-radius:10px; padding:16px; }
+  .stat-val { font-size:1.5rem; font-weight:700; color:var(--accent); }
+  .stat-label { font-size:.7rem; color:var(--text3); margin-top:2px; font-weight:500; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-title">OSINT Arsenal</div>
+      <div class="logo-sub">Red Team Dashboard</div>
+    </div>
+
+    <div class="sidebar-section">Arsenal</div>
+    <button class="nav-btn active" onclick="show('home',this)"><span class="icon">⌂</span>Overview</button>
+
+    <div class="nav-divider"></div>
+    <div class="sidebar-section">Herramientas</div>
+    <button class="nav-btn" onclick="show('discover',this)"><span class="icon">🔍</span>Discover</button>
+    <button class="nav-btn" onclick="show('amass',this)"><span class="icon">🌐</span>Amass</button>
+    <button class="nav-btn" onclick="show('katana',this)"><span class="icon">🕷</span>Katana</button>
+    <button class="nav-btn" onclick="show('gitleaks',this)"><span class="icon">🔑</span>GitLeaks</button>
+    <button class="nav-btn" onclick="show('wayback',this)"><span class="icon">🕰</span>Wayback DL</button>
+    <button class="nav-btn" onclick="show('spiderfoot',this)"><span class="icon">🕸</span>SpiderFoot</button>
+
+    <div class="sidebar-status">
+      <span class="status-dot"></span>Kali Linux · localhost:5000
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <span class="topbar-label">🎯 Objetivo</span>
+      <input class="target-input" id="targetInput" placeholder="ejemplo.com" oninput="updateTarget(this.value)">
+      <div class="topbar-right">
+        <span class="target-chip" id="targetChip"></span>
+        <span id="clock" style="font-size:.72rem;color:var(--text3);"></span>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- HOME -->
+      <div class="panel active" id="panel-home">
+        <div class="page-header">
+          <div class="page-title">👋 Bienvenido</div>
+          <div class="page-desc">Introduce el dominio objetivo arriba y selecciona una herramienta para empezar.</div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-val">6</div><div class="stat-label">Herramientas</div></div>
+          <div class="stat-card"><div class="stat-val">40+</div><div class="stat-label">Subherramientas</div></div>
+          <div class="stat-card"><div class="stat-val">100%</div><div class="stat-label">Open Source</div></div>
+          <div class="stat-card"><div class="stat-val">Local</div><div class="stat-label">Sin datos externos</div></div>
+        </div>
+        <div class="home-grid">
+          <div class="home-card" onclick="show('discover',null)">
+            <div class="home-card-icon">🔍</div>
+            <div class="home-card-name">Discover</div>
+            <div class="home-card-desc">Framework orquestador. theHarvester, Nmap, DNSRecon, Nikto y más.</div>
+            <div class="home-card-tag"><span class="tag tag-mit">MIT</span></div>
+          </div>
+          <div class="home-card" onclick="show('amass',null)">
+            <div class="home-card-icon">🌐</div>
+            <div class="home-card-name">Amass</div>
+            <div class="home-card-desc">Enumeración de subdominios con +55 fuentes y tracking histórico.</div>
+            <div class="home-card-tag"><span class="tag tag-apache">Apache 2.0</span></div>
+          </div>
+          <div class="home-card" onclick="show('katana',null)">
+            <div class="home-card-icon">🕷</div>
+            <div class="home-card-name">Katana</div>
+            <div class="home-card-desc">Crawling web. Endpoints estáticos, JS y headless con Chrome.</div>
+            <div class="home-card-tag"><span class="tag tag-mit">MIT</span></div>
+          </div>
+          <div class="home-card" onclick="show('gitleaks',null)">
+            <div class="home-card-icon">🔑</div>
+            <div class="home-card-name">GitLeaks</div>
+            <div class="home-card-desc">Detecta credenciales y secretos en repositorios Git.</div>
+            <div class="home-card-tag"><span class="tag tag-mit">MIT</span></div>
+          </div>
+          <div class="home-card" onclick="show('wayback',null)">
+            <div class="home-card-icon">🕰</div>
+            <div class="home-card-name">Wayback DL</div>
+            <div class="home-card-desc">Descarga histórico de archive.org. El objetivo no recibe tráfico.</div>
+            <div class="home-card-tag"><span class="tag tag-mit">MIT</span></div>
+          </div>
+          <div class="home-card" onclick="show('spiderfoot',null)">
+            <div class="home-card-icon">🕸</div>
+            <div class="home-card-name">SpiderFoot</div>
+            <div class="home-card-desc">200+ módulos OSINT con correlación automática.</div>
+            <div class="home-card-tag"><span class="tag tag-gpl">GPL v2</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DISCOVER -->
+      <div class="panel" id="panel-discover">
+        <div class="page-header">
+          <div class="page-title">🔍 Discover <span class="tag tag-mit">MIT</span><span class="tag tag-npsl">Nmap NPSL</span></div>
+          <div class="page-desc">Framework orquestador — automatiza recon pasivo y activo en un solo flujo.</div>
+        </div>
+        <div class="subtool-grid" id="sg-discover"></div>
+        <div class="cmd-preview" id="cp-discover"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-discover"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-discover" placeholder="Flags adicionales (opcional)">
+          <button class="run-btn" id="run-discover" onclick="runTool('discover')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-discover" onclick="stopTool('discover')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header">
+            <span class="output-title">Resultados</span>
+            <div class="output-actions"><button class="clr-btn" onclick="clearOut('discover')">Limpiar</button></div>
+          </div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('discover','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('discover','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-discover"><div class="results-area" id="results-discover"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-discover"><div class="raw-output" id="raw-out-discover">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-discover"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-discover">✓ Completado</div>
+            <span id="ss-discover" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AMASS -->
+      <div class="panel" id="panel-amass">
+        <div class="page-header">
+          <div class="page-title">🌐 Amass <span class="tag tag-apache">Apache 2.0</span></div>
+          <div class="page-desc">Enumeración avanzada de subdominios con +55 fuentes, grafos de infraestructura y tracking histórico.</div>
+        </div>
+        <div class="subtool-grid" id="sg-amass"></div>
+        <div class="cmd-preview" id="cp-amass"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-amass"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-amass" placeholder="Flags adicionales (ej: -timeout 30)">
+          <button class="run-btn" id="run-amass" onclick="runTool('amass')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-amass" onclick="stopTool('amass')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header"><span class="output-title">Resultados</span><div class="output-actions"><button class="clr-btn" onclick="clearOut('amass')">Limpiar</button></div></div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('amass','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('amass','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-amass"><div class="results-area" id="results-amass"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-amass"><div class="raw-output" id="raw-out-amass">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-amass"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-amass">✓ Completado</div>
+            <span id="ss-amass" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KATANA -->
+      <div class="panel" id="panel-katana">
+        <div class="page-header">
+          <div class="page-title">🕷 Katana <span class="tag tag-mit">MIT</span></div>
+          <div class="page-desc">Crawling web — endpoints estáticos y dinámicos con JavaScript.</div>
+        </div>
+        <div class="subtool-grid" id="sg-katana"></div>
+        <div class="cmd-preview" id="cp-katana"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-katana"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-katana" placeholder="Flags adicionales (ej: -depth 3)">
+          <button class="run-btn" id="run-katana" onclick="runTool('katana')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-katana" onclick="stopTool('katana')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header"><span class="output-title">Resultados</span><div class="output-actions"><button class="clr-btn" onclick="clearOut('katana')">Limpiar</button></div></div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('katana','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('katana','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-katana"><div class="results-area" id="results-katana"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-katana"><div class="raw-output" id="raw-out-katana">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-katana"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-katana">✓ Completado</div>
+            <span id="ss-katana" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GITLEAKS -->
+      <div class="panel" id="panel-gitleaks">
+        <div class="page-header">
+          <div class="page-title">🔑 GitLeaks <span class="tag tag-mit">MIT</span></div>
+          <div class="page-desc">Detecta credenciales y secretos en repositorios Git. Análisis 100% local.</div>
+        </div>
+        <div class="subtool-grid" id="sg-gitleaks"></div>
+        <div class="cmd-preview" id="cp-gitleaks"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-gitleaks"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-gitleaks" placeholder="Ruta del repo (ej: /opt/repos/objetivo)">
+          <button class="run-btn" id="run-gitleaks" onclick="runTool('gitleaks')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-gitleaks" onclick="stopTool('gitleaks')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header"><span class="output-title">Resultados</span><div class="output-actions"><button class="clr-btn" onclick="clearOut('gitleaks')">Limpiar</button></div></div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('gitleaks','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('gitleaks','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-gitleaks"><div class="results-area" id="results-gitleaks"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-gitleaks"><div class="raw-output" id="raw-out-gitleaks">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-gitleaks"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-gitleaks">✓ Completado</div>
+            <span id="ss-gitleaks" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- WAYBACK -->
+      <div class="panel" id="panel-wayback">
+        <div class="page-header">
+          <div class="page-title">🕰 Wayback Downloader <span class="tag tag-mit">MIT</span></div>
+          <div class="page-desc">Descarga versiones archivadas desde archive.org. El objetivo nunca recibe tráfico.</div>
+        </div>
+        <div class="subtool-grid" id="sg-wayback"></div>
+        <div class="cmd-preview" id="cp-wayback"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-wayback"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-wayback" placeholder="Flags adicionales (ej: --limit-pages 100)">
+          <button class="run-btn" id="run-wayback" onclick="runTool('wayback')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-wayback" onclick="stopTool('wayback')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header"><span class="output-title">Resultados</span><div class="output-actions"><button class="clr-btn" onclick="clearOut('wayback')">Limpiar</button></div></div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('wayback','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('wayback','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-wayback"><div class="results-area" id="results-wayback"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-wayback"><div class="raw-output" id="raw-out-wayback">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-wayback"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-wayback">✓ Completado</div>
+            <span id="ss-wayback" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPIDERFOOT -->
+      <div class="panel" id="panel-spiderfoot">
+        <div class="page-header">
+          <div class="page-title">🕸 SpiderFoot <span class="tag tag-gpl">GPL v2</span></div>
+          <div class="page-desc">200+ módulos OSINT con correlación automática e interfaz web integrada.</div>
+        </div>
+        <div class="subtool-grid" id="sg-spiderfoot"></div>
+        <div class="cmd-preview" id="cp-spiderfoot"><div class="cmd-label">Comando a ejecutar</div><div class="cmd-code" id="cc-spiderfoot"></div></div>
+        <div class="actions-row">
+          <input class="extra-input" id="args-spiderfoot" placeholder="Flags adicionales (ej: -max-threads 5)">
+          <button class="run-btn" id="run-spiderfoot" onclick="runTool('spiderfoot')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-spiderfoot" onclick="stopTool('spiderfoot')">⬛ Parar</button>
+        </div>
+        <div class="output-section">
+          <div class="output-header"><span class="output-title">Resultados</span><div class="output-actions"><button class="clr-btn" onclick="clearOut('spiderfoot')">Limpiar</button></div></div>
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchOutTab('spiderfoot','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchOutTab('spiderfoot','raw',this)">Output completo</button>
+          </div>
+          <div class="out-tab-content active" id="parsed-spiderfoot"><div class="results-area" id="results-spiderfoot"><p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p></div></div>
+          <div class="out-tab-content" id="raw-spiderfoot"><div class="raw-output" id="raw-out-spiderfoot">// Output completo aparecerá aquí</div></div>
+          <div class="status-bar">
+            <div class="status-running" id="sr-spiderfoot"><div class="spinner"></div>Ejecutando...</div>
+            <div class="status-done" id="sd-spiderfoot">✓ Completado</div>
+            <span id="ss-spiderfoot" style="color:var(--text3)">Listo</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+setInterval(()=>{ document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES'); },1000);
+
+let target='';
+function updateTarget(v){
+  target=v;
+  const chip=document.getElementById('targetChip');
+  chip.textContent='🎯 '+v;
+  chip.style.display=v?'inline':'none';
+  Object.keys(selectedSubtool).forEach(t=>{ if(selectedSubtool[t]!==undefined) buildPreview(t,selectedSubtool[t]); });
+}
+
+function show(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  else {
+    const b=[...document.querySelectorAll('.nav-btn')].find(b=>b.textContent.trim().toLowerCase().includes(id));
+    if(b) b.classList.add('active');
+  }
+}
+
+function switchOutTab(tool,tab,btn){
+  const base=btn.closest('.output-section');
+  base.querySelectorAll('.out-tab').forEach(t=>t.classList.remove('active'));
+  base.querySelectorAll('.out-tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById((tab==='parsed'?'parsed':'raw-out')+'-'+tool+(tab==='raw'?'':'')).closest('.out-tab-content').classList.add('active');
+  // simpler:
+  base.querySelectorAll('.out-tab-content').forEach(c=>{
+    if((tab==='parsed' && c.id==='parsed-'+tool)||(tab==='raw' && c.id==='raw-'+tool)) c.classList.add('active');
+  });
+}
+
+const SUBTOOLS = {
+  discover:[
+    {name:'theHarvester',func:'Emails, subdominios, IPs desde APIs OSINT',alert:'none',cmd:t=>`theHarvester -d ${t} -b all`},
+    {name:'DNSRecon',func:'Registros DNS: A, AAAA, MX, NS, TXT, SOA, AXFR',alert:'low',cmd:t=>`dnsrecon -d ${t}`},
+    {name:'WHOIS',func:'Propietario, fechas y nameservers del dominio',alert:'none',cmd:t=>`whois ${t}`},
+    {name:'WafW00f',func:'Detecta y fingerprinta WAFs con peticiones HTTP',alert:'med',cmd:t=>`wafw00f https://${t}`},
+    {name:'WhatWeb',func:'Identifica CMS, frameworks y versiones del servidor',alert:'low',cmd:t=>`whatweb ${t}`},
+    {name:'Traceroute',func:'Mapea la ruta de red hasta el objetivo',alert:'low',cmd:t=>`traceroute ${t}`},
+    {name:'Nmap top1000',func:'Escaneo SYN de los 1000 puertos más comunes',alert:'high',cmd:t=>`nmap -sS -T3 ${t}`},
+    {name:'Nmap + versiones',func:'Detección de servicios y versiones exactas',alert:'high',cmd:t=>`nmap -sV -T3 ${t}`},
+    {name:'Nmap + NSE scripts',func:'Scripts NSE automáticos de reconocimiento',alert:'high',cmd:t=>`nmap -sC -sV -T3 ${t}`},
+    {name:'enum4linux',func:'Enumera usuarios, shares y políticas SMB',alert:'high',cmd:t=>`enum4linux ${t}`},
+    {name:'smbclient',func:'Lista recursos compartidos SMB del objetivo',alert:'med',cmd:t=>`smbclient -L ${t} -N`},
+    {name:'ike-scan',func:'Detecta y fingerprinta gateways VPN IPsec',alert:'med',cmd:t=>`ike-scan ${t}`},
+    {name:'Nikto',func:'5000+ peticiones buscando configs inseguros',alert:'high',cmd:t=>`nikto -h ${t}`},
+    {name:'sslscan',func:'Versiones TLS, cipher suites y certificados',alert:'med',cmd:t=>`sslscan ${t}`},
+    {name:'sslyze',func:'Análisis profundo TLS: ROBOT, Heartbleed, CCS',alert:'med',cmd:t=>`sslyze ${t}`},
+  ],
+  amass:[
+    {name:'intel',func:'Dominios de la org por WHOIS inverso y ASNs',alert:'none',cmd:t=>`amass intel -d ${t}`},
+    {name:'enum -passive',func:'Subdominios solo con fuentes OSINT, sin contacto',alert:'none',cmd:t=>`amass enum -passive -d ${t}`},
+    {name:'enum -active',func:'Enumera y valida subdominios con DNS activo',alert:'low',cmd:t=>`amass enum -active -d ${t}`},
+    {name:'enum -brute',func:'Fuerza bruta DNS con resolvers públicos',alert:'med',cmd:t=>`amass enum -brute -r 8.8.8.8,1.1.1.1 -dns-qps 30 -d ${t}`},
+    {name:'track',func:'Detecta subdominios nuevos vs escaneos anteriores',alert:'none',cmd:t=>`amass track -d ${t}`},
+    {name:'db',func:'Consulta la base de datos local de resultados',alert:'none',cmd:t=>`amass db -d ${t}`},
+  ],
+  katana:[
+    {name:'Estático',func:'Rastrea HTML sin ejecutar JS. Rápido y silencioso',alert:'low',cmd:t=>`katana -u https://${t} -rl 20 -silent`},
+    {name:'Con JS (-jc)',func:'Analiza .js buscando endpoints hardcoded',alert:'low',cmd:t=>`katana -u https://${t} -jc -rl 20 -silent`},
+    {name:'Headless',func:'Usa Chrome real para ejecutar JS antes de extraer',alert:'med',cmd:t=>`katana -u https://${t} -headless -rl 15 -c 5 -no-sandbox`},
+    {name:'robots + sitemap',func:'Lee robots.txt y sitemap.xml del objetivo',alert:'low',cmd:t=>`katana -u https://${t} -kf robotstxt,sitemapxml -rl 20 -silent`},
+    {name:'Deep crawl',func:'Crawling profundo con JS, robots y depth 5',alert:'med',cmd:t=>`katana -u https://${t} -jc -kf robotstxt,sitemapxml -rl 10 -depth 5 -silent`},
+    {name:'Con sesión',func:'Crawling autenticado con cookie de sesión',alert:'med',cmd:t=>`katana -u https://${t} -H "Cookie: session=PEGAR_AQUI" -headless -rl 10`},
+  ],
+  gitleaks:[
+    {name:'detect (dir)',func:'Escanea directorio local buscando secretos',alert:'none',cmd:_=>`gitleaks detect --source=. --report-format=json --report-path=gitleaks_report.json`},
+    {name:'git (historial)',func:'Analiza todo el historial de commits',alert:'none',cmd:_=>`gitleaks git --report-path=gitleaks_report.json .`},
+    {name:'git (6 meses)',func:'Limita el escaneo a los últimos 6 meses',alert:'none',cmd:_=>`gitleaks git --log-opts="--since=6months" --report-path=gitleaks_report.json .`},
+    {name:'git + ZIPs',func:'Escanea también archivos comprimidos del repo',alert:'none',cmd:_=>`gitleaks git --max-archive-depth=3 --report-path=gitleaks_report.json .`},
+    {name:'Reglas custom',func:'Usa reglas TOML personalizadas para tokens propios',alert:'none',cmd:_=>`gitleaks git -c custom-rules.toml --report-path=gitleaks_report.json .`},
+  ],
+  wayback:[
+    {name:'Descarga básica',func:'Descarga todo lo archivado (rate 3/s)',alert:'none',cmd:t=>`wayback_machine_downloader ${t} -d ./wayback_output -r 3`},
+    {name:'Solo configs',func:'Filtra páginas con "config" o "admin"',alert:'none',cmd:t=>`wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p config -p admin --limit-pages 200`},
+    {name:'Solo JS',func:'Descarga solo ficheros .js del histórico',alert:'none',cmd:t=>`wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p .js --limit-pages 500`},
+    {name:'Solo .env',func:'Busca ficheros .env y configuración expuestos',alert:'none',cmd:t=>`wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p .env -p .config`},
+    {name:'Prefix limitado',func:'Descarga controlada con límite de páginas',alert:'none',cmd:t=>`wayback_machine_downloader ${t} -d ./wayback_output -r 3 -m prefix --limit-pages 100`},
+  ],
+  spiderfoot:[
+    {name:'Pasivo',func:'Solo fuentes pasivas, sin contacto con el objetivo',alert:'none',cmd:t=>`spiderfoot -s ${t} -u passive -q`},
+    {name:'Footprint',func:'Huella digital moderada con contacto limitado',alert:'low',cmd:t=>`spiderfoot -s ${t} -u footprint -q -max-threads 5`},
+    {name:'DNS + WHOIS',func:'Solo módulos DNS y WHOIS, muy silencioso',alert:'none',cmd:t=>`spiderfoot -s ${t} -m sfp_dns,sfp_dnsraw,sfp_whois -q`},
+    {name:'Emails + HIBP',func:'Busca emails y verifica brechas conocidas',alert:'none',cmd:t=>`spiderfoot -s ${t} -m sfp_hunter,sfp_haveibeenpwned -q`},
+    {name:'Shodan + Censys',func:'Infraestructura expuesta en internet',alert:'none',cmd:t=>`spiderfoot -s ${t} -m sfp_shodan,sfp_censys,sfp_alienvault -q`},
+    {name:'Repos GitHub',func:'Busca repositorios GitHub del objetivo',alert:'none',cmd:t=>`spiderfoot -s ${t} -m sfp_github -q`},
+    {name:'Interfaz web',func:'Lanza SpiderFoot con UI completa en :5001',alert:'none',cmd:_=>`spiderfoot -l 127.0.0.1:5001`},
+  ],
+};
+
+function alertBadge(a){
+  const map={none:['al-none','Sin alerta'],low:['al-low','Baja'],med:['al-med','Media'],high:['al-high','Alta']};
+  const [cls,txt]=map[a]||['al-none','—'];
+  return `<span class="alert-badge ${cls}">${txt}</span>`;
+}
+
+Object.entries(SUBTOOLS).forEach(([tool,subs])=>{
+  const grid=document.getElementById('sg-'+tool);
+  if(!grid) return;
+  subs.forEach((s,i)=>{
+    const card=document.createElement('div');
+    card.className='subtool-card';
+    card.innerHTML=`<div class="sc-top"><span class="sc-name">${s.name}</span>${alertBadge(s.alert)}</div><div class="sc-func">${s.func}</div>`;
+    card.onclick=()=>selectSubtool(tool,i,card);
+    grid.appendChild(card);
+  });
+});
+
+const selectedSubtool={};
+
+function selectSubtool(tool,idx,card){
+  document.querySelectorAll(`#sg-${tool} .subtool-card`).forEach(c=>c.classList.remove('selected'));
+  card.classList.add('selected');
+  selectedSubtool[tool]=idx;
+  buildPreview(tool,idx);
+}
+
+function buildPreview(tool,idx){
+  const s=SUBTOOLS[tool][idx];
+  const t=target||'OBJETIVO';
+  const extra=document.getElementById('args-'+tool)?.value?.trim()||'';
+  const fullCmd=s.cmd(t)+(extra?' '+extra:'');
+  document.getElementById('cc-'+tool).innerHTML=`<span class="cmd-prompt">$ </span>${escHtml(fullCmd)}`;
+  document.getElementById('cp-'+tool).classList.add('show');
+}
+
+// ── PARSERS ─────────────────────────────────────────────────────────────
+function parseOutput(tool,lines){
+  const text=lines.join('\n');
+  const groups=[];
+
+  if(tool==='discover'||tool==='amass'||tool==='spiderfoot'){
+    // Emails
+    const emails=[...new Set(lines.filter(l=>l.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/))
+      .map(l=>l.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/)[0]))];
+    if(emails.length) groups.push({title:'Emails',icon:'✉️',type:'email',items:emails});
+
+    // Hosts/subdomains
+    const hosts=[...new Set(lines.filter(l=>l.match(/[a-z0-9\-]+\.[a-z0-9\-]+\.[a-z]{2,}/i)&&!l.includes('@')&&!l.includes('http'))
+      .map(l=>l.match(/[a-z0-9\-]+\.[a-z0-9\-]+\.[a-z]{2,}/i)[0])
+      .filter(h=>h.length>4&&h.includes('.')))];
+    if(hosts.length) groups.push({title:'Hosts / Subdominios',icon:'🌐',type:'host',items:hosts});
+
+    // IPs
+    const ips=[...new Set(lines.filter(l=>l.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/))
+      .map(l=>l.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/)[0]))];
+    if(ips.length) groups.push({title:'IPs',icon:'📡',type:'ip',items:ips});
+  }
+
+  if(tool==='katana'){
+    const urls=[...new Set(lines.filter(l=>l.match(/https?:\/\/[^\s]+/))
+      .map(l=>l.match(/https?:\/\/[^\s]+/)[0]))];
+    if(urls.length) groups.push({title:'URLs encontradas',icon:'🔗',type:'url',items:urls});
+  }
+
+  if(tool==='gitleaks'){
+    const secrets=lines.filter(l=>l.toLowerCase().includes('finding')||l.toLowerCase().includes('secret')||l.toLowerCase().includes('leak'));
+    if(secrets.length) groups.push({title:'Secretos detectados',icon:'🔑',type:'generic',items:secrets});
+  }
+
+  if(tool==='wayback'){
+    const files=lines.filter(l=>l.includes('Downloading')||l.includes('Saved')||l.match(/\.(js|php|html|env|config|json)/i));
+    if(files.length) groups.push({title:'Archivos descargados',icon:'📁',type:'generic',items:files});
+  }
+
+  // Ports (nmap)
+  const ports=lines.filter(l=>l.match(/\d+\/(tcp|udp)\s+(open|closed|filtered)/i));
+  if(ports.length) groups.push({title:'Puertos',icon:'🔌',type:'generic',items:ports});
+
+  return groups;
+}
+
+function renderParsed(tool,groups){
+  const container=document.getElementById('results-'+tool);
+  if(!groups.length){
+    container.innerHTML='<p style="color:var(--text3);font-size:.8rem;padding:8px 0">No se encontraron datos estructurados. Revisa el output completo.</p>';
+    return;
+  }
+  container.innerHTML=groups.map(g=>`
+    <div class="result-group">
+      <div class="rg-title">${g.icon} ${g.title} <span class="rg-count">${g.items.length}</span></div>
+      <div class="result-items">
+        ${g.items.map(item=>`<div class="result-item ${g.type}">${escHtml(item)}</div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── RUN ─────────────────────────────────────────────────────────────────
+function runTool(tool){
+  const idx=selectedSubtool[tool];
+  if(idx===undefined){
+    document.getElementById('results-'+tool).innerHTML='<p style="color:var(--red);font-size:.8rem">Selecciona una subherramienta primero.</p>';
+    return;
+  }
+  const s=SUBTOOLS[tool][idx];
+  const t=document.getElementById('targetInput').value.trim()||target;
+  const extra=document.getElementById('args-'+tool).value.trim();
+
+  if(!t&&tool!=='gitleaks'){
+    document.getElementById('results-'+tool).innerHTML='<p style="color:var(--red);font-size:.8rem">Introduce un dominio objetivo arriba.</p>';
+    return;
+  }
+
+  const fullCmd=s.cmd(t)+(extra?' '+extra:'');
+  const rawEl=document.getElementById('raw-out-'+tool);
+  rawEl.textContent='';
+
+  // Status
+  document.getElementById('sr-'+tool).style.display='flex';
+  document.getElementById('sd-'+tool).style.display='none';
+  document.getElementById('ss-'+tool).style.display='none';
+  document.getElementById('run-'+tool).disabled=true;
+  document.getElementById('stop-'+tool).style.display='inline-flex';
+  document.getElementById('results-'+tool).innerHTML='<p style="color:var(--text3);font-size:.8rem">Ejecutando...</p>';
+
+  const allLines=[];
+
+  fetch('/run',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cmd:fullCmd})
+  }).then(res=>{
+    const reader=res.body.getReader();
+    const dec=new TextDecoder();
+    function read(){
+      reader.read().then(({done,value})=>{
+        if(done){resetBtn(tool);return;}
+        dec.decode(value).split('\n').forEach(line=>{
+          if(!line.startsWith('data:'))return;
+          let msg;
+          try{msg=JSON.parse(line.slice(5).trim());}catch{return;}
+          if(msg==='[DONE]'){
+            document.getElementById('sr-'+tool).style.display='none';
+            document.getElementById('sd-'+tool).style.display='inline';
+            document.getElementById('ss-'+tool).style.display='none';
+            renderParsed(tool,parseOutput(tool,allLines));
+            resetBtn(tool);
+          } else {
+            allLines.push(msg);
+            rawEl.textContent+=msg+'\n';
+            rawEl.scrollTop=rawEl.scrollHeight;
+          }
+        });
+        read();
+      });
+    }
+    read();
+  }).catch(e=>{
+    document.getElementById('results-'+tool).innerHTML=`<p style="color:var(--red);font-size:.8rem">Error: ${e.message}</p>`;
+    resetBtn(tool);
+  });
+}
+
+function stopTool(tool){
+  resetBtn(tool);
+  document.getElementById('sr-'+tool).style.display='none';
+  document.getElementById('ss-'+tool).style.display='inline';
+  document.getElementById('ss-'+tool).textContent='Detenido';
+}
+function resetBtn(tool){
+  document.getElementById('run-'+tool).disabled=false;
+  document.getElementById('stop-'+tool).style.display='none';
+}
+function clearOut(tool){
+  document.getElementById('results-'+tool).innerHTML='<p style="color:var(--text3);font-size:.8rem;padding:8px 0">Selecciona una subherramienta y pulsa Ejecutar.</p>';
+  document.getElementById('raw-out-'+tool).textContent='// Output limpiado';
+  document.getElementById('sr-'+tool).style.display='none';
+  document.getElementById('sd-'+tool).style.display='none';
+  document.getElementById('ss-'+tool).style.display='inline';
+  document.getElementById('ss-'+tool).textContent='Listo';
+}
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
