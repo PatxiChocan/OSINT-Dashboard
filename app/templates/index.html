@@ -2,39 +2,55 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>OSINT Arsenal</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>Aletheia OSINT Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
   <div class="layout">
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-title">OSINT Arsenal</div>
-        <div class="logo-sub">Red Team Dashboard</div>
+        <div class="logo-title">ALETHEIA</div>
+        <div class="logo-sub">OSINT Dashboard</div>
       </div>
-      <div class="sidebar-section">Arsenal</div>
-      <button class="nav-btn active" onclick="show('home',this)"><span class="icon">⌂</span>Overview</button>
+
+      <div class="sidebar-section">Navegación</div>
+      <button class="nav-btn active" onclick="show('home',this)"><span class="icon">⌂</span>Inicio</button>
       <button class="nav-btn" onclick="show('plan',this)"><span class="icon">📋</span>Plan de prueba</button>
-      <button class="nav-btn" onclick="show('parallel',this)"><span class="icon">⚡</span>Lanzar en paralelo</button>
+      <button class="nav-btn" onclick="show('parallel',this)"><span class="icon">⚡</span>Modo paralelo</button>
+
       <div class="nav-divider"></div>
+
       <div class="sidebar-section">Herramientas</div>
       <button class="nav-btn" onclick="show('discover',this)"><span class="icon">🔍</span>Discover</button>
       <button class="nav-btn" onclick="show('amass',this)"><span class="icon">🌐</span>Amass</button>
       <button class="nav-btn" onclick="show('katana',this)"><span class="icon">🕷</span>Katana</button>
+
+      <!-- Ocultas para la demo
       <button class="nav-btn" onclick="show('gitleaks',this)"><span class="icon">🔑</span>GitLeaks</button>
       <button class="nav-btn" onclick="show('wayback',this)"><span class="icon">🕰</span>Wayback DL</button>
       <button class="nav-btn" onclick="show('spiderfoot',this)"><span class="icon">🕸</span>SpiderFoot</button>
-      <div class="sidebar-status"><span class="status-dot"></span>Kali Linux · localhost:5000</div>
+      -->
+
+      <div class="sidebar-status">
+        <span class="status-dot"></span>
+        Kali Linux · localhost:5000
+      </div>
     </nav>
 
     <div class="main">
       <div class="topbar">
         <span class="topbar-label">🎯 Objetivo</span>
-        <input class="target-input" id="targetInput" placeholder="ejemplo.com" oninput="updateTarget(this.value)">
+        <input
+          class="target-input"
+          id="targetInput"
+          placeholder="ej: example.com"
+          oninput="updateTarget(this.value)"
+        >
         <div class="topbar-right">
           <span class="target-chip" id="targetChip"></span>
-          <span id="clock" style="font-size:.72rem;color:var(--text3);"></span>
+          <span id="clock" class="clock-label"></span>
         </div>
       </div>
 
@@ -42,68 +58,278 @@
 
         <div class="panel active" id="panel-home">
           <div class="page-header">
-            <div class="page-title">👋 Bienvenido</div>
-            <div class="page-desc">Introduce el dominio objetivo arriba y selecciona una herramienta para empezar.</div>
+            <div class="page-title">🎯 Análisis OSINT guiado</div>
+            <div class="page-desc">
+              Introduce un dominio y ejecuta reconocimiento pasivo, enumeración y crawling desde una única interfaz.
+            </div>
           </div>
+
+          <div class="hero-box">
+            <div class="hero-box-left">
+              <div class="hero-box-title">Empieza por Discover</div>
+              <div class="hero-box-desc">
+                Es la mejor opción para la demo: agrupa comprobaciones rápidas y visibles como WHOIS, DNSRecon y WhatWeb.
+              </div>
+              <div class="hero-actions">
+                <button class="run-btn" onclick="show('discover', null)">🚀 Ir a Discover</button>
+                <button class="secondary-btn" onclick="show('plan', null)">📋 Ver plan guiado</button>
+              </div>
+            </div>
+            <div class="hero-box-right">
+              <div class="quick-steps">
+                <div class="quick-step">
+                  <span class="quick-step-num">1</span>
+                  <span class="quick-step-text">Escribe un dominio objetivo arriba</span>
+                </div>
+                <div class="quick-step">
+                  <span class="quick-step-num">2</span>
+                  <span class="quick-step-text">Abre Discover o el Plan de prueba</span>
+                </div>
+                <div class="quick-step">
+                  <span class="quick-step-num">3</span>
+                  <span class="quick-step-text">Lanza una herramienta y revisa el output</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="stats-row">
-            <div class="stat-card"><div class="stat-val">6</div><div class="stat-label">Herramientas</div></div>
-            <div class="stat-card"><div class="stat-val">40+</div><div class="stat-label">Subherramientas</div></div>
-            <div class="stat-card"><div class="stat-val">⚡</div><div class="stat-label">Modo paralelo</div></div>
-            <div class="stat-card"><div class="stat-val">📋</div><div class="stat-label">Plan de prueba</div></div>
+            <div class="stat-card">
+              <div class="stat-val">3</div>
+              <div class="stat-label">Herramientas destacadas</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">40+</div>
+              <div class="stat-label">Subcomandos preparados</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">⚡</div>
+              <div class="stat-label">Ejecución en paralelo</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">📋</div>
+              <div class="stat-label">Flujo de prueba guiado</div>
+            </div>
           </div>
+
+          <div class="section-title">Inicio rápido</div>
           <div class="home-grid">
-            <div class="home-card" onclick="show('plan',null)"><div class="home-card-icon">📋</div><div class="home-card-name">Plan de prueba</div><div class="home-card-desc">Secuencia guiada de menor a mayor impacto para maristak.com.</div></div>
-            <div class="home-card" onclick="show('parallel',null)"><div class="home-card-icon">⚡</div><div class="home-card-name">Lanzar en paralelo</div><div class="home-card-desc">Selecciona varias subherramientas y lánzalas a la vez.</div></div>
-            <div class="home-card" onclick="show('discover',null)"><div class="home-card-icon">🔍</div><div class="home-card-name">Discover</div><div class="home-card-desc">theHarvester, Nmap, DNSRecon, Nikto y más.</div><div class="home-card-tag"><span class="tag tag-mit">MIT</span></div></div>
-            <div class="home-card" onclick="show('amass',null)"><div class="home-card-icon">🌐</div><div class="home-card-name">Amass</div><div class="home-card-desc">Subdominios con +55 fuentes y tracking histórico.</div><div class="home-card-tag"><span class="tag tag-apache">Apache 2.0</span></div></div>
-            <div class="home-card" onclick="show('katana',null)"><div class="home-card-icon">🕷</div><div class="home-card-name">Katana</div><div class="home-card-desc">Crawling web estático, JS y headless.</div><div class="home-card-tag"><span class="tag tag-mit">MIT</span></div></div>
-            <div class="home-card" onclick="show('gitleaks',null)"><div class="home-card-icon">🔑</div><div class="home-card-name">GitLeaks</div><div class="home-card-desc">Secretos y credenciales en repos Git.</div><div class="home-card-tag"><span class="tag tag-mit">MIT</span></div></div>
-            <div class="home-card" onclick="show('wayback',null)"><div class="home-card-icon">🕰</div><div class="home-card-name">Wayback DL</div><div class="home-card-desc">Histórico de archive.org sin tocar el objetivo.</div><div class="home-card-tag"><span class="tag tag-mit">MIT</span></div></div>
-            <div class="home-card" onclick="show('spiderfoot',null)"><div class="home-card-icon">🕸</div><div class="home-card-name">SpiderFoot</div><div class="home-card-desc">200+ módulos OSINT con correlación automática.</div><div class="home-card-tag"><span class="tag tag-gpl">GPL v2</span></div></div>
+            <div class="home-card home-card-primary" onclick="show('discover',null)">
+              <div class="home-card-icon">🔍</div>
+              <div class="home-card-name">Discover</div>
+              <div class="home-card-desc">
+                WHOIS, DNSRecon, WhatWeb, Nmap, Nikto y otras comprobaciones rápidas para reconocimiento inicial.
+              </div>
+              <div class="home-card-tag">
+                <span class="tag tag-primary">Recomendado</span>
+              </div>
+            </div>
+
+            <div class="home-card" onclick="show('amass',null)">
+              <div class="home-card-icon">🌐</div>
+              <div class="home-card-name">Amass</div>
+              <div class="home-card-desc">
+                Enumeración de subdominios con fuentes pasivas y activas, ideal para ampliar superficie de ataque.
+              </div>
+              <div class="home-card-tag">
+                <span class="tag tag-apache">Apache 2.0</span>
+              </div>
+            </div>
+
+            <div class="home-card" onclick="show('katana',null)">
+              <div class="home-card-icon">🕷</div>
+              <div class="home-card-name">Katana</div>
+              <div class="home-card-desc">
+                Crawling web para descubrir rutas, endpoints y recursos expuestos en aplicaciones modernas.
+              </div>
+              <div class="home-card-tag">
+                <span class="tag tag-mit">MIT</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">Flujos disponibles</div>
+          <div class="home-grid">
+            <div class="home-card" onclick="show('plan',null)">
+              <div class="home-card-icon">📋</div>
+              <div class="home-card-name">Plan de prueba</div>
+              <div class="home-card-desc">
+                Secuencia guiada de menor a mayor impacto para presentar el flujo de análisis paso a paso.
+              </div>
+            </div>
+
+            <div class="home-card" onclick="show('parallel',null)">
+              <div class="home-card-icon">⚡</div>
+              <div class="home-card-name">Modo paralelo</div>
+              <div class="home-card-desc">
+                Ejecuta varias subherramientas al mismo tiempo y muestra el output unificado en una sola vista.
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="panel" id="panel-plan">
           <div class="page-header">
-            <div class="page-title">📋 Plan de prueba — maristak.com</div>
-            <div class="page-desc">Secuencia ordenada de menor a mayor impacto. Haz clic en cualquier paso para ir directamente a esa herramienta con el comando listo.</div>
+            <div class="page-title">📋 Plan de prueba</div>
+            <div class="page-desc">
+              Secuencia ordenada de menor a mayor impacto. Haz clic en cualquier paso para ir a la herramienta correspondiente con el comando preparado.
+            </div>
           </div>
+
           <div class="plan-phases">
             <div class="plan-phase">
-              <div class="phase-header"><div class="phase-num" style="background:#1a7f4b">1</div><div class="phase-title">Fase 1 — Pasivo total</div><div class="phase-desc">Sin contacto con el objetivo</div></div>
+              <div class="phase-header">
+                <div class="phase-num" style="background:#1a7f4b">1</div>
+                <div class="phase-title">Fase 1 — Pasivo total</div>
+                <div class="phase-desc">Sin contacto con el objetivo</div>
+              </div>
               <div class="plan-items">
-                <div class="plan-item" onclick="goToPlan('discover',0)"><span class="plan-item-num">1</span><span class="plan-item-name">theHarvester</span><span class="plan-item-desc">Emails, subdominios e IPs desde APIs OSINT públicas</span><span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('theHarvester -d OBJETIVO -b all','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('amass',1)"><span class="plan-item-num">2</span><span class="plan-item-name">amass enum -passive</span><span class="plan-item-desc">Subdominios desde 55+ fuentes sin contacto directo</span><span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('amass enum -passive -d OBJETIVO','amass')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',2)"><span class="plan-item-num">3</span><span class="plan-item-name">WHOIS</span><span class="plan-item-desc">Propietario, fechas y nameservers del dominio</span><span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('whois OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('wayback',0)"><span class="plan-item-num">4</span><span class="plan-item-name">Wayback básico</span><span class="plan-item-desc">Histórico completo desde archive.org</span><span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('wayback_machine_downloader OBJETIVO -d ./wayback_output -r 3','wayback')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('spiderfoot',0)"><span class="plan-item-num">5</span><span class="plan-item-name">SpiderFoot pasivo</span><span class="plan-item-desc">Correlación automática de todas las fuentes pasivas</span><span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('spiderfoot -s OBJETIVO -u passive -q','spiderfoot')">▶ Lanzar</button></div>
+                <div class="plan-item" onclick="goToPlan('discover',0)">
+                  <span class="plan-item-num">1</span>
+                  <span class="plan-item-name">theHarvester</span>
+                  <span class="plan-item-desc">Emails, subdominios e IPs desde fuentes OSINT públicas</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('theHarvester -d OBJETIVO -b all','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('amass',1)">
+                  <span class="plan-item-num">2</span>
+                  <span class="plan-item-name">amass enum -passive</span>
+                  <span class="plan-item-desc">Subdominios desde múltiples fuentes sin contacto directo</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('amass enum -passive -d OBJETIVO','amass')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',2)">
+                  <span class="plan-item-num">3</span>
+                  <span class="plan-item-name">WHOIS</span>
+                  <span class="plan-item-desc">Propietario, fechas relevantes y nameservers del dominio</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('whois OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
               </div>
             </div>
+
             <div class="plan-phase">
-              <div class="phase-header"><div class="phase-num" style="background:#1565c0">2</div><div class="phase-title">Fase 2 — Contacto mínimo</div><div class="phase-desc">Peticiones normales de navegador</div></div>
+              <div class="phase-header">
+                <div class="phase-num" style="background:#1565c0">2</div>
+                <div class="phase-title">Fase 2 — Contacto mínimo</div>
+                <div class="phase-desc">Peticiones normales de navegador</div>
+              </div>
               <div class="plan-items">
-                <div class="plan-item" onclick="goToPlan('discover',4)"><span class="plan-item-num">6</span><span class="plan-item-name">WhatWeb</span><span class="plan-item-desc">CMS, frameworks y versiones del servidor web</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('whatweb OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',13)"><span class="plan-item-num">7</span><span class="plan-item-name">sslscan</span><span class="plan-item-desc">Versiones TLS, cipher suites y certificado</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('sslscan OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',14)"><span class="plan-item-num">8</span><span class="plan-item-name">sslyze</span><span class="plan-item-desc">Análisis profundo TLS: ROBOT, Heartbleed, CCS</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('sslyze OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('katana',0)"><span class="plan-item-num">9</span><span class="plan-item-name">Katana estático</span><span class="plan-item-desc">Endpoints y rutas actuales del sitio web</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('katana -u https://OBJETIVO -rl 20 -silent','katana')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',1)"><span class="plan-item-num">10</span><span class="plan-item-name">DNSRecon</span><span class="plan-item-desc">Registros DNS completos: A, AAAA, MX, NS, TXT, SOA</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('dnsrecon -d OBJETIVO','discover')">▶ Lanzar</button></div>
+                <div class="plan-item" onclick="goToPlan('discover',4)">
+                  <span class="plan-item-num">6</span>
+                  <span class="plan-item-name">WhatWeb</span>
+                  <span class="plan-item-desc">CMS, frameworks y tecnologías visibles del servidor web</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('whatweb OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',13)">
+                  <span class="plan-item-num">7</span>
+                  <span class="plan-item-name">sslscan</span>
+                  <span class="plan-item-desc">Versiones TLS, cipher suites y certificado</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('sslscan OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',14)">
+                  <span class="plan-item-num">8</span>
+                  <span class="plan-item-name">sslyze</span>
+                  <span class="plan-item-desc">Análisis TLS más profundo sobre configuración y debilidades</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('sslyze OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('katana',0)">
+                  <span class="plan-item-num">9</span>
+                  <span class="plan-item-name">Katana estático</span>
+                  <span class="plan-item-desc">Descubrimiento de endpoints y rutas actuales del sitio</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('katana -u https://OBJETIVO -rl 20 -silent','katana')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',1)">
+                  <span class="plan-item-num">10</span>
+                  <span class="plan-item-name">DNSRecon</span>
+                  <span class="plan-item-desc">Registros DNS completos: A, AAAA, MX, NS, TXT y SOA</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('dnsrecon -d OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
               </div>
             </div>
+
             <div class="plan-phase">
-              <div class="phase-header"><div class="phase-num" style="background:#b45309">3</div><div class="phase-title">Fase 3 — Activo moderado</div><div class="phase-desc">Detectable por el objetivo</div></div>
+              <div class="phase-header">
+                <div class="phase-num" style="background:#b45309">3</div>
+                <div class="phase-title">Fase 3 — Activo moderado</div>
+                <div class="phase-desc">Detectable por el objetivo</div>
+              </div>
               <div class="plan-items">
-                <div class="plan-item" onclick="goToPlan('discover',3)"><span class="plan-item-num">11</span><span class="plan-item-name">WafW00f</span><span class="plan-item-desc">Detectar y fingerprinta WAFs activos</span><span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('wafw00f https://OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('katana',2)"><span class="plan-item-num">12</span><span class="plan-item-name">Katana headless</span><span class="plan-item-desc">JS y endpoints dinámicos con Chrome real</span><span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('katana -u https://OBJETIVO -headless -rl 15 -c 5 -no-sandbox','katana')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('amass',2)"><span class="plan-item-num">13</span><span class="plan-item-name">amass enum -active</span><span class="plan-item-desc">Valida subdominios con DNS activo</span><span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('amass enum -active -d OBJETIVO','amass')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',5)"><span class="plan-item-num">14</span><span class="plan-item-name">Traceroute</span><span class="plan-item-desc">Ruta de red hasta el objetivo</span><span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('traceroute OBJETIVO','discover')">▶ Lanzar</button></div>
+                <div class="plan-item" onclick="goToPlan('discover',3)">
+                  <span class="plan-item-num">11</span>
+                  <span class="plan-item-name">WafW00f</span>
+                  <span class="plan-item-desc">Detección y fingerprint de WAFs activos</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('wafw00f https://OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('katana',2)">
+                  <span class="plan-item-num">12</span>
+                  <span class="plan-item-name">Katana headless</span>
+                  <span class="plan-item-desc">Rutas y endpoints dinámicos usando navegador real</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('katana -u https://OBJETIVO -headless -rl 15 -c 5 -no-sandbox','katana')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('amass',2)">
+                  <span class="plan-item-num">13</span>
+                  <span class="plan-item-name">amass enum -active</span>
+                  <span class="plan-item-desc">Validación activa de subdominios y expansión de superficie</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-med">Media</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('amass enum -active -d OBJETIVO','amass')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',5)">
+                  <span class="plan-item-num">14</span>
+                  <span class="plan-item-name">Traceroute</span>
+                  <span class="plan-item-desc">Ruta de red aproximada hasta el objetivo</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-low">Baja</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('traceroute OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
               </div>
             </div>
+
             <div class="plan-phase">
-              <div class="phase-header"><div class="phase-num" style="background:#c0392b">4</div><div class="phase-title">Fase 4 — Ruidoso</div><div class="phase-desc">⚠️ Solo con autorización expresa</div></div>
+              <div class="phase-header">
+                <div class="phase-num" style="background:#c0392b">4</div>
+                <div class="phase-title">Fase 4 — Ruidoso</div>
+                <div class="phase-desc">⚠️ Solo con autorización expresa</div>
+              </div>
               <div class="plan-items">
-                <div class="plan-item" onclick="goToPlan('discover',6)"><span class="plan-item-num">15</span><span class="plan-item-name">Nmap top1000</span><span class="plan-item-desc">Puertos abiertos más comunes</span><span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nmap -sS -T3 OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',7)"><span class="plan-item-num">16</span><span class="plan-item-name">Nmap + versiones</span><span class="plan-item-desc">Servicios y versiones exactas</span><span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nmap -sV -T3 OBJETIVO','discover')">▶ Lanzar</button></div>
-                <div class="plan-item" onclick="goToPlan('discover',12)"><span class="plan-item-num">17</span><span class="plan-item-name">Nikto</span><span class="plan-item-desc">5000+ peticiones buscando configs inseguros</span><span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span><button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nikto -h OBJETIVO','discover')">▶ Lanzar</button></div>
+                <div class="plan-item" onclick="goToPlan('discover',6)">
+                  <span class="plan-item-num">15</span>
+                  <span class="plan-item-name">Nmap top1000</span>
+                  <span class="plan-item-desc">Detección de puertos abiertos más comunes</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nmap -sS -T3 OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',7)">
+                  <span class="plan-item-num">16</span>
+                  <span class="plan-item-name">Nmap + versiones</span>
+                  <span class="plan-item-desc">Servicios detectados y versiones reportadas</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nmap -sV -T3 OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
+
+                <div class="plan-item" onclick="goToPlan('discover',12)">
+                  <span class="plan-item-num">17</span>
+                  <span class="plan-item-name">Nikto</span>
+                  <span class="plan-item-desc">Búsqueda de configuraciones inseguras y exposición web</span>
+                  <span class="plan-item-alert"><span class="alert-badge al-high">Alta</span></span>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('nikto -h OBJETIVO','discover')">▶ Lanzar</button>
+                </div>
               </div>
             </div>
           </div>
@@ -111,23 +337,32 @@
 
         <div class="panel" id="panel-parallel">
           <div class="page-header">
-            <div class="page-title">⚡ Lanzar en paralelo</div>
-            <div class="page-desc">Marca las subherramientas que quieras ejecutar a la vez y pulsa Lanzar. Los resultados aparecen abajo con etiquetas de color.</div>
+            <div class="page-title">⚡ Modo paralelo</div>
+            <div class="page-desc">
+              Selecciona varias subherramientas para ejecutarlas a la vez y visualizar el output unificado abajo.
+            </div>
           </div>
-          <div id="parallel-subtool-grid" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;"></div>
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
-            <span id="parallel-count" style="font-size:.78rem;color:#7c3aed;font-weight:600;">0 seleccionadas</span>
+
+          <div id="parallel-subtool-grid" class="parallel-subtool-grid"></div>
+
+          <div class="parallel-actions">
+            <span id="parallel-count" class="parallel-count-label">0 seleccionadas</span>
             <button class="launch-btn" id="launch-parallel-btn" onclick="launchParallel()" disabled>⚡ Lanzar seleccionadas</button>
             <button class="cancel-parallel-btn" onclick="clearParallel()">Limpiar</button>
           </div>
+
           <div class="output-section">
-            <div class="output-header"><span class="output-title">Output unificado</span><button class="clr-btn" onclick="document.getElementById('parallel-out').innerHTML=''">Limpiar</button></div>
-            <div class="parallel-output" id="parallel-out"><span style="color:var(--text3);font-size:.8rem">Selecciona herramientas arriba y pulsa Lanzar.</span></div>
+            <div class="output-header">
+              <span class="output-title">Output unificado</span>
+              <button class="clr-btn" onclick="document.getElementById('parallel-out').innerHTML=''">Limpiar</button>
+            </div>
+            <div class="parallel-output" id="parallel-out">
+              <span class="empty-output-text">Selecciona herramientas arriba y pulsa Lanzar.</span>
+            </div>
           </div>
         </div>
 
         <div id="tool-panels"></div>
-
       </div>
     </div>
   </div>

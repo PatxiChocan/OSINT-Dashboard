@@ -1,268 +1,383 @@
+const UI_TEXT = {
+  emptySummary: 'Selecciona una subherramienta y pulsa Ejecutar.',
+  emptyParallel: 'Selecciona herramientas arriba y pulsa Lanzar.',
+  emptyStructured: 'No se encontraron datos estructurados. Revisa el output completo.',
+  missingCommand: 'Selecciona una subherramienta o escribe un comando.',
+  missingTarget: 'Introduce un objetivo real arriba antes de ejecutar.',
+  running: 'Ejecutando...',
+  runningFromPlan: 'Ejecutando desde plan...'
+};
+
 setInterval(() => {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString('es-ES');
+  const clock = document.getElementById('clock');
+  if (clock) {
+    clock.textContent = new Date().toLocaleTimeString('es-ES');
+  }
 }, 1000);
 
 let target = '';
-
 const runningRequests = {};
-
-function updateTarget(v) {
-  target = v;
-  const chip = document.getElementById('targetChip');
-  chip.textContent = '🎯 ' + v;
-  chip.style.display = v ? 'inline' : 'none';
-
-  Object.keys(selectedSubtool).forEach(t => {
-    if (selectedSubtool[t] !== undefined) {
-      buildPreview(t, selectedSubtool[t]);
-    }
-  });
-}
-
-function show(id, btn) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
-  const p = document.getElementById('panel-' + id);
-  if (p) p.classList.add('active');
-
-  if (btn) {
-    btn.classList.add('active');
-  } else {
-    const b = [...document.querySelectorAll('.nav-btn')].find(b =>
-      b.textContent.trim().toLowerCase().includes(id.toLowerCase())
-    );
-    if (b) b.classList.add('active');
-  }
-}
+const selectedSubtool = {};
 
 const TOOL_COLORS = {
-  discover:  { bg:'#fff7ed', color:'#c2410c', border:'#fed7aa' },
-  amass:     { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
-  katana:    { bg:'#f5f3ff', color:'#6d28d9', border:'#ddd6fe' },
-  gitleaks:  { bg:'#fdf4ff', color:'#86198f', border:'#f0abfc' },
-  wayback:   { bg:'#ecfdf5', color:'#065f46', border:'#6ee7b7' },
-  spiderfoot:{ bg:'#fef2f2', color:'#991b1b', border:'#fecaca' },
+  discover: { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+  amass: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  katana: { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' }
 };
 
 const SUBTOOLS = {
   discover: [
-    { name:'theHarvester', func:'Emails, subdominios, IPs desde APIs OSINT', alert:'none', cmd:t => `theHarvester -d ${t} -b all` },
-    { name:'DNSRecon', func:'Registros DNS: A, AAAA, MX, NS, TXT, SOA', alert:'low', cmd:t => `dnsrecon -d ${t}` },
-    { name:'WHOIS', func:'Propietario, fechas y nameservers', alert:'none', cmd:t => `whois ${t}` },
-    { name:'WafW00f', func:'Detecta y fingerprinta WAFs', alert:'med', cmd:t => `wafw00f https://${t}` },
-    { name:'WhatWeb', func:'CMS, frameworks y versiones del servidor', alert:'low', cmd:t => `whatweb ${t}` },
-    { name:'Traceroute', func:'Ruta de red hasta el objetivo', alert:'low', cmd:t => `traceroute ${t}` },
-    { name:'Nmap top1000', func:'SYN scan de los 1000 puertos más comunes', alert:'high', cmd:t => `nmap -sS -T3 ${t}` },
-    { name:'Nmap + versiones', func:'Detección de servicios y versiones', alert:'high', cmd:t => `nmap -sV -T3 ${t}` },
-    { name:'Nmap + NSE', func:'Scripts NSE automáticos de reconocimiento', alert:'high', cmd:t => `nmap -sC -sV -T3 ${t}` },
-    { name:'enum4linux', func:'Usuarios, shares y políticas SMB', alert:'high', cmd:t => `enum4linux ${t}` },
-    { name:'smbclient', func:'Recursos compartidos SMB', alert:'med', cmd:t => `smbclient -L ${t} -N` },
-    { name:'ike-scan', func:'Gateways VPN IPsec', alert:'med', cmd:t => `ike-scan ${t}` },
-    { name:'Nikto', func:'5000+ peticiones buscando configs inseguros', alert:'high', cmd:t => `nikto -h ${t}` },
-    { name:'sslscan', func:'Versiones TLS, cipher suites y certificados', alert:'med', cmd:t => `sslscan ${t}` },
-    { name:'sslyze', func:'Análisis profundo TLS: ROBOT, Heartbleed', alert:'med', cmd:t => `sslyze ${t}` },
+    { name: 'theHarvester', func: 'Emails, subdominios, IPs desde APIs OSINT', alert: 'none', cmd: t => `theHarvester -d ${t} -b all` },
+    { name: 'DNSRecon', func: 'Registros DNS: A, AAAA, MX, NS, TXT, SOA', alert: 'low', cmd: t => `dnsrecon -d ${t}` },
+    { name: 'WHOIS', func: 'Propietario, fechas y nameservers', alert: 'none', cmd: t => `whois ${t}` },
+    { name: 'WafW00f', func: 'Detecta y fingerprinta WAFs', alert: 'med', cmd: t => `wafw00f https://${t}` },
+    { name: 'WhatWeb', func: 'CMS, frameworks y versiones del servidor', alert: 'low', cmd: t => `timeout 20 whatweb --no-errors ${t}` },
+    { name: 'Traceroute', func: 'Ruta de red hasta el objetivo', alert: 'low', cmd: t => `traceroute ${t}` },
+    { name: 'Nmap top1000', func: 'SYN scan de los 1000 puertos más comunes', alert: 'high', cmd: t => `nmap -sS -T3 ${t}` },
+    { name: 'Nmap + versiones', func: 'Detección de servicios y versiones', alert: 'high', cmd: t => `nmap -sV -T3 ${t}` },
+    { name: 'Nmap + NSE', func: 'Scripts NSE automáticos de reconocimiento', alert: 'high', cmd: t => `nmap -sC -sV -T3 ${t}` },
+    { name: 'enum4linux', func: 'Usuarios, shares y políticas SMB', alert: 'high', cmd: t => `enum4linux ${t}` },
+    { name: 'smbclient', func: 'Recursos compartidos SMB', alert: 'med', cmd: t => `smbclient -L ${t} -N` },
+    { name: 'ike-scan', func: 'Gateways VPN IPsec', alert: 'med', cmd: t => `ike-scan ${t}` },
+    { name: 'Nikto', func: '5000+ peticiones buscando configs inseguros', alert: 'high', cmd: t => `nikto -h ${t}` },
+    { name: 'sslscan', func: 'Versiones TLS, cipher suites y certificados', alert: 'med', cmd: t => `sslscan ${t}` },
+    { name: 'sslyze', func: 'Análisis profundo TLS: ROBOT, Heartbleed', alert: 'med', cmd: t => `sslyze ${t}` }
   ],
   amass: [
-    { name:'intel', func:'Dominios por WHOIS inverso y ASNs', alert:'none', cmd:t => `amass intel -d ${t}` },
-    { name:'enum -passive', func:'Subdominios solo con fuentes OSINT', alert:'none', cmd:t => `amass enum -passive -d ${t}` },
-    { name:'enum -active', func:'Valida subdominios con DNS activo', alert:'low', cmd:t => `amass enum -active -d ${t}` },
-    { name:'enum -brute', func:'Fuerza bruta DNS con resolvers públicos', alert:'med', cmd:t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -dns-qps 30 -d ${t}` },
-    { name:'track', func:'Nuevos subdominios vs escaneos anteriores', alert:'none', cmd:t => `amass track -d ${t}` },
-    { name:'db', func:'Consulta base de datos local', alert:'none', cmd:t => `amass db -d ${t}` },
+    { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -d ${t}` },
+    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t}` },
+    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t}` },
+    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -dns-qps 30 -d ${t}` },
+    { name: 'track', func: 'Nuevos subdominios vs escaneos anteriores', alert: 'none', cmd: t => `amass track -d ${t}` },
+    { name: 'db', func: 'Consulta base de datos local', alert: 'none', cmd: t => `amass db -d ${t}` }
   ],
   katana: [
-    { name:'Estático', func:'Rastrea HTML sin JS', alert:'low', cmd:t => `katana -u https://${t} -rl 20 -silent` },
-    { name:'Con JS (-jc)', func:'Analiza .js buscando endpoints', alert:'low', cmd:t => `katana -u https://${t} -jc -rl 20 -silent` },
-    { name:'Headless', func:'Chrome real para ejecutar JS', alert:'med', cmd:t => `katana -u https://${t} -headless -rl 15 -c 5 -no-sandbox` },
-    { name:'robots + sitemap', func:'Lee robots.txt y sitemap.xml', alert:'low', cmd:t => `katana -u https://${t} -kf robotstxt,sitemapxml -rl 20 -silent` },
-    { name:'Deep crawl', func:'Crawling profundo depth 5', alert:'med', cmd:t => `katana -u https://${t} -jc -kf robotstxt,sitemapxml -rl 10 -depth 5 -silent` },
-    { name:'Con sesión', func:'Crawling autenticado con cookie', alert:'med', cmd:t => `katana -u https://${t} -H "Cookie: session=PEGAR_AQUI" -headless -rl 10` },
-  ],
-  gitleaks: [
-    { name:'detect (dir)', func:'Escanea directorio local', alert:'none', cmd:_ => `gitleaks detect --source=. --report-format=json --report-path=gitleaks_report.json` },
-    { name:'git (historial)', func:'Todo el historial de commits', alert:'none', cmd:_ => `gitleaks git --report-path=gitleaks_report.json .` },
-    { name:'git (6 meses)', func:'Últimos 6 meses de commits', alert:'none', cmd:_ => `gitleaks git --log-opts="--since=6months" --report-path=gitleaks_report.json .` },
-    { name:'git + ZIPs', func:'Incluye archivos comprimidos', alert:'none', cmd:_ => `gitleaks git --max-archive-depth=3 --report-path=gitleaks_report.json .` },
-    { name:'Reglas custom', func:'Reglas TOML personalizadas', alert:'none', cmd:_ => `gitleaks git -c custom-rules.toml --report-path=gitleaks_report.json .` },
-  ],
-  wayback: [
-    { name:'Básico', func:'Descarga todo lo archivado', alert:'none', cmd:t => `wayback_machine_downloader ${t} -d ./wayback_output -r 3` },
-    { name:'Solo configs', func:'Filtra config y admin', alert:'none', cmd:t => `wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p config -p admin --limit-pages 200` },
-    { name:'Solo JS', func:'Solo ficheros .js', alert:'none', cmd:t => `wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p .js --limit-pages 500` },
-    { name:'Solo .env', func:'Ficheros .env y config expuestos', alert:'none', cmd:t => `wayback_machine_downloader ${t} -d ./wayback_output -r 2 -p .env -p .config` },
-    { name:'Prefix limitado', func:'Descarga controlada con límite', alert:'none', cmd:t => `wayback_machine_downloader ${t} -d ./wayback_output -r 3 -m prefix --limit-pages 100` },
-  ],
-  spiderfoot: [
-    { name:'Pasivo', func:'Solo fuentes pasivas', alert:'none', cmd:t => `spiderfoot -s ${t} -u passive -q` },
-    { name:'Footprint', func:'Huella digital moderada', alert:'low', cmd:t => `spiderfoot -s ${t} -u footprint -q -max-threads 5` },
-    { name:'DNS + WHOIS', func:'Solo DNS y WHOIS', alert:'none', cmd:t => `spiderfoot -s ${t} -m sfp_dns,sfp_dnsraw,sfp_whois -q` },
-    { name:'Emails + HIBP', func:'Emails y brechas conocidas', alert:'none', cmd:t => `spiderfoot -s ${t} -m sfp_hunter,sfp_haveibeenpwned -q` },
-    { name:'Shodan + Censys', func:'Infraestructura expuesta', alert:'none', cmd:t => `spiderfoot -s ${t} -m sfp_shodan,sfp_censys,sfp_alienvault -q` },
-    { name:'Repos GitHub', func:'Repositorios GitHub del objetivo', alert:'none', cmd:t => `spiderfoot -s ${t} -m sfp_github -q` },
-    { name:'Interfaz web', func:'UI completa en :5001', alert:'none', cmd:_ => `spiderfoot -l 127.0.0.1:5001` },
-  ],
+    { name: 'Estático', func: 'Rastrea HTML sin JS', alert: 'low', cmd: t => `katana -u https://${t} -rl 20 -silent` },
+    { name: 'Con JS (-jc)', func: 'Analiza .js buscando endpoints', alert: 'low', cmd: t => `katana -u https://${t} -jc -rl 20 -silent` },
+    { name: 'Headless', func: 'Chrome real para ejecutar JS', alert: 'med', cmd: t => `katana -u https://${t} -headless -rl 15 -c 5 -no-sandbox` },
+    { name: 'robots + sitemap', func: 'Lee robots.txt y sitemap.xml', alert: 'low', cmd: t => `katana -u https://${t} -kf robotstxt,sitemapxml -rl 20 -silent` },
+    { name: 'Deep crawl', func: 'Crawling profundo depth 5', alert: 'med', cmd: t => `katana -u https://${t} -jc -kf robotstxt,sitemapxml -rl 10 -depth 5 -silent` },
+    { name: 'Con sesión', func: 'Crawling autenticado con cookie', alert: 'med', cmd: t => `katana -u https://${t} -H "Cookie: session=PEGAR_AQUI" -headless -rl 10` }
+  ]
 };
 
-function alertBadge(a) {
-  const map = {
-    none:['al-none','Sin alerta'],
-    low:['al-low','Baja'],
-    med:['al-med','Media'],
-    high:['al-high','Alta']
-  };
-
-  const [cls, txt] = map[a] || ['al-none', '—'];
-  return `<span class="alert-badge ${cls}">${txt}</span>`;
-}
-
-const toolList = ['discover','amass','katana','gitleaks','wayback','spiderfoot'];
+const toolList = ['discover', 'amass', 'katana'];
 
 const toolMeta = {
-  discover:{ title:'🔍 Discover', desc:'Framework orquestador.', tags:'<span class="tag tag-mit">MIT</span><span class="tag tag-npsl">Nmap NPSL</span>' },
-  amass:{ title:'🌐 Amass', desc:'Subdominios con +55 fuentes.', tags:'<span class="tag tag-apache">Apache 2.0</span>' },
-  katana:{ title:'🕷 Katana', desc:'Crawling web.', tags:'<span class="tag tag-mit">MIT</span>' },
-  gitleaks:{ title:'🔑 GitLeaks', desc:'Secretos en repos Git.', tags:'<span class="tag tag-mit">MIT</span>' },
-  wayback:{ title:'🕰 Wayback DL', desc:'Histórico archive.org.', tags:'<span class="tag tag-mit">MIT</span>' },
-  spiderfoot:{ title:'🕸 SpiderFoot', desc:'200+ módulos OSINT.', tags:'<span class="tag tag-gpl">GPL v2</span>' },
+  discover: {
+    title: '🔍 Discover',
+    desc: 'Framework orquestador para reconocimiento inicial.',
+    tags: '<span class="tag tag-mit">MIT</span><span class="tag tag-npsl">Nmap NPSL</span>'
+  },
+  amass: {
+    title: '🌐 Amass',
+    desc: 'Enumeración de subdominios con múltiples fuentes.',
+    tags: '<span class="tag tag-apache">Apache 2.0</span>'
+  },
+  katana: {
+    title: '🕷 Katana',
+    desc: 'Crawling web estático, JS y headless.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  }
 };
 
-const container = document.getElementById('tool-panels');
-
-toolList.forEach(tool => {
-  const m = toolMeta[tool];
-  const ph = `
-    <div class="panel" id="panel-${tool}">
-      <div class="page-header">
-        <div class="page-title">${m.title} ${m.tags}</div>
-        <div class="page-desc">${m.desc}</div>
-      </div>
-      <div class="subtool-grid" id="sg-${tool}"></div>
-      <div class="terminal-box" id="tb-${tool}" style="display:none">
-        <div class="terminal-label">Terminal — edita o escribe cualquier comando</div>
-        <div class="terminal-row">
-          <span class="terminal-prompt">root@kali:~#</span>
-          <input class="terminal-input" id="cmd-${tool}" placeholder="Escribe o edita el comando..." spellcheck="false">
-        </div>
-      </div>
-      <div class="actions-row">
-        <button class="run-btn" id="run-${tool}" onclick="runTool('${tool}')">▶ Ejecutar</button>
-        <button class="stop-btn" id="stop-${tool}" onclick="stopTool('${tool}')">⬛ Parar</button>
-      </div>
-      <div class="output-section">
-        <div class="output-header"><span class="output-title">Resultados</span><button class="clr-btn" onclick="clearOut('${tool}')">Limpiar</button></div>
-        <div class="out-tabs">
-          <button class="out-tab active" onclick="switchTab('${tool}','parsed',this)">Resumen</button>
-          <button class="out-tab" onclick="switchTab('${tool}','raw',this)">Output completo</button>
-        </div>
-        <div class="out-tab-content active" id="parsed-${tool}">
-          <div class="results-area" id="results-${tool}">
-            <p style="color:var(--text3);font-size:.8rem">Selecciona una subherramienta y pulsa Ejecutar.</p>
-          </div>
-        </div>
-        <div class="out-tab-content" id="raw-${tool}">
-          <div class="raw-output" id="raw-out-${tool}"></div>
-        </div>
-        <div class="status-bar">
-          <div class="status-running" id="sr-${tool}"><div class="spinner"></div>Ejecutando...</div>
-          <div class="status-done" id="sd-${tool}">✓ Completado</div>
-          <span id="ss-${tool}">Listo</span>
-        </div>
-      </div>
-    </div>
-  `;
-  container.insertAdjacentHTML('beforeend', ph);
-
-  const grid = document.getElementById('sg-' + tool);
-  SUBTOOLS[tool].forEach((s, i) => {
-    const card = document.createElement('div');
-    card.className = 'subtool-card';
-    card.id = `card-${tool}-${i}`;
-    card.innerHTML = `<div class="sc-top"><span class="sc-name">${s.name}</span>${alertBadge(s.alert)}</div><div class="sc-func">${s.func}</div>`;
-    card.onclick = () => selectSubtool(tool, i, card);
-    grid.appendChild(card);
-  });
-});
-
-const pgrid = document.getElementById('parallel-subtool-grid');
-
-toolList.forEach(tool => {
-  const c = TOOL_COLORS[tool];
-  const sec = document.createElement('div');
-  sec.style.cssText = `background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;`;
-  sec.innerHTML = `
-    <div style="padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:.75rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;">
-      <span style="background:${c.bg};color:${c.color};border:1px solid ${c.border};padding:2px 8px;border-radius:20px;font-size:.65rem;font-weight:700;">${tool.toUpperCase()}</span>
-      ${toolMeta[tool].title.replace(/^.\s/,'')}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;padding:12px;" id="psg-${tool}"></div>
-  `;
-  pgrid.appendChild(sec);
-
-  SUBTOOLS[tool].forEach((s, i) => {
-    const card = document.createElement('div');
-    card.className = 'subtool-card';
-    card.style.cssText = 'padding-left:32px;position:relative;';
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.style.cssText = 'position:absolute;top:10px;left:10px;width:15px;height:15px;accent-color:#7c3aed;cursor:pointer;';
-    cb.onchange = () => updateParallelCount();
-    cb.dataset.tool = tool;
-    cb.dataset.idx = i;
-
-    card.appendChild(cb);
-    card.insertAdjacentHTML('beforeend', `<div class="sc-top"><span class="sc-name">${s.name}</span>${alertBadge(s.alert)}</div><div class="sc-func">${s.func}</div>`);
-    card.onclick = (e) => {
-      if (e.target !== cb) {
-        cb.checked = !cb.checked;
-        updateParallelCount();
-      }
-    };
-
-    document.getElementById('psg-' + tool).appendChild(card);
-  });
-});
-
-function updateParallelCount() {
-  const n = document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]:checked').length;
-  document.getElementById('parallel-count').textContent = n + ' seleccionada' + (n === 1 ? '' : 's');
-  document.getElementById('launch-parallel-btn').disabled = n === 0;
+function $(id) {
+  return document.getElementById(id);
 }
 
-const selectedSubtool = {};
+function escHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function makeInfoText(text, type = 'muted') {
+  const cls = type === 'error' ? 'ui-message ui-message-error' : 'ui-message';
+  return `<p class="${cls}">${escHtml(text)}</p>`;
+}
+
+function setHtml(id, html) {
+  const el = $(id);
+  if (el) el.innerHTML = html;
+}
+
+function setText(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+
+function updateTarget(value) {
+  target = value.trim();
+
+  const chip = $('targetChip');
+  if (chip) {
+    chip.textContent = `🎯 ${target}`;
+    chip.style.display = target ? 'inline-flex' : 'none';
+  }
+
+  Object.keys(selectedSubtool).forEach(tool => {
+    const idx = selectedSubtool[tool];
+    if (idx !== undefined) buildPreview(tool, idx);
+  });
+}
+
+function show(id, btn) {
+  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(button => button.classList.remove('active'));
+
+  const panel = $(`panel-${id}`);
+  if (panel) panel.classList.add('active');
+
+  if (btn) {
+    btn.classList.add('active');
+    return;
+  }
+
+  const matching = [...document.querySelectorAll('.nav-btn')].find(button =>
+    button.textContent.trim().toLowerCase().includes(id.toLowerCase())
+  );
+  if (matching) matching.classList.add('active');
+}
+
+function alertBadge(level) {
+  const map = {
+    none: ['al-none', 'Sin alerta'],
+    low: ['al-low', 'Baja'],
+    med: ['al-med', 'Media'],
+    high: ['al-high', 'Alta']
+  };
+
+  const [cls, label] = map[level] || ['al-none', '—'];
+  return `<span class="alert-badge ${cls}">${label}</span>`;
+}
+
+function buildToolPanels() {
+  const container = $('tool-panels');
+  if (!container) return;
+
+  toolList.forEach(tool => {
+    const meta = toolMeta[tool];
+    const panelHtml = `
+      <div class="panel" id="panel-${tool}">
+        <div class="page-header">
+          <div class="page-title">${meta.title} ${meta.tags}</div>
+          <div class="page-desc">${meta.desc}</div>
+        </div>
+
+        <div class="subtool-grid" id="sg-${tool}"></div>
+
+        <div class="terminal-box" id="tb-${tool}" style="display:none">
+          <div class="terminal-label">Terminal — edita o revisa el comando</div>
+          <div class="terminal-row">
+            <span class="terminal-prompt">root@kali:~#</span>
+            <input class="terminal-input" id="cmd-${tool}" placeholder="Escribe o edita el comando..." spellcheck="false">
+          </div>
+        </div>
+
+        <div class="actions-row">
+          <button class="run-btn" id="run-${tool}" onclick="runTool('${tool}')">▶ Ejecutar</button>
+          <button class="stop-btn" id="stop-${tool}" onclick="stopTool('${tool}')">⬛ Parar</button>
+        </div>
+
+        <div class="output-section">
+          <div class="output-header">
+            <span class="output-title">Resultados</span>
+            <button class="clr-btn" onclick="clearOut('${tool}')">Limpiar</button>
+          </div>
+
+          <div class="out-tabs">
+            <button class="out-tab active" onclick="switchTab('${tool}','parsed',this)">Resumen</button>
+            <button class="out-tab" onclick="switchTab('${tool}','raw',this)">Output completo</button>
+          </div>
+
+          <div class="out-tab-content active" id="parsed-${tool}">
+            <div class="results-area" id="results-${tool}">
+              ${makeInfoText(UI_TEXT.emptySummary)}
+            </div>
+          </div>
+
+          <div class="out-tab-content" id="raw-${tool}">
+            <div class="raw-output" id="raw-out-${tool}"></div>
+          </div>
+
+          <div class="status-bar">
+            <div class="status-running" id="sr-${tool}">
+              <div class="spinner"></div>
+              Ejecutando...
+            </div>
+            <div class="status-done" id="sd-${tool}">✓ Completado</div>
+            <span id="ss-${tool}">Listo</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', panelHtml);
+
+    const grid = $(`sg-${tool}`);
+    SUBTOOLS[tool].forEach((subtool, idx) => {
+      const card = document.createElement('div');
+      card.className = 'subtool-card';
+      card.id = `card-${tool}-${idx}`;
+      card.innerHTML = `
+        <div class="sc-top">
+          <span class="sc-name">${subtool.name}</span>
+          ${alertBadge(subtool.alert)}
+        </div>
+        <div class="sc-func">${subtool.func}</div>
+      `;
+      card.onclick = () => selectSubtool(tool, idx, card);
+      grid.appendChild(card);
+    });
+  });
+}
+
+function buildParallelGrid() {
+  const parallelGrid = $('parallel-subtool-grid');
+  if (!parallelGrid) return;
+
+  toolList.forEach(tool => {
+    const color = TOOL_COLORS[tool];
+    const section = document.createElement('div');
+    section.className = 'parallel-tool-section';
+
+    section.innerHTML = `
+      <div class="parallel-tool-header">
+        <span class="parallel-tool-badge"
+          style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
+          ${tool.toUpperCase()}
+        </span>
+        ${toolMeta[tool].title.replace(/^.\s/, '')}
+      </div>
+      <div class="parallel-tool-grid" id="psg-${tool}"></div>
+    `;
+
+    parallelGrid.appendChild(section);
+
+    SUBTOOLS[tool].forEach((subtool, idx) => {
+      const card = document.createElement('div');
+      card.className = 'subtool-card parallel-select-card';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'parallel-checkbox';
+      checkbox.dataset.tool = tool;
+      checkbox.dataset.idx = idx;
+      checkbox.onchange = updateParallelCount;
+
+      card.appendChild(checkbox);
+      card.insertAdjacentHTML('beforeend', `
+        <div class="sc-top">
+          <span class="sc-name">${subtool.name}</span>
+          ${alertBadge(subtool.alert)}
+        </div>
+        <div class="sc-func">${subtool.func}</div>
+      `);
+
+      card.onclick = (event) => {
+        if (event.target !== checkbox) {
+          checkbox.checked = !checkbox.checked;
+          updateParallelCount();
+        }
+      };
+
+      $(`psg-${tool}`).appendChild(card);
+    });
+  });
+}
+
+function updateParallelCount() {
+  const checked = document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]:checked').length;
+  setText('parallel-count', `${checked} seleccionada${checked === 1 ? '' : 's'}`);
+
+  const launchBtn = $('launch-parallel-btn');
+  if (launchBtn) launchBtn.disabled = checked === 0;
+}
 
 function selectSubtool(tool, idx, card) {
-  document.querySelectorAll(`#sg-${tool} .subtool-card`).forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll(`#sg-${tool} .subtool-card`).forEach(item => item.classList.remove('selected'));
   card.classList.add('selected');
   selectedSubtool[tool] = idx;
   buildPreview(tool, idx);
 }
 
 function buildPreview(tool, idx) {
-  const s = SUBTOOLS[tool][idx];
-  const t = target || 'OBJETIVO';
-  const fullCmd = s.cmd(t);
-  const inp = document.getElementById('cmd-' + tool);
-  const tb = document.getElementById('tb-' + tool);
+  const subtool = SUBTOOLS[tool][idx];
+  const fullCmd = subtool.cmd(target || 'OBJETIVO');
+  const input = $(`cmd-${tool}`);
+  const box = $(`tb-${tool}`);
 
-  if (inp) {
-    inp.value = fullCmd;
-    tb.style.display = 'block';
-  }
+  if (input) input.value = fullCmd;
+  if (box) box.style.display = 'block';
 }
 
 function switchTab(tool, tab, btn) {
-  const sec = btn.closest('.output-section');
-  sec.querySelectorAll('.out-tab').forEach(t => t.classList.remove('active'));
-  sec.querySelectorAll('.out-tab-content').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
+  const section = btn.closest('.output-section');
+  section.querySelectorAll('.out-tab').forEach(item => item.classList.remove('active'));
+  section.querySelectorAll('.out-tab-content').forEach(item => item.classList.remove('active'));
 
-  if (tab === 'parsed') {
-    document.getElementById('parsed-' + tool).classList.add('active');
-  } else {
-    document.getElementById('raw-' + tool).classList.add('active');
-  }
+  btn.classList.add('active');
+  $(`${tab}-${tool}`).classList.add('active');
+}
+
+function collectWhatWebData(lines) {
+  const data = {
+    urls: [],
+    ips: [],
+    titles: [],
+    servers: [],
+    technologies: []
+  };
+
+  const urlSet = new Set();
+  const ipSet = new Set();
+  const titleSet = new Set();
+  const serverSet = new Set();
+  const techSet = new Set();
+
+  lines.forEach(line => {
+    const clean = line.trim();
+    if (!clean) return;
+
+    const urlMatch = clean.match(/^https?:\/\/[^\s\[]+/i);
+    if (urlMatch) urlSet.add(urlMatch[0]);
+
+    const ipMatch = clean.match(/IP\[([^\]]+)\]/i);
+    if (ipMatch) ipSet.add(ipMatch[1].trim());
+
+    const titleMatch = clean.match(/Title\[([^\]]+)\]/i);
+    if (titleMatch) titleSet.add(titleMatch[1].trim());
+
+    const serverMatch = clean.match(/HTTPServer\[([^\]]+)\]/i);
+    if (serverMatch) serverSet.add(serverMatch[1].trim());
+
+    const techMatches = clean.match(/\b(?:Cloudflare|WordPress|PHP|Apache|nginx|jQuery|Bootstrap|MySQL|Drupal|Joomla|IIS|OpenResty|LiteSpeed)\b/gi);
+    if (techMatches) {
+      techMatches.forEach(t => techSet.add(t));
+    }
+
+    const bracketMatches = clean.match(/[A-Za-z0-9.+_-]+\[[^\]]+\]/g) || [];
+    bracketMatches.forEach(token => {
+      if (!/^https?:\/\//i.test(token) &&
+          !/^IP\[/i.test(token) &&
+          !/^Title\[/i.test(token) &&
+          !/^Country\[/i.test(token) &&
+          !/^HTTPServer\[/i.test(token) &&
+          !/^UncommonHeaders\[/i.test(token) &&
+          !/^X-Frame-Options\[/i.test(token)) {
+        techSet.add(token);
+      }
+    });
+  });
+
+  data.urls = [...urlSet];
+  data.ips = [...ipSet];
+  data.titles = [...titleSet];
+  data.servers = [...serverSet];
+  data.technologies = [...techSet].slice(0, 20);
+
+  return data;
 }
 
 function parseOutput(tool, lines) {
@@ -270,18 +385,46 @@ function parseOutput(tool, lines) {
   const joined = lines.join('\n');
   const isWhoisOutput = /Domain Name:|Registrar:|Name Server:|WHOIS/i.test(joined);
 
-  if (['discover', 'amass', 'spiderfoot'].includes(tool)) {
+  const whatwebData = collectWhatWebData(lines);
+  const looksLikeWhatWeb = whatwebData.urls.length || whatwebData.ips.length || whatwebData.titles.length || whatwebData.servers.length || whatwebData.technologies.length;
+
+  if (looksLikeWhatWeb) {
+    if (whatwebData.urls.length) {
+      groups.push({ title: 'URLs analizadas', icon: '🔗', type: 'url', items: whatwebData.urls });
+    }
+
+    if (whatwebData.ips.length) {
+      groups.push({ title: 'IPs detectadas', icon: '📡', type: 'ip', items: whatwebData.ips });
+    }
+
+    if (whatwebData.titles.length) {
+      groups.push({ title: 'Títulos', icon: '📰', type: 'generic', items: whatwebData.titles });
+    }
+
+    if (whatwebData.servers.length) {
+      groups.push({ title: 'Servidor web', icon: '🖥️', type: 'generic', items: whatwebData.servers });
+    }
+
+    if (whatwebData.technologies.length) {
+      groups.push({ title: 'Tecnologías detectadas', icon: '🧩', type: 'generic', items: whatwebData.technologies });
+    }
+
+    return groups;
+  }
+
+  if (['discover', 'amass'].includes(tool)) {
     const emails = [...new Set(
-      lines.flatMap(l => (l.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []))
+      lines.flatMap(line => line.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [])
     )];
+
     if (emails.length) {
       groups.push({ title: 'Emails', icon: '✉️', type: 'email', items: emails });
     }
 
     let hosts = [...new Set(
-      lines.flatMap(l => (l.match(/(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}/gi) || []))
-        .map(h => h.trim().toLowerCase())
-        .filter(h => !h.match(/^\d/) && h.split('.').length >= 2 && h.length > 5)
+      lines.flatMap(line => line.match(/(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}/gi) || [])
+        .map(host => host.trim().toLowerCase())
+        .filter(host => !host.match(/^\d/) && host.split('.').length >= 2 && host.length > 5)
     )];
 
     if (isWhoisOutput) {
@@ -296,23 +439,21 @@ function parseOutput(tool, lines) {
       ]);
 
       const nsMatches = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)]
-        .map(m => m[1].trim().toLowerCase());
+        .map(match => match[1].trim().toLowerCase());
 
       const domainMatch = joined.match(/Domain Name:\s*([^\n]+)/i);
       const mainDomain = domainMatch ? domainMatch[1].trim().toLowerCase() : null;
 
-      hosts = hosts.filter(h => {
-        if (noiseHosts.has(h)) return false;
-        if (h.includes('http://') || h.includes('https://')) return false;
-        if (h.includes('/')) return false;
-        if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(h)) return false;
-        if (h.split('.').some(part => !part || part.length > 63)) return false;
+      hosts = hosts.filter(host => {
+        if (noiseHosts.has(host)) return false;
+        if (host.includes('http://') || host.includes('https://')) return false;
+        if (host.includes('/')) return false;
+        if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host)) return false;
+        if (host.split('.').some(part => !part || part.length > 63)) return false;
         return true;
       });
 
-      hosts = hosts.filter(h => {
-        return h === mainDomain || nsMatches.includes(h);
-      });
+      hosts = hosts.filter(host => host === mainDomain || nsMatches.includes(host));
     }
 
     if (hosts.length) {
@@ -320,32 +461,27 @@ function parseOutput(tool, lines) {
     }
 
     const ips = [...new Set(
-      lines.flatMap(l => (l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))
+      lines.flatMap(line => line.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [])
     )];
+
     if (ips.length) {
       groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: ips });
     }
   }
 
   if (tool === 'discover') {
-    const domainMatch =
-      joined.match(/Domain Name:\s*([^\n]+)/i);
-
-    const registrarMatch =
-      joined.match(/Registrar:\s*([^\n]+)/i);
-
-    const creationMatch =
-      joined.match(/Creation Date:\s*([^\n]+)/i);
-
+    const domainMatch = joined.match(/Domain Name:\s*([^\n]+)/i);
+    const registrarMatch = joined.match(/Registrar:\s*([^\n]+)/i);
+    const creationMatch = joined.match(/Creation Date:\s*([^\n]+)/i);
     const expiryMatch =
       joined.match(/Registry Expiry Date:\s*([^\n]+)/i) ||
       joined.match(/Registrar Registration Expiration Date:\s*([^\n]+)/i);
 
     const nsMatches = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)]
-      .map(m => m[1].trim().toLowerCase());
+      .map(match => match[1].trim().toLowerCase());
 
     const statusMatches = [...joined.matchAll(/Domain Status:\s*([^\n]+)/gi)]
-      .map(m => m[1].trim());
+      .map(match => match[1].trim());
 
     const whoisItems = [];
     if (domainMatch) whoisItems.push(`Dominio: ${domainMatch[1].trim()}`);
@@ -383,28 +519,15 @@ function parseOutput(tool, lines) {
 
   if (tool === 'katana') {
     const urls = [...new Set(
-      lines.flatMap(l => (l.match(/https?:\/\/[^\s]+/g) || []))
+      lines.flatMap(line => line.match(/https?:\/\/[^\s]+/g) || [])
     )];
+
     if (urls.length) {
       groups.push({ title: 'URLs encontradas', icon: '🔗', type: 'url', items: urls });
     }
   }
 
-  if (tool === 'gitleaks') {
-    const s = lines.filter(l => /(finding|secret|leak|RuleID|Match)/i.test(l));
-    if (s.length) {
-      groups.push({ title: 'Secretos detectados', icon: '🔑', type: 'generic', items: s });
-    }
-  }
-
-  if (tool === 'wayback') {
-    const f = lines.filter(l => /Downloading|Saved|\.(js|php|html|env|config|json)/i.test(l));
-    if (f.length) {
-      groups.push({ title: 'Archivos', icon: '📁', type: 'generic', items: f });
-    }
-  }
-
-  const ports = lines.filter(l => /\d+\/(tcp|udp)\s+(open|closed|filtered)/i.test(l));
+  const ports = lines.filter(line => /\d+\/(tcp|udp)\s+(open|closed|filtered)/i.test(line));
   if (ports.length) {
     groups.push({ title: 'Puertos', icon: '🔌', type: 'generic', items: ports });
   }
@@ -413,50 +536,79 @@ function parseOutput(tool, lines) {
 }
 
 function renderParsed(tool, groups) {
-  const el = document.getElementById('results-' + tool);
+  const container = $(`results-${tool}`);
+  if (!container) return;
 
   if (!groups.length) {
-    el.innerHTML = '<p style="color:var(--text3);font-size:.8rem">No se encontraron datos estructurados. Revisa el output completo.</p>';
+    container.innerHTML = makeInfoText(UI_TEXT.emptyStructured);
     return;
   }
 
-  el.innerHTML = groups.map(g => `
+  container.innerHTML = groups.map(group => `
     <div class="result-group">
-      <div class="rg-title">${g.icon} ${g.title} <span class="rg-count">${g.items.length}</span></div>
+      <div class="rg-title">
+        ${group.icon} ${group.title}
+        <span class="rg-count">${group.items.length}</span>
+      </div>
       <div class="result-items">
-        ${g.items.map(i => `<div class="result-item ${g.type}">${escHtml(i)}</div>`).join('')}
+        ${group.items.map(item => `<div class="result-item ${group.type}">${escHtml(item)}</div>`).join('')}
       </div>
     </div>
   `).join('');
 }
 
+function createBufferedWriter(rawOutput) {
+  let buffer = [];
+  let timer = null;
+
+  function flush() {
+    if (!rawOutput || !buffer.length) return;
+    rawOutput.textContent += buffer.join('');
+    buffer = [];
+    rawOutput.scrollTop = rawOutput.scrollHeight;
+    timer = null;
+  }
+
+  return {
+    write(text) {
+      buffer.push(text);
+      if (!timer) {
+        timer = setTimeout(flush, 120);
+      }
+    },
+    flushNow() {
+      flush();
+    }
+  };
+}
+
 function runTool(tool) {
-  const cmdEl = document.getElementById('cmd-' + tool);
-  let cmd = cmdEl ? cmdEl.value.trim() : '';
+  const input = $(`cmd-${tool}`);
+  let cmd = input ? input.value.trim() : '';
 
   if (!cmd) {
     const idx = selectedSubtool[tool];
     if (idx === undefined) {
-      document.getElementById('results-' + tool).innerHTML =
-        '<p style="color:var(--red);font-size:.8rem">Selecciona una subherramienta o escribe un comando.</p>';
+      setHtml(`results-${tool}`, makeInfoText(UI_TEXT.missingCommand, 'error'));
       return;
     }
     cmd = SUBTOOLS[tool][idx].cmd(target || 'OBJETIVO');
   }
 
   if (cmd.includes('OBJETIVO')) {
-    document.getElementById('results-' + tool).innerHTML =
-      '<p style="color:var(--red);font-size:.8rem">Introduce un objetivo real arriba antes de ejecutar.</p>';
+    setHtml(`results-${tool}`, makeInfoText(UI_TEXT.missingTarget, 'error'));
     return;
   }
 
-  const rawEl = document.getElementById('raw-out-' + tool);
-  rawEl.textContent = '';
+  const rawOutput = $(`raw-out-${tool}`);
+  if (rawOutput) rawOutput.textContent = '';
+
+  const writer = createBufferedWriter(rawOutput);
+
   setStatus(tool, 'running');
-  document.getElementById('run-' + tool).disabled = true;
-  document.getElementById('stop-' + tool).style.display = 'inline-block';
-  document.getElementById('results-' + tool).innerHTML =
-    '<p style="color:var(--text3);font-size:.8rem">Ejecutando...</p>';
+  if ($(`run-${tool}`)) $(`run-${tool}`).disabled = true;
+  if ($(`stop-${tool}`)) $(`stop-${tool}`).style.display = 'inline-block';
+  setHtml(`results-${tool}`, makeInfoText(UI_TEXT.running));
 
   const allLines = [];
   const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
@@ -467,37 +619,34 @@ function runTool(tool) {
     requestId,
     (msg) => {
       if (msg.type === 'start') {
-        rawEl.textContent += "▶ " + msg.message + "\n";
-        rawEl.scrollTop = rawEl.scrollHeight;
+        writer.write(`▶ ${msg.message}\n`);
         return;
       }
 
       if (msg.type === 'line') {
         if (msg.stream === 'stderr') {
-          rawEl.textContent += "⚠ " + msg.message + "\n";
+          writer.write(`⚠ ${msg.message}\n`);
         } else {
           allLines.push(msg.message);
-          rawEl.textContent += msg.message + "\n";
+          writer.write(`${msg.message}\n`);
         }
-        rawEl.scrollTop = rawEl.scrollHeight;
         return;
       }
 
       if (msg.type === 'exit') {
-        rawEl.textContent += "⚠ Process finished with code " + msg.message + "\n";
-        rawEl.scrollTop = rawEl.scrollHeight;
+        writer.write(`⚠ Process finished with code ${msg.message}\n`);
         return;
       }
 
       if (msg.type === 'error') {
-        document.getElementById('results-' + tool).innerHTML =
-          `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(msg.message)}</p>`;
-        rawEl.textContent += "✖ " + msg.message + "\n";
-        rawEl.scrollTop = rawEl.scrollHeight;
+        writer.flushNow();
+        setHtml(`results-${tool}`, makeInfoText(`Error: ${msg.message}`, 'error'));
+        writer.write(`✖ ${msg.message}\n`);
         return;
       }
 
       if (msg.type === 'done') {
+        writer.flushNow();
         setStatus(tool, 'done');
         renderParsed(tool, parseOutput(tool, allLines));
         resetBtn(tool);
@@ -505,8 +654,8 @@ function runTool(tool) {
       }
     },
     (err) => {
-      document.getElementById('results-' + tool).innerHTML =
-        `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(err)}</p>`;
+      writer.flushNow();
+      setHtml(`results-${tool}`, makeInfoText(`Error: ${err}`, 'error'));
       resetBtn(tool);
       delete runningRequests[tool];
     }
@@ -514,135 +663,156 @@ function runTool(tool) {
 }
 
 function launchParallel() {
-  const t = target || 'OBJETIVO';
   const checked = [...document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]:checked')];
   if (!checked.length) return;
 
-  const out = document.getElementById('parallel-out');
-  out.innerHTML = '';
-  document.getElementById('launch-parallel-btn').disabled = true;
+  const parallelOut = $('parallel-out');
+  parallelOut.innerHTML = '';
 
-  checked.forEach(cb => {
-    const tool = cb.dataset.tool;
-    const idx = parseInt(cb.dataset.idx);
-    const s = SUBTOOLS[tool][idx];
-    const cmd = s.cmd(t);
-    const c = TOOL_COLORS[tool];
+  const launchBtn = $('launch-parallel-btn');
+  if (launchBtn) launchBtn.disabled = true;
 
-    appendParallelLine(tool, `▶ Iniciando: ${cmd}`, c, true);
+  checked.forEach(checkbox => {
+    const tool = checkbox.dataset.tool;
+    const idx = parseInt(checkbox.dataset.idx, 10);
+    const subtool = SUBTOOLS[tool][idx];
+    const cmd = subtool.cmd(target || 'OBJETIVO');
+    const color = TOOL_COLORS[tool];
+
+    if (cmd.includes('OBJETIVO')) {
+      appendParallelLine(tool, `[ERROR] ${UI_TEXT.missingTarget}`, color, false);
+      return;
+    }
 
     const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
-    streamCmd(cmd, requestId, (msg) => {
-          if (msg.type === 'start') {
-      appendParallelLine(tool, `▶ Iniciando: ${msg.message}`, c, true);
-    } else if (msg.type === 'line') {
-      appendParallelLine(tool, msg.message, c, false);
-    } else if (msg.type === 'exit') {
-      appendParallelLine(tool, `⚠ Exit code: ${msg.message}`, c, false);
-    } else if (msg.type === 'error') {
-      appendParallelLine(tool, `[ERROR] ${msg.message}`, c, false);
-    } else if (msg.type === 'done') {
-      appendParallelLine(tool, '✓ Completado', c, true);
-    }
-    }, (err) => appendParallelLine(tool, '[ERROR] ' + err, c, false));
+
+    streamCmd(
+      cmd,
+      requestId,
+      (msg) => {
+        if (msg.type === 'start') {
+          appendParallelLine(tool, `▶ Iniciando: ${msg.message}`, color, true);
+        } else if (msg.type === 'line') {
+          appendParallelLine(tool, msg.stream === 'stderr' ? `⚠ ${msg.message}` : msg.message, color, false);
+        } else if (msg.type === 'exit') {
+          appendParallelLine(tool, `⚠ Exit code: ${msg.message}`, color, false);
+        } else if (msg.type === 'error') {
+          appendParallelLine(tool, `[ERROR] ${msg.message}`, color, false);
+        } else if (msg.type === 'done') {
+          appendParallelLine(tool, '✓ Completado', color, true);
+        }
+      },
+      (err) => appendParallelLine(tool, `[ERROR] ${err}`, color, false)
+    );
   });
 
   setTimeout(() => {
-    document.getElementById('launch-parallel-btn').disabled = false;
+    if (launchBtn) launchBtn.disabled = false;
   }, 1000);
 }
 
-function appendParallelLine(tool, msg, c, isHeader) {
-  const out = document.getElementById('parallel-out');
-  const div = document.createElement('div');
-  div.className = 'pline';
-  div.innerHTML = `<span class="ptag" style="background:${c.bg};color:${c.color};border:1px solid ${c.border}">${tool}</span><span class="ptext" style="${isHeader ? 'color:var(--text);font-weight:500' : ''}">${escHtml(msg)}</span>`;
-  out.appendChild(div);
-  out.scrollTop = out.scrollHeight;
+function appendParallelLine(tool, message, color, isHeader = false) {
+  const output = $('parallel-out');
+  if (!output) return;
+
+  const line = document.createElement('div');
+  line.className = 'pline';
+  line.innerHTML = `
+    <span class="ptag" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
+      ${tool}
+    </span>
+    <span class="ptext ${isHeader ? 'ptext-strong' : ''}">${escHtml(message)}</span>
+  `;
+  output.appendChild(line);
+  output.scrollTop = output.scrollHeight;
 }
 
 function clearParallel() {
-  document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]').forEach(checkbox => {
+    checkbox.checked = false;
+  });
+
   updateParallelCount();
-  document.getElementById('parallel-out').innerHTML = '<span style="color:var(--text3);font-size:.8rem">Selecciona herramientas arriba y pulsa Lanzar.</span>';
+  setHtml('parallel-out', `<span class="empty-output-text">${UI_TEXT.emptyParallel}</span>`);
 }
 
 function goToPlan(tool, idx) {
   show(tool, null);
-  const card = document.getElementById(`card-${tool}-${idx}`);
+  const card = $(`card-${tool}-${idx}`);
+
   if (card) {
     selectSubtool(tool, idx, card);
-    card.scrollIntoView({ behavior:'smooth', block:'center' });
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
 function runPlanStep(cmdTemplate, tool) {
-  const t = target || 'OBJETIVO';
-  const cmd = cmdTemplate.replace(/OBJETIVO/g, t);
-  show(tool, null);
-
-  const rawEl = document.getElementById('raw-out-' + tool);
-  if (rawEl) rawEl.textContent = '';
-
-  setStatus(tool, 'running');
-  if (document.getElementById('run-' + tool)) document.getElementById('run-' + tool).disabled = true;
-  if (document.getElementById('stop-' + tool)) document.getElementById('stop-' + tool).style.display = 'inline-block';
-  if (document.getElementById('results-' + tool)) document.getElementById('results-' + tool).innerHTML = '<p style="color:var(--text3);font-size:.8rem">Ejecutando desde plan...</p>';
-
-  const inp = document.getElementById('cmd-' + tool);
-  if (inp) {
-    inp.value = cmd;
-    document.getElementById('tb-' + tool).style.display = 'block';
+  const cmd = cmdTemplate.replace(/OBJETIVO/g, target || 'OBJETIVO');
+  if (cmd.includes('OBJETIVO')) {
+    setHtml(`results-${tool}`, makeInfoText(UI_TEXT.missingTarget, 'error'));
+    return;
   }
 
-  const allLines = [];
+  show(tool, null);
 
+  const rawOutput = $(`raw-out-${tool}`);
+  const cmdInput = $(`cmd-${tool}`);
+  const cmdBox = $(`tb-${tool}`);
+
+  if (rawOutput) rawOutput.textContent = '';
+  if (cmdInput) cmdInput.value = cmd;
+  if (cmdBox) cmdBox.style.display = 'block';
+
+  const writer = createBufferedWriter(rawOutput);
+
+  setStatus(tool, 'running');
+  if ($(`run-${tool}`)) $(`run-${tool}`).disabled = true;
+  if ($(`stop-${tool}`)) $(`stop-${tool}`).style.display = 'inline-block';
+
+  setHtml(`results-${tool}`, makeInfoText(UI_TEXT.runningFromPlan));
+
+  const allLines = [];
   const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
   runningRequests[tool] = requestId;
 
-  streamCmd(cmd, requestId, (msg) => {
-    if (msg.type === 'start') {
-      if (rawEl) {
-        rawEl.textContent += "▶ " + msg.message + '\n';
-        rawEl.scrollTop = rawEl.scrollHeight;
-      }
-      return;
-    }
-
-    if (msg.type === 'line') {
-      if (msg.stream === 'stdout') {
-        allLines.push(msg.message);
+  streamCmd(
+    cmd,
+    requestId,
+    (msg) => {
+      if (msg.type === 'start') {
+        writer.write(`▶ ${msg.message}\n`);
+        return;
       }
 
-      if (rawEl) {
-        rawEl.textContent += (msg.stream === 'stderr' ? "⚠ " : "") + msg.message + '\n';
-        rawEl.scrollTop = rawEl.scrollHeight;
+      if (msg.type === 'line') {
+        if (msg.stream === 'stdout') {
+          allLines.push(msg.message);
+        }
+        writer.write(`${msg.stream === 'stderr' ? '⚠ ' : ''}${msg.message}\n`);
+        return;
       }
-      return;
-    }
 
-    if (msg.type === 'error') {
-      if (document.getElementById('results-' + tool)) {
-        document.getElementById('results-' + tool).innerHTML =
-          `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(msg.message)}</p>`;
+      if (msg.type === 'error') {
+        writer.flushNow();
+        setHtml(`results-${tool}`, makeInfoText(`Error: ${msg.message}`, 'error'));
+        return;
       }
-      return;
-    }
 
-    if (msg.type === 'done') {
-      setStatus(tool, 'done');
-      renderParsed(tool, parseOutput(tool, allLines));
+      if (msg.type === 'done') {
+        writer.flushNow();
+        setStatus(tool, 'done');
+        renderParsed(tool, parseOutput(tool, allLines));
+        resetBtn(tool);
+        delete runningRequests[tool];
+      }
+    },
+    (err) => {
+      writer.flushNow();
+      setHtml(`results-${tool}`, makeInfoText(`Error: ${err}`, 'error'));
       resetBtn(tool);
       delete runningRequests[tool];
     }
-  }, (err) => {
-        if (document.getElementById('results-' + tool)) {
-      document.getElementById('results-' + tool).innerHTML =
-        `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(err)}</p>`;
-    }
-    resetBtn(tool);
-    delete runningRequests[tool];
-  });
+  );
 }
 
 function streamCmd(cmd, requestId, onData, onError) {
@@ -651,48 +821,53 @@ function streamCmd(cmd, requestId, onData, onError) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cmd, request_id: requestId })
   })
-  .then(async (res) => {
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || 'Error HTTP');
-    }
+    .then(async (res) => {
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || 'Error HTTP');
+      }
 
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buffer = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-    function read() {
-      reader.read().then(({ done, value }) => {
-        if (done) return;
+      function read() {
+        reader.read()
+          .then(({ done, value }) => {
+            if (done) return;
 
-        buffer += dec.decode(value, { stream: true });
-        const chunks = buffer.split('\n\n');
-        buffer = chunks.pop();
+            buffer += decoder.decode(value, { stream: true });
+            const chunks = buffer.split('\n\n');
+            buffer = chunks.pop();
 
-        chunks.forEach(chunk => {
-          const line = chunk.split('\n').find(l => l.startsWith('data:'));
-          if (!line) return;
+            chunks.forEach(chunk => {
+              const line = chunk.split('\n').find(item => item.startsWith('data:'));
+              if (!line) return;
 
-          try {
-            const msg = JSON.parse(line.slice(5).trim());
-            onData(msg);
-          } catch (_) {}
-        });
+              try {
+                const msg = JSON.parse(line.slice(5).trim());
+                onData(msg);
+              } catch (_) {}
+            });
 
-        read();
-      }).catch(e => onError(e.message));
-    }
+            read();
+          })
+          .catch(err => onError(err.message));
+      }
 
-    read();
-  })
-  .catch(e => onError(e.message));
+      read();
+    })
+    .catch(err => onError(err.message));
 }
 
 function setStatus(tool, state) {
-  document.getElementById('sr-' + tool).style.display = state === 'running' ? 'flex' : 'none';
-  document.getElementById('sd-' + tool).style.display = state === 'done' ? 'inline' : 'none';
-  const ss = document.getElementById('ss-' + tool);
-  ss.style.display = state === 'running' || state === 'done' ? 'none' : 'inline';
+  const running = $(`sr-${tool}`);
+  const done = $(`sd-${tool}`);
+  const idle = $(`ss-${tool}`);
+
+  if (running) running.style.display = state === 'running' ? 'flex' : 'none';
+  if (done) done.style.display = state === 'done' ? 'inline' : 'none';
+  if (idle) idle.style.display = state === 'running' || state === 'done' ? 'none' : 'inline';
 }
 
 function stopTool(tool) {
@@ -700,10 +875,12 @@ function stopTool(tool) {
 
   if (!requestId) {
     resetBtn(tool);
-    const ss = document.getElementById('ss-' + tool);
-    document.getElementById('sr-' + tool).style.display = 'none';
-    ss.style.display = 'inline';
-    ss.textContent = 'Detenido';
+    const idle = $(`ss-${tool}`);
+    if ($(`sr-${tool}`)) $(`sr-${tool}`).style.display = 'none';
+    if (idle) {
+      idle.style.display = 'inline';
+      idle.textContent = 'Detenido';
+    }
     return;
   }
 
@@ -711,32 +888,38 @@ function stopTool(tool) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ request_id: requestId })
-  })
-  .finally(() => {
+  }).finally(() => {
     resetBtn(tool);
-    const ss = document.getElementById('ss-' + tool);
-    document.getElementById('sr-' + tool).style.display = 'none';
-    document.getElementById('sd-' + tool).style.display = 'none';
-    ss.style.display = 'inline';
-    ss.textContent = 'Detenido';
+
+    const running = $(`sr-${tool}`);
+    const done = $(`sd-${tool}`);
+    const idle = $(`ss-${tool}`);
+
+    if (running) running.style.display = 'none';
+    if (done) done.style.display = 'none';
+    if (idle) {
+      idle.style.display = 'inline';
+      idle.textContent = 'Detenido';
+    }
+
     delete runningRequests[tool];
   });
 }
 
 function resetBtn(tool) {
-  if (document.getElementById('run-' + tool)) document.getElementById('run-' + tool).disabled = false;
-  if (document.getElementById('stop-' + tool)) document.getElementById('stop-' + tool).style.display = 'none';
+  const runBtn = $(`run-${tool}`);
+  const stopBtn = $(`stop-${tool}`);
+
+  if (runBtn) runBtn.disabled = false;
+  if (stopBtn) stopBtn.style.display = 'none';
 }
 
 function clearOut(tool) {
-  document.getElementById('results-' + tool).innerHTML = '<p style="color:var(--text3);font-size:.8rem;padding:4px 0">Selecciona una subherramienta y pulsa Ejecutar.</p>';
-  document.getElementById('raw-out-' + tool).textContent = '';
+  setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptySummary));
+  setText(`raw-out-${tool}`, '');
   setStatus(tool, 'idle');
 }
 
-function escHtml(s) {
-  return String(s)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
-}
+buildToolPanels();
+buildParallelGrid();
+updateParallelCount();
