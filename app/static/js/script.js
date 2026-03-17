@@ -4,6 +4,8 @@ setInterval(() => {
 
 let target = '';
 
+const runningRequests = {};
+
 function updateTarget(v) {
   target = v;
   const chip = document.getElementById('targetChip');
@@ -435,14 +437,16 @@ function runTool(tool) {
   if (!cmd) {
     const idx = selectedSubtool[tool];
     if (idx === undefined) {
-      document.getElementById('results-' + tool).innerHTML = '<p style="color:var(--red);font-size:.8rem">Selecciona una subherramienta o escribe un comando.</p>';
+      document.getElementById('results-' + tool).innerHTML =
+        '<p style="color:var(--red);font-size:.8rem">Selecciona una subherramienta o escribe un comando.</p>';
       return;
     }
     cmd = SUBTOOLS[tool][idx].cmd(target || 'OBJETIVO');
   }
 
-  if (!target && tool !== 'gitleaks' && !cmd.includes(' ')) {
-    document.getElementById('results-' + tool).innerHTML = '<p style="color:var(--red);font-size:.8rem">Introduce un dominio objetivo arriba.</p>';
+  if (cmd.includes('OBJETIVO')) {
+    document.getElementById('results-' + tool).innerHTML =
+      '<p style="color:var(--red);font-size:.8rem">Introduce un objetivo real arriba antes de ejecutar.</p>';
     return;
   }
 
@@ -451,45 +455,62 @@ function runTool(tool) {
   setStatus(tool, 'running');
   document.getElementById('run-' + tool).disabled = true;
   document.getElementById('stop-' + tool).style.display = 'inline-block';
-  document.getElementById('results-' + tool).innerHTML = '<p style="color:var(--text3);font-size:.8rem">Ejecutando...</p>';
+  document.getElementById('results-' + tool).innerHTML =
+    '<p style="color:var(--text3);font-size:.8rem">Ejecutando...</p>';
 
   const allLines = [];
+  const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+  runningRequests[tool] = requestId;
 
-  streamCmd(cmd,(msg)=>{
+  streamCmd(
+    cmd,
+    requestId,
+    (msg) => {
+      if (msg.type === 'start') {
+        rawEl.textContent += "▶ " + msg.message + "\n";
+        rawEl.scrollTop = rawEl.scrollHeight;
+        return;
+      }
 
-  if(msg.startsWith('[START]')){
-    rawEl.textContent += "▶ " + msg.replace('[START] ','') + "\n";
-    rawEl.scrollTop = rawEl.scrollHeight;
-    return;
-  }
+      if (msg.type === 'line') {
+        if (msg.stream === 'stderr') {
+          rawEl.textContent += "⚠ " + msg.message + "\n";
+        } else {
+          allLines.push(msg.message);
+          rawEl.textContent += msg.message + "\n";
+        }
+        rawEl.scrollTop = rawEl.scrollHeight;
+        return;
+      }
 
-  if(msg.startsWith('[stderr]')){
-    rawEl.textContent += "⚠ " + msg.replace('[stderr] ','') + "\n";
-    rawEl.scrollTop = rawEl.scrollHeight;
-    return;
-  }
+      if (msg.type === 'exit') {
+        rawEl.textContent += "⚠ Process finished with code " + msg.message + "\n";
+        rawEl.scrollTop = rawEl.scrollHeight;
+        return;
+      }
 
-  if(msg.startsWith('[EXIT CODE]')){
-    rawEl.textContent += "⚠ Process finished with code " + msg.replace('[EXIT CODE] ','') + "\n";
-    return;
-  }
+      if (msg.type === 'error') {
+        document.getElementById('results-' + tool).innerHTML =
+          `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(msg.message)}</p>`;
+        rawEl.textContent += "✖ " + msg.message + "\n";
+        rawEl.scrollTop = rawEl.scrollHeight;
+        return;
+      }
 
-  if(msg === '[DONE]'){
-    setStatus(tool,'done');
-    renderParsed(tool,parseOutput(tool,allLines));
-    resetBtn(tool);
-    return;
-  }
-
-  allLines.push(msg);
-  rawEl.textContent += msg + "\n";
-  rawEl.scrollTop = rawEl.scrollHeight;
-
-  },(err)=>{
-    document.getElementById('results-'+tool).innerHTML=
-      `<p style="color:var(--red);font-size:.8rem">Error: ${err}</p>`;
-    resetBtn(tool);
-  });
+      if (msg.type === 'done') {
+        setStatus(tool, 'done');
+        renderParsed(tool, parseOutput(tool, allLines));
+        resetBtn(tool);
+        delete runningRequests[tool];
+      }
+    },
+    (err) => {
+      document.getElementById('results-' + tool).innerHTML =
+        `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(err)}</p>`;
+      resetBtn(tool);
+      delete runningRequests[tool];
+    }
+  );
 }
 
 function launchParallel() {
@@ -510,12 +531,19 @@ function launchParallel() {
 
     appendParallelLine(tool, `▶ Iniciando: ${cmd}`, c, true);
 
-    streamCmd(cmd, (msg) => {
-      if (msg === '[DONE]') {
-        appendParallelLine(tool, '✓ Completado', c, true);
-      } else {
-        appendParallelLine(tool, msg, c, false);
-      }
+    const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    streamCmd(cmd, requestId, (msg) => {
+          if (msg.type === 'start') {
+      appendParallelLine(tool, `▶ Iniciando: ${msg.message}`, c, true);
+    } else if (msg.type === 'line') {
+      appendParallelLine(tool, msg.message, c, false);
+    } else if (msg.type === 'exit') {
+      appendParallelLine(tool, `⚠ Exit code: ${msg.message}`, c, false);
+    } else if (msg.type === 'error') {
+      appendParallelLine(tool, `[ERROR] ${msg.message}`, c, false);
+    } else if (msg.type === 'done') {
+      appendParallelLine(tool, '✓ Completado', c, true);
+    }
     }, (err) => appendParallelLine(tool, '[ERROR] ' + err, c, false));
   });
 
@@ -569,53 +597,90 @@ function runPlanStep(cmdTemplate, tool) {
 
   const allLines = [];
 
-  streamCmd(cmd, (msg) => {
-    if (msg === '[DONE]') {
+  const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+  runningRequests[tool] = requestId;
+
+  streamCmd(cmd, requestId, (msg) => {
+    if (msg.type === 'start') {
+      if (rawEl) {
+        rawEl.textContent += "▶ " + msg.message + '\n';
+        rawEl.scrollTop = rawEl.scrollHeight;
+      }
+      return;
+    }
+
+    if (msg.type === 'line') {
+      if (msg.stream === 'stdout') {
+        allLines.push(msg.message);
+      }
+
+      if (rawEl) {
+        rawEl.textContent += (msg.stream === 'stderr' ? "⚠ " : "") + msg.message + '\n';
+        rawEl.scrollTop = rawEl.scrollHeight;
+      }
+      return;
+    }
+
+    if (msg.type === 'error') {
+      if (document.getElementById('results-' + tool)) {
+        document.getElementById('results-' + tool).innerHTML =
+          `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(msg.message)}</p>`;
+      }
+      return;
+    }
+
+    if (msg.type === 'done') {
       setStatus(tool, 'done');
       renderParsed(tool, parseOutput(tool, allLines));
       resetBtn(tool);
-    } else {
-      allLines.push(msg);
-      if (rawEl) {
-        rawEl.textContent += msg + '\n';
-        rawEl.scrollTop = rawEl.scrollHeight;
-      }
+      delete runningRequests[tool];
     }
   }, (err) => {
-    if (document.getElementById('results-' + tool)) {
-      document.getElementById('results-' + tool).innerHTML = `<p style="color:var(--red);font-size:.8rem">Error: ${err}</p>`;
+        if (document.getElementById('results-' + tool)) {
+      document.getElementById('results-' + tool).innerHTML =
+        `<p style="color:var(--red);font-size:.8rem">Error: ${escHtml(err)}</p>`;
     }
     resetBtn(tool);
+    delete runningRequests[tool];
   });
 }
 
-function streamCmd(cmd, onData, onError) {
+function streamCmd(cmd, requestId, onData, onError) {
   fetch('/run', {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify({ cmd })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd, request_id: requestId })
   })
-  .then(res => {
+  .then(async (res) => {
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(txt || 'Error HTTP');
+    }
+
     const reader = res.body.getReader();
     const dec = new TextDecoder();
+    let buffer = '';
 
     function read() {
       reader.read().then(({ done, value }) => {
         if (done) return;
 
-        dec.decode(value).split('\n').forEach(line => {
-          if (!line.startsWith('data:')) return;
-          let msg;
+        buffer += dec.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop();
+
+        chunks.forEach(chunk => {
+          const line = chunk.split('\n').find(l => l.startsWith('data:'));
+          if (!line) return;
+
           try {
-            msg = JSON.parse(line.slice(5).trim());
-          } catch {
-            return;
-          }
-          onData(msg);
+            const msg = JSON.parse(line.slice(5).trim());
+            onData(msg);
+          } catch (_) {}
         });
 
         read();
-      });
+      }).catch(e => onError(e.message));
     }
 
     read();
@@ -631,11 +696,31 @@ function setStatus(tool, state) {
 }
 
 function stopTool(tool) {
-  resetBtn(tool);
-  const ss = document.getElementById('ss-' + tool);
-  document.getElementById('sr-' + tool).style.display = 'none';
-  ss.style.display = 'inline';
-  ss.textContent = 'Detenido';
+  const requestId = runningRequests[tool];
+
+  if (!requestId) {
+    resetBtn(tool);
+    const ss = document.getElementById('ss-' + tool);
+    document.getElementById('sr-' + tool).style.display = 'none';
+    ss.style.display = 'inline';
+    ss.textContent = 'Detenido';
+    return;
+  }
+
+  fetch('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId })
+  })
+  .finally(() => {
+    resetBtn(tool);
+    const ss = document.getElementById('ss-' + tool);
+    document.getElementById('sr-' + tool).style.display = 'none';
+    document.getElementById('sd-' + tool).style.display = 'none';
+    ss.style.display = 'inline';
+    ss.textContent = 'Detenido';
+    delete runningRequests[tool];
+  });
 }
 
 function resetBtn(tool) {
