@@ -8,6 +8,33 @@ const UI_TEXT = {
   runningFromPlan: 'Ejecutando desde plan...'
 };
 
+// ── Elapsed timer per tool ────────────────────────────────────────────────────
+const _runTimers = {};
+
+function startTimer(tool) {
+  stopTimer(tool);
+  _runTimers[tool + '_start'] = Date.now();
+  _runTimers[tool] = setInterval(() => {
+    const srEl = $(`sr-${tool}`);
+    if (!srEl || srEl.style.display === 'none') return;
+    const timeEl = srEl.querySelector('.elapsed-time');
+    if (timeEl) timeEl.textContent = _fmtSecs(Math.floor((Date.now() - _runTimers[tool + '_start']) / 1000));
+  }, 500);
+}
+
+function stopTimer(tool) {
+  if (_runTimers[tool]) { clearInterval(_runTimers[tool]); delete _runTimers[tool]; }
+}
+
+function getElapsed(tool) {
+  const start = _runTimers[tool + '_start'];
+  return start ? _fmtSecs(Math.floor((Date.now() - start) / 1000)) : '';
+}
+
+function _fmtSecs(s) {
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 setInterval(() => {
   const clock = document.getElementById('clock');
   if (clock) {
@@ -18,6 +45,7 @@ setInterval(() => {
 let target = '';
 const runningRequests = {};
 const selectedSubtool = {};
+const _structuredCache = {}; // stores structured JSON until 'done' arrives
 
 const TOOL_COLORS = {
   discover: { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
@@ -27,7 +55,7 @@ const TOOL_COLORS = {
 
 const SUBTOOLS = {
   discover: [
-    { name: 'theHarvester', func: 'Emails, subdominios, IPs desde APIs OSINT', alert: 'none', cmd: t => `theHarvester -d ${t} -b all` },
+    { name: 'theHarvester', func: 'Emails, subdominios, IPs desde APIs OSINT', alert: 'none', cmd: t => `script -q -c "theHarvester -d ${t} -b baidu,certspotter,crtsh,duckduckgo,hackertarget,urlscan" /dev/null` },
     { name: 'DNSRecon', func: 'Registros DNS: A, AAAA, MX, NS, TXT, SOA', alert: 'low', cmd: t => `dnsrecon -d ${t}` },
     { name: 'WHOIS', func: 'Propietario, fechas y nameservers', alert: 'none', cmd: t => `whois ${t}` },
     { name: 'WafW00f', func: 'Detecta y fingerprinta WAFs', alert: 'med', cmd: t => `wafw00f https://${t}` },
@@ -188,7 +216,7 @@ function buildToolPanels() {
 
           <div class="out-tabs">
             <button class="out-tab active" onclick="switchTab('${tool}','parsed',this)">Resumen</button>
-            <button class="out-tab" onclick="switchTab('${tool}','raw',this)">Output completo</button>
+            <button class="out-tab" onclick="switchTab('${tool}','raw',this)">Output completo <span class="line-count-badge"></span></button>
           </div>
 
           <div class="out-tab-content active" id="parsed-${tool}">
@@ -204,9 +232,9 @@ function buildToolPanels() {
           <div class="status-bar">
             <div class="status-running" id="sr-${tool}">
               <div class="spinner"></div>
-              Ejecutando...
+              Ejecutando…&nbsp;<span class="elapsed-time">0s</span>
             </div>
-            <div class="status-done" id="sd-${tool}">✓ Completado</div>
+            <div class="status-done" id="sd-${tool}">✓ Completado <span class="elapsed-done" id="et-${tool}"></span></div>
             <span id="ss-${tool}">Listo</span>
           </div>
         </div>
@@ -239,58 +267,81 @@ function buildParallelGrid() {
 
   toolList.forEach(tool => {
     const color = TOOL_COLORS[tool];
-    const section = document.createElement('div');
-    section.className = 'parallel-tool-section';
 
-    section.innerHTML = `
-      <div class="parallel-tool-header">
-        <span class="parallel-tool-badge"
-          style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
-          ${tool.toUpperCase()}
-        </span>
-        ${toolMeta[tool].title.replace(/^.\s/, '')}
-      </div>
-      <div class="parallel-tool-grid" id="psg-${tool}"></div>
+    // Section header
+    const header = document.createElement('div');
+    header.className = 'pg-section-header';
+    header.innerHTML = `
+      <span class="pg-tool-badge" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
+        ${tool.toUpperCase()}
+      </span>
+      <span class="pg-tool-name">${toolMeta[tool].title.replace(/^.\s*/, '')}</span>
+      <button class="pg-select-all" data-tool="${tool}" onclick="toggleSelectAll('${tool}')">Seleccionar todo</button>
     `;
+    parallelGrid.appendChild(header);
 
-    parallelGrid.appendChild(section);
+    // Cards grid
+    const grid = document.createElement('div');
+    grid.className = 'pg-cards-grid';
+    grid.id = `psg-${tool}`;
+    parallelGrid.appendChild(grid);
 
     SUBTOOLS[tool].forEach((subtool, idx) => {
       const card = document.createElement('div');
-      card.className = 'subtool-card parallel-select-card';
+      card.className = 'pg-card';
+      card.dataset.tool = tool;
+      card.dataset.idx = idx;
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
-      checkbox.className = 'parallel-checkbox';
+      checkbox.className = 'pg-checkbox';
       checkbox.dataset.tool = tool;
       checkbox.dataset.idx = idx;
       checkbox.onchange = updateParallelCount;
 
-      card.appendChild(checkbox);
-      card.insertAdjacentHTML('beforeend', `
-        <div class="sc-top">
-          <span class="sc-name">${subtool.name}</span>
+      card.innerHTML = `
+        <div class="pg-card-top">
+          <span class="pg-card-name">${subtool.name}</span>
           ${alertBadge(subtool.alert)}
         </div>
-        <div class="sc-func">${subtool.func}</div>
-      `);
+        <div class="pg-card-desc">${subtool.func}</div>
+      `;
+      card.insertBefore(checkbox, card.firstChild);
 
-      card.onclick = (event) => {
-        if (event.target !== checkbox) {
+      card.onclick = (e) => {
+        if (e.target !== checkbox) {
           checkbox.checked = !checkbox.checked;
           updateParallelCount();
         }
+        card.classList.toggle('pg-selected', checkbox.checked);
+      };
+      checkbox.onchange = () => {
+        card.classList.toggle('pg-selected', checkbox.checked);
+        updateParallelCount();
       };
 
-      $(`psg-${tool}`).appendChild(card);
+      grid.appendChild(card);
     });
   });
 }
 
-function updateParallelCount() {
-  const checked = document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]:checked').length;
-  setText('parallel-count', `${checked} seleccionada${checked === 1 ? '' : 's'}`);
+function toggleSelectAll(tool) {
+  const checkboxes = document.querySelectorAll(`#psg-${tool} .pg-checkbox`);
+  const allChecked = [...checkboxes].every(cb => cb.checked);
+  checkboxes.forEach(cb => {
+    cb.checked = !allChecked;
+    const card = cb.closest('.pg-card');
+    if (card) card.classList.toggle('pg-selected', cb.checked);
+  });
+  // update button label
+  const btn = document.querySelector(`.pg-select-all[data-tool="${tool}"]`);
+  if (btn) btn.textContent = allChecked ? 'Seleccionar todo' : 'Deseleccionar todo';
+  updateParallelCount();
+}
 
+function updateParallelCount() {
+  const checked = document.querySelectorAll('#parallel-subtool-grid .pg-checkbox:checked').length;
+  setText('parallel-count', `${checked} seleccionada${checked === 1 ? '' : 's'}`);
   const launchBtn = $('launch-parallel-btn');
   if (launchBtn) launchBtn.disabled = checked === 0;
 }
@@ -383,156 +434,248 @@ function collectWhatWebData(lines) {
 function parseOutput(tool, lines) {
   const groups = [];
   const joined = lines.join('\n');
-  const isWhoisOutput = /Domain Name:|Registrar:|Name Server:|WHOIS/i.test(joined);
 
+  // ── theHarvester (must check BEFORE WhatWeb — its URLs trigger WhatWeb detector) ──
+  const isHarvester = lines.some(l => /\[\*\] Target:|\[\*\] Searching \w|\[\*\] Hosts found:|\[\*\] IPs found:|\[\*\] Emails found:/i.test(l));
+  if (isHarvester) {
+    const _hostRe = /^[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,}$/;
+
+    const emails = [...new Set(lines.flatMap(l =>
+      l.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []
+    ))].filter(e => !e.includes('edge-security') && !e.includes('markmonitor'));
+
+    const ips = [...new Set(lines.filter(l => {
+      const t = l.trim();
+      return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(t) || /^[0-9a-f:]+:[0-9a-f:]+$/i.test(t);
+    }).map(l => l.trim()))];
+
+    const hosts = [...new Set(lines
+      .filter(l => {
+        const t = l.trim();
+        if (!t || t.startsWith('*') || t.startsWith('http') || t.startsWith('[') ||
+            t.startsWith('-') || t.includes(' ') || t.includes('@') || t.includes('/')) return false;
+        return _hostRe.test(t.split(':')[0].trim());
+      })
+      .map(l => l.trim().split(':')[0].trim())
+    )];
+
+    const asns = [...new Set(lines.filter(l => /^AS\d+$/.test(l.trim())).map(l => l.trim()))];
+    const urls = [...new Set(lines.filter(l => /^https?:\/\//.test(l.trim())).map(l => l.trim()))];
+
+    if (emails.length) groups.push({ title: `Emails (${emails.length})`, icon: '✉️', type: 'email', items: emails });
+    if (ips.length)    groups.push({ title: `IPs (${ips.length})`, icon: '📡', type: 'ip', items: ips });
+    if (hosts.length)  groups.push({ title: `Hosts / Subdominios (${hosts.length})`, icon: '🌐', type: 'host', items: hosts });
+    if (urls.length)   groups.push({ title: `URLs interesantes (${urls.length})`, icon: '🔗', type: 'url', items: urls });
+    if (asns.length)   groups.push({ title: `ASNs (${asns.length})`, icon: '🏢', type: 'generic', items: asns });
+
+    if (groups.length) return groups;
+  }
+
+  // ── WhatWeb ──────────────────────────────────────────────────────────────
   const whatwebData = collectWhatWebData(lines);
-  const looksLikeWhatWeb = whatwebData.urls.length || whatwebData.ips.length || whatwebData.titles.length || whatwebData.servers.length || whatwebData.technologies.length;
+  const looksLikeWhatWeb = whatwebData.urls.length || whatwebData.ips.length ||
+    whatwebData.titles.length || whatwebData.servers.length || whatwebData.technologies.length;
 
   if (looksLikeWhatWeb) {
-    if (whatwebData.urls.length) {
-      groups.push({ title: 'URLs analizadas', icon: '🔗', type: 'url', items: whatwebData.urls });
-    }
-
-    if (whatwebData.ips.length) {
-      groups.push({ title: 'IPs detectadas', icon: '📡', type: 'ip', items: whatwebData.ips });
-    }
-
-    if (whatwebData.titles.length) {
-      groups.push({ title: 'Títulos', icon: '📰', type: 'generic', items: whatwebData.titles });
-    }
-
-    if (whatwebData.servers.length) {
-      groups.push({ title: 'Servidor web', icon: '🖥️', type: 'generic', items: whatwebData.servers });
-    }
-
-    if (whatwebData.technologies.length) {
-      groups.push({ title: 'Tecnologías detectadas', icon: '🧩', type: 'generic', items: whatwebData.technologies });
-    }
-
+    if (whatwebData.urls.length) groups.push({ title: 'URLs analizadas', icon: '🔗', type: 'url', items: whatwebData.urls });
+    if (whatwebData.ips.length) groups.push({ title: 'IPs detectadas', icon: '📡', type: 'ip', items: whatwebData.ips });
+    if (whatwebData.titles.length) groups.push({ title: 'Títulos', icon: '📰', type: 'generic', items: whatwebData.titles });
+    if (whatwebData.servers.length) groups.push({ title: 'Servidor web', icon: '🖥️', type: 'generic', items: whatwebData.servers });
+    if (whatwebData.technologies.length) groups.push({ title: 'Tecnologías detectadas', icon: '🧩', type: 'generic', items: whatwebData.technologies });
     return groups;
   }
 
-  if (['discover', 'amass'].includes(tool)) {
-    const emails = [...new Set(
-      lines.flatMap(line => line.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [])
-    )];
-
-    if (emails.length) {
-      groups.push({ title: 'Emails', icon: '✉️', type: 'email', items: emails });
-    }
-
-    let hosts = [...new Set(
-      lines.flatMap(line => line.match(/(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}/gi) || [])
-        .map(host => host.trim().toLowerCase())
-        .filter(host => !host.match(/^\d/) && host.split('.').length >= 2 && host.length > 5)
-    )];
-
-    if (isWhoisOutput) {
-      const noiseHosts = new Set([
-        'icann.org',
-        'www.icann.org',
-        'internic.net',
-        'wdprs.internic.net',
-        'networksolutions.com',
-        'whois.networksolutions.com',
-        'maskeddetails.com'
-      ]);
-
-      const nsMatches = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)]
-        .map(match => match[1].trim().toLowerCase());
-
-      const domainMatch = joined.match(/Domain Name:\s*([^\n]+)/i);
-      const mainDomain = domainMatch ? domainMatch[1].trim().toLowerCase() : null;
-
-      hosts = hosts.filter(host => {
-        if (noiseHosts.has(host)) return false;
-        if (host.includes('http://') || host.includes('https://')) return false;
-        if (host.includes('/')) return false;
-        if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host)) return false;
-        if (host.split('.').some(part => !part || part.length > 63)) return false;
-        return true;
-      });
-
-      hosts = hosts.filter(host => host === mainDomain || nsMatches.includes(host));
-    }
-
-    if (hosts.length) {
-      groups.push({ title: 'Hosts / Subdominios', icon: '🌐', type: 'host', items: hosts });
-    }
-
-    const ips = [...new Set(
-      lines.flatMap(line => line.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [])
-    )];
-
-    if (ips.length) {
-      groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: ips });
-    }
-  }
-
-  if (tool === 'discover') {
-    const domainMatch = joined.match(/Domain Name:\s*([^\n]+)/i);
+  // ── WHOIS (discover) ─────────────────────────────────────────────────────
+  const isWhoisOutput = /Domain Name:|Registrar:|Name Server:|WHOIS/i.test(joined);
+  if (isWhoisOutput && tool === 'discover') {
+    const domainMatch    = joined.match(/Domain Name:\s*([^\n]+)/i);
     const registrarMatch = joined.match(/Registrar:\s*([^\n]+)/i);
-    const creationMatch = joined.match(/Creation Date:\s*([^\n]+)/i);
-    const expiryMatch =
-      joined.match(/Registry Expiry Date:\s*([^\n]+)/i) ||
-      joined.match(/Registrar Registration Expiration Date:\s*([^\n]+)/i);
-
-    const nsMatches = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)]
-      .map(match => match[1].trim().toLowerCase());
-
-    const statusMatches = [...joined.matchAll(/Domain Status:\s*([^\n]+)/gi)]
-      .map(match => match[1].trim());
+    const creationMatch  = joined.match(/Creation Date:\s*([^\n]+)/i);
+    const expiryMatch    = joined.match(/Registry Expiry Date:\s*([^\n]+)/i) ||
+                           joined.match(/Registrar Registration Expiration Date:\s*([^\n]+)/i);
+    const orgMatch       = joined.match(/Registrant Organization:\s*([^\n]+)/i) ||
+                           joined.match(/org:\s*([^\n]+)/i);
+    const countryMatch   = joined.match(/Registrant Country:\s*([^\n]+)/i) ||
+                           joined.match(/country:\s*([^\n]+)/i);
+    const nsMatches      = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)].map(m => m[1].trim().toLowerCase());
+    const statusMatches  = [...joined.matchAll(/Domain Status:\s*([^\n]+)/gi)].map(m => m[1].trim());
+    const dnssecMatch    = joined.match(/DNSSEC:\s*([^\n]+)/i);
 
     const whoisItems = [];
-    if (domainMatch) whoisItems.push(`Dominio: ${domainMatch[1].trim()}`);
+    if (domainMatch)    whoisItems.push(`Dominio: ${domainMatch[1].trim()}`);
     if (registrarMatch) whoisItems.push(`Registrador: ${registrarMatch[1].trim()}`);
-    if (creationMatch) whoisItems.push(`Creado: ${creationMatch[1].trim()}`);
-    if (expiryMatch) whoisItems.push(`Expira: ${expiryMatch[1].trim()}`);
-
-    if (whoisItems.length) {
-      groups.unshift({
-        title: 'Resumen WHOIS',
-        icon: '📇',
-        type: 'generic',
-        items: whoisItems
-      });
-    }
-
-    if (nsMatches.length) {
-      groups.push({
-        title: 'Name Servers',
-        icon: '🧭',
-        type: 'host',
-        items: [...new Set(nsMatches)]
-      });
-    }
-
-    if (statusMatches.length) {
-      groups.push({
-        title: 'Estados del dominio',
-        icon: '🛡️',
-        type: 'generic',
-        items: [...new Set(statusMatches)]
-      });
-    }
+    if (orgMatch)       whoisItems.push(`Organización: ${orgMatch[1].trim()}`);
+    if (countryMatch)   whoisItems.push(`País: ${countryMatch[1].trim()}`);
+    if (creationMatch)  whoisItems.push(`Creado: ${creationMatch[1].trim()}`);
+    if (expiryMatch)    whoisItems.push(`Expira: ${expiryMatch[1].trim()}`);
+    if (dnssecMatch)    whoisItems.push(`DNSSEC: ${dnssecMatch[1].trim()}`);
+    if (whoisItems.length) groups.push({ title: 'Resumen WHOIS', icon: '📇', type: 'generic', items: whoisItems });
+    if (nsMatches.length)  groups.push({ title: 'Name Servers', icon: '🧭', type: 'host', items: [...new Set(nsMatches)] });
+    if (statusMatches.length) groups.push({ title: 'Estados del dominio', icon: '🛡️', type: 'generic', items: [...new Set(statusMatches)] });
+    return groups;
   }
 
-  if (tool === 'katana') {
-    const urls = [...new Set(
-      lines.flatMap(line => line.match(/https?:\/\/[^\s]+/g) || [])
+  // ── DNSRecon ─────────────────────────────────────────────────────────────
+  const isDNSRecon = lines.some(l => /\[\*\]\s*(A|AAAA|MX|NS|TXT|SOA|CNAME|SRV|PTR|CAA)\b/i.test(l) ||
+    /\[\+\] (DNS|Enumerating|Performing)/i.test(l));
+  if (isDNSRecon) {
+    const recTypes = { A: [], AAAA: [], MX: [], NS: [], TXT: [], SOA: [], CNAME: [], SRV: [], OTHER: [] };
+    lines.forEach(line => {
+      const m = line.match(/\[\*\]\s*(A|AAAA|MX|NS|TXT|SOA|CNAME|SRV|PTR|CAA)\s+(.+)/i);
+      if (!m) return;
+      const type = m[1].toUpperCase();
+      const val  = m[2].trim();
+      if (recTypes[type]) recTypes[type].push(val); else recTypes.OTHER.push(`${type} ${val}`);
+    });
+    const iconMap = { A:'📍', AAAA:'📍', MX:'📧', NS:'🧭', TXT:'📝', SOA:'🏛️', CNAME:'🔀', SRV:'⚙️', OTHER:'📋' };
+    const titleMap = { A:'Registros A (IPv4)', AAAA:'Registros AAAA (IPv6)', MX:'Registros MX (correo)',
+      NS:'Nameservers (NS)', TXT:'Registros TXT', SOA:'SOA', CNAME:'CNAME', SRV:'SRV', OTHER:'Otros registros' };
+    const typeMap  = { A:'ip', AAAA:'ip', NS:'host', MX:'host', CNAME:'host', TXT:'generic', SOA:'generic', SRV:'generic', OTHER:'generic' };
+    Object.entries(recTypes).forEach(([k, items]) => {
+      if (items.length) groups.push({ title: titleMap[k], icon: iconMap[k], type: typeMap[k], items });
+    });
+    // also pick up IPs from the lines
+    const ips = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (ips.length) groups.push({ title: 'IPs mencionadas', icon: '📡', type: 'ip', items: ips });
+    if (groups.length) return groups;
+  }
+
+  // ── Nmap ─────────────────────────────────────────────────────────────────
+  const nmapPorts = lines.filter(l => /\d+\/(tcp|udp)\s+(open|closed|filtered)/i.test(l));
+  if (nmapPorts.length) {
+    const open     = nmapPorts.filter(l => /\s+open\s+/i.test(l));
+    const filtered = nmapPorts.filter(l => /\s+filtered\s+/i.test(l));
+    const closed   = nmapPorts.filter(l => /\s+closed\s+/i.test(l));
+    if (open.length)     groups.push({ title: `Puertos abiertos (${open.length})`, icon: '🔓', type: 'port-open', items: open });
+    if (filtered.length) groups.push({ title: `Puertos filtrados (${filtered.length})`, icon: '🔒', type: 'port-filtered', items: filtered });
+    if (closed.length)   groups.push({ title: `Puertos cerrados (${closed.length})`, icon: '⛔', type: 'generic', items: closed });
+    // Detect OS
+    const os = lines.find(l => /OS details:|Running:|OS CPE:/i.test(l));
+    if (os) groups.push({ title: 'Sistema operativo detectado', icon: '💻', type: 'generic', items: [os.replace(/^.*?:/,'').trim()] });
+    const nmapIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (nmapIps.length) groups.push({ title: 'IPs escaneadas', icon: '📡', type: 'ip', items: nmapIps });
+    return groups;
+  }
+
+  // ── theHarvester handled at top of function ────────────────────────────
+
+  // ── Amass ────────────────────────────────────────────────────────────────
+  if (tool === 'amass') {
+    const subdomains = [...new Set(
+      lines.map(l => l.trim()).filter(l => l && /\./.test(l) && !/^\[|^Error/i.test(l))
     )];
-
-    if (urls.length) {
-      groups.push({ title: 'URLs encontradas', icon: '🔗', type: 'url', items: urls });
-    }
+    if (subdomains.length) groups.push({ title: `Subdominios (${subdomains.length})`, icon: '🌐', type: 'host', items: subdomains });
+    const ips = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (ips.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: ips });
+    if (groups.length) return groups;
   }
 
-  const ports = lines.filter(line => /\d+\/(tcp|udp)\s+(open|closed|filtered)/i.test(line));
-  if (ports.length) {
-    groups.push({ title: 'Puertos', icon: '🔌', type: 'generic', items: ports });
+  // ── Katana ───────────────────────────────────────────────────────────────
+  if (tool === 'katana') {
+    const urls = [...new Set(lines.flatMap(l => l.match(/https?:\/\/[^\s]+/g) || []))];
+    const jsUrls  = urls.filter(u => u.endsWith('.js'));
+    const apiUrls = urls.filter(u => /\/api\/|\/v[0-9]+\//.test(u));
+    const other   = urls.filter(u => !jsUrls.includes(u) && !apiUrls.includes(u));
+    if (apiUrls.length) groups.push({ title: `Endpoints API (${apiUrls.length})`, icon: '⚡', type: 'url', items: apiUrls });
+    if (jsUrls.length)  groups.push({ title: `Archivos JS (${jsUrls.length})`, icon: '📜', type: 'url', items: jsUrls });
+    if (other.length)   groups.push({ title: `Rutas / URLs (${other.length})`, icon: '🔗', type: 'url', items: other });
+    return groups;
   }
+
+  // ── Generic fallback ─────────────────────────────────────────────────────
+  const emails = [...new Set(lines.flatMap(l => l.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []))];
+  if (emails.length) groups.push({ title: 'Emails', icon: '✉️', type: 'email', items: emails });
+
+  const ips = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+  if (ips.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: ips });
+
+  const ports2 = lines.filter(l => /\d+\/(tcp|udp)\s+(open|closed|filtered)/i.test(l));
+  if (ports2.length) groups.push({ title: 'Puertos', icon: '🔌', type: 'generic', items: ports2 });
 
   return groups;
+}
+
+// ── Structured JSON renderer (from backend parse_structured_json) ─────────────
+function renderStructured(tool, data) {
+  const groups = [];
+
+  // ── theHarvester ────────────────────────────────────────────────────────
+  if (data.tool === 'theharvester') {
+    if (data.emails?.length)
+      groups.push({ title: `Emails (${data.emails.length})`, icon: '✉️', type: 'email', items: data.emails });
+    if (data.ips?.length)
+      groups.push({ title: `IPs (${data.ips.length})`, icon: '📡', type: 'ip', items: data.ips });
+    if (data.hosts?.length)
+      groups.push({ title: `Hosts / Subdominios (${data.hosts.length})`, icon: '🌐', type: 'host', items: data.hosts });
+    if (data.interesting_urls?.length)
+      groups.push({ title: `URLs interesantes (${data.interesting_urls.length})`, icon: '🔗', type: 'url', items: data.interesting_urls });
+    if (data.asns?.length)
+      groups.push({ title: `ASNs (${data.asns.length})`, icon: '🏢', type: 'generic', items: data.asns });
+  }
+
+  // ── DNSRecon ────────────────────────────────────────────────────────────
+  else if (data.tool === 'dnsrecon') {
+    const iconMap = { A:'📍', AAAA:'📍', MX:'📧', NS:'🧭', TXT:'📝', SOA:'🏛️', CNAME:'🔀', SRV:'⚙️' };
+    const typeMap  = { A:'ip', AAAA:'ip', NS:'host', MX:'host', CNAME:'host', TXT:'generic', SOA:'generic', SRV:'generic' };
+    const labelMap = { A:'Registros A (IPv4)', AAAA:'Registros AAAA (IPv6)', MX:'Registros MX',
+                       NS:'Nameservers', TXT:'Registros TXT', SOA:'SOA', CNAME:'CNAME', SRV:'SRV' };
+    Object.entries(data.records || {}).forEach(([type, items]) => {
+      if (items.length) groups.push({
+        title: labelMap[type] || type,
+        icon: iconMap[type] || '📋',
+        type: typeMap[type] || 'generic',
+        items
+      });
+    });
+  }
+
+  // ── Nmap ────────────────────────────────────────────────────────────────
+  else if (data.tool === 'nmap') {
+    if (data.ips?.length)
+      groups.push({ title: `IPs escaneadas`, icon: '📡', type: 'ip', items: data.ips });
+    if (data.ports_open?.length)
+      groups.push({ title: `Puertos abiertos (${data.ports_open.length})`, icon: '🔓', type: 'port-open',
+        items: data.ports_open.map(p => `${p.port}/${p.proto}   open   ${p.service}   ${p.version}`.trimEnd()) });
+    if (data.ports_filtered?.length)
+      groups.push({ title: `Puertos filtrados (${data.ports_filtered.length})`, icon: '🔒', type: 'port-filtered',
+        items: data.ports_filtered.map(p => `${p.port}/${p.proto}   ${p.state}   ${p.service}`.trimEnd()) });
+    if (data.os?.length)
+      groups.push({ title: 'Sistema operativo', icon: '💻', type: 'generic', items: data.os });
+  }
+
+  // ── Amass ───────────────────────────────────────────────────────────────
+  else if (data.tool === 'amass') {
+    if (data.subdomains?.length)
+      groups.push({ title: `Subdominios (${data.subdomains.length})`, icon: '🌐', type: 'host', items: data.subdomains });
+    if (data.ips?.length)
+      groups.push({ title: `IPs (${data.ips.length})`, icon: '📡', type: 'ip', items: data.ips });
+  }
+
+  if (groups.length) {
+    renderParsed(tool, groups);
+    return true;
+  }
+  return false;
+}
+
+
+function _renderPortTable(items) {
+  const rows = items.map(line => {
+    // e.g. "80/tcp   open  http    Apache httpd 2.4"
+    const m = line.match(/(\d+)\/(tcp|udp)\s+(\w+)\s*(\S*)\s*(.*)/i);
+    if (!m) return `<tr><td colspan="4">${escHtml(line)}</td></tr>`;
+    const [, port, proto, state, svc, version] = m;
+    const stateCls = state === 'open' ? 'port-open-row' : 'port-filtered-row';
+    return `<tr class="${stateCls}">
+      <td class="pt-port">${escHtml(port)}/${escHtml(proto)}</td>
+      <td class="pt-state">${escHtml(state)}</td>
+      <td class="pt-svc">${escHtml(svc)}</td>
+      <td class="pt-ver">${escHtml(version)}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="port-table"><thead><tr>
+    <th>Puerto</th><th>Estado</th><th>Servicio</th><th>Versión</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderParsed(tool, groups) {
@@ -544,41 +687,68 @@ function renderParsed(tool, groups) {
     return;
   }
 
-  container.innerHTML = groups.map(group => `
+  container.innerHTML = groups.map(group => {
+    const isPortGroup = group.type === 'port-open' || group.type === 'port-filtered';
+    const content = isPortGroup
+      ? _renderPortTable(group.items)
+      : `<div class="result-items">${group.items.map(item =>
+          `<div class="result-item ${group.type}">${escHtml(item)}</div>`
+        ).join('')}</div>`;
+    return `
     <div class="result-group">
       <div class="rg-title">
         ${group.icon} ${group.title}
         <span class="rg-count">${group.items.length}</span>
       </div>
-      <div class="result-items">
-        ${group.items.map(item => `<div class="result-item ${group.type}">${escHtml(item)}</div>`).join('')}
-      </div>
-    </div>
-  `).join('');
+      ${content}
+    </div>`;
+  }).join('');
+}
+
+function _rawLine(text) {
+  if (!text) return '';
+  const t = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  if (t.startsWith('⚠')) return `<span class="rl-err">${t}</span>\n`;
+  if (t.startsWith('▶')) return `<span class="rl-cmd">${t}</span>\n`;
+  if (t.startsWith('✖')) return `<span class="rl-err">${t}</span>\n`;
+  if (/\d+\/(tcp|udp)\s+(open)/i.test(t)) return `<span class="rl-open">${t}</span>\n`;
+  if (/\d+\/(tcp|udp)\s+(filtered|closed)/i.test(t)) return `<span class="rl-closed">${t}</span>\n`;
+  if (/^\[\+\]|^\[INFO\]/i.test(t)) return `<span class="rl-info">${t}</span>\n`;
+  if (/^\[!\]|^\[-\]|\bERROR\b|\bFAILED\b/i.test(t)) return `<span class="rl-warn">${t}</span>\n`;
+  return t + '\n';
 }
 
 function createBufferedWriter(rawOutput) {
   let buffer = [];
   let timer = null;
+  let lineCount = 0;
 
   function flush() {
     if (!rawOutput || !buffer.length) return;
-    rawOutput.textContent += buffer.join('');
+    const html = buffer.map(_rawLine).join('');
     buffer = [];
+    rawOutput.insertAdjacentHTML('beforeend', html);
+    // count newlines added
+    lineCount += (html.match(/\n/g) || []).length;
     rawOutput.scrollTop = rawOutput.scrollHeight;
     timer = null;
+    // update line counter badge if present
+    const badge = rawOutput.parentElement && rawOutput.parentElement.querySelector('.line-count-badge');
+    if (badge) badge.textContent = `${lineCount} líneas`;
   }
 
   return {
     write(text) {
-      buffer.push(text);
-      if (!timer) {
-        timer = setTimeout(flush, 120);
-      }
+      // split multi-line text so each line gets colorized independently
+      const lines = text.split('\n');
+      lines.forEach(l => { if (l !== '') buffer.push(l); });
+      if (!timer) timer = setTimeout(flush, 120);
     },
-    flushNow() {
-      flush();
-    }
+    flushNow() { clearTimeout(timer); timer = null; flush(); },
+    reset() { if (rawOutput) rawOutput.innerHTML = ''; lineCount = 0; }
   };
 }
 
@@ -601,7 +771,7 @@ function runTool(tool) {
   }
 
   const rawOutput = $(`raw-out-${tool}`);
-  if (rawOutput) rawOutput.textContent = '';
+  if (rawOutput) rawOutput.innerHTML = '';
 
   const writer = createBufferedWriter(rawOutput);
 
@@ -639,76 +809,279 @@ function runTool(tool) {
       }
 
       if (msg.type === 'error') {
-        writer.flushNow();
-        setHtml(`results-${tool}`, makeInfoText(`Error: ${msg.message}`, 'error'));
+        // Log to raw output but don't overwrite summary — process may still be running
         writer.write(`✖ ${msg.message}\n`);
+        return;
+      }
+
+      if (msg.type === 'structured') {
+        // Store structured data — will be rendered on 'done'
+        _structuredCache[tool] = msg.data;
         return;
       }
 
       if (msg.type === 'done') {
         writer.flushNow();
         setStatus(tool, 'done');
-        renderParsed(tool, parseOutput(tool, allLines));
+        // Prefer structured JSON over text parsing
+        const structured = _structuredCache[tool];
+        delete _structuredCache[tool];
+        if (structured && renderStructured(tool, structured)) {
+          // rendered from JSON ✓
+        } else {
+          const parsed = parseOutput(tool, allLines);
+          if (parsed.length) renderParsed(tool, parsed);
+          else setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptyStructured));
+        }
         resetBtn(tool);
         delete runningRequests[tool];
       }
     },
     (err) => {
       writer.flushNow();
-      setHtml(`results-${tool}`, makeInfoText(`Error: ${err}`, 'error'));
+      setHtml(`results-${tool}`, makeInfoText(`Error de conexión: ${err}`, 'error'));
       resetBtn(tool);
       delete runningRequests[tool];
     }
   );
 }
 
+// ── Parallel mode state ──────────────────────────────────────────────────────
+const _parallelState = {}; // key: "tool-idx" → { startTime, done, lines, structured }
+let _parallelTotal = 0;
+let _parallelDone  = 0;
+let _parallelTimer = null;
+
+function _parallelKey(tool, idx) { return `${tool}-${idx}`; }
+
+function _startParallelTimer() {
+  if (_parallelTimer) clearInterval(_parallelTimer);
+  _parallelTimer = setInterval(_updateParallelSummaryTimers, 500);
+}
+
+function _stopParallelTimer() {
+  if (_parallelTimer) { clearInterval(_parallelTimer); _parallelTimer = null; }
+}
+
+function _updateParallelSummaryTimers() {
+  Object.entries(_parallelState).forEach(([key, state]) => {
+    if (state.done) return;
+    const el = document.getElementById(`psum-timer-${key}`);
+    if (el) el.textContent = _fmtSecs(Math.floor((Date.now() - state.startTime) / 1000));
+  });
+}
+
+function _notifyParallelDone() {
+  if (Notification.permission === 'granted') {
+    new Notification('Aletheia — Modo paralelo', {
+      body: `${_parallelTotal} herramientas completadas`,
+      icon: '/favicon.ico'
+    });
+  }
+}
+
+function togglePsCard(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.toggle('ps-collapsed');
+}
+
+function _parallelGroups(state) {
+  // Returns groups array (same format as parseOutput) from state
+  if (state.structured) {
+    const d = state.structured;
+    const groups = [];
+    if (d.tool === 'theharvester') {
+      if (d.emails?.length)           groups.push({ title: `Emails (${d.emails.length})`, icon: '✉️', type: 'email', items: d.emails });
+      if (d.ips?.length)              groups.push({ title: `IPs (${d.ips.length})`, icon: '📡', type: 'ip', items: d.ips });
+      if (d.hosts?.length)            groups.push({ title: `Hosts / Subdominios (${d.hosts.length})`, icon: '🌐', type: 'host', items: d.hosts });
+      if (d.interesting_urls?.length) groups.push({ title: `URLs interesantes (${d.interesting_urls.length})`, icon: '🔗', type: 'url', items: d.interesting_urls });
+      if (d.asns?.length)             groups.push({ title: `ASNs (${d.asns.length})`, icon: '🏢', type: 'generic', items: d.asns });
+    } else if (d.tool === 'dnsrecon') {
+      const iconMap  = { A:'📍', AAAA:'📍', MX:'📧', NS:'🧭', TXT:'📝', SOA:'🏛️', CNAME:'🔀', SRV:'⚙️' };
+      const typeMap  = { A:'ip', AAAA:'ip', NS:'host', MX:'host', CNAME:'host', TXT:'generic', SOA:'generic', SRV:'generic' };
+      const labelMap = { A:'Registros A (IPv4)', AAAA:'Registros AAAA (IPv6)', MX:'Registros MX', NS:'Nameservers', TXT:'Registros TXT', SOA:'SOA', CNAME:'CNAME', SRV:'SRV' };
+      Object.entries(d.records || {}).forEach(([type, items]) => {
+        if (items.length) groups.push({ title: labelMap[type] || type, icon: iconMap[type] || '📋', type: typeMap[type] || 'generic', items });
+      });
+    } else if (d.tool === 'nmap') {
+      if (d.ips?.length)              groups.push({ title: 'IPs escaneadas', icon: '📡', type: 'ip', items: d.ips });
+      if (d.ports_open?.length)       groups.push({ title: `Puertos abiertos (${d.ports_open.length})`, icon: '🔓', type: 'port-open',
+        items: d.ports_open.map(p => `${p.port}/${p.proto}   open   ${p.service}   ${p.version}`.trimEnd()) });
+      if (d.ports_filtered?.length)   groups.push({ title: `Puertos filtrados (${d.ports_filtered.length})`, icon: '🔒', type: 'port-filtered',
+        items: d.ports_filtered.map(p => `${p.port}/${p.proto}   ${p.state}   ${p.service}`.trimEnd()) });
+      if (d.os?.length)               groups.push({ title: 'Sistema operativo', icon: '💻', type: 'generic', items: d.os });
+    } else if (d.tool === 'amass') {
+      if (d.subdomains?.length) groups.push({ title: `Subdominios (${d.subdomains.length})`, icon: '🌐', type: 'host', items: d.subdomains });
+      if (d.ips?.length)        groups.push({ title: `IPs (${d.ips.length})`, icon: '📡', type: 'ip', items: d.ips });
+    }
+    return groups;
+  }
+
+  // Text-based fallback
+  if (!state.allLines || !state.allLines.length) return [];
+  return parseOutput(state.tool, state.allLines);
+}
+
+function _renderGroupsHtml(groups) {
+  if (!groups.length) return '<p class="ps-empty">Sin resultados encontrados.</p>';
+  return groups.map(group => {
+    const isPortGroup = group.type === 'port-open' || group.type === 'port-filtered';
+    const scrollCls = group.items.length > 8 ? 'ps-body-scroll' : '';
+    const content = isPortGroup
+      ? `<div class="${scrollCls}">${_renderPortTable(group.items)}</div>`
+      : `<div class="result-items ${scrollCls}">${group.items.map(item =>
+          `<div class="result-item ${group.type}">${escHtml(item)}</div>`
+        ).join('')}</div>`;
+    return `<div class="result-group">
+      <div class="rg-title">${group.icon} ${escHtml(group.title)}<span class="rg-count">${group.items.length}</span></div>
+      ${content}
+    </div>`;
+  }).join('');
+}
+
+function _renderParallelSummary() {
+  const container = $('parallel-summary');
+  if (!container) return;
+
+  const entries = Object.entries(_parallelState);
+  if (!entries.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = entries.map(([key, state]) => {
+    const color = TOOL_COLORS[state.tool] || { bg: '#f3f4f6', color: '#374151', border: '#d1d5db' };
+
+    const elapsed = state.done
+      ? `<span class="ps-time ps-time-done">${_fmtSecs(state.elapsed)}</span>`
+      : `<span class="ps-time ps-time-running"><span class="ps-spinner"></span><span id="psum-timer-${key}">0s</span></span>`;
+
+    const statusIcon = state.done ? '✓' : '…';
+    const statusCls  = state.done ? 'ps-status-done' : 'ps-status-running';
+
+    let bodyHtml = '';
+    if (state.done) {
+      const groups = _parallelGroups(state);
+      bodyHtml = `<div class="ps-body">${_renderGroupsHtml(groups)}</div>`;
+    } else {
+      bodyHtml = `<div class="ps-body ps-body-running">
+        <p class="ui-message" style="padding:12px 16px">
+          <span class="ps-spinner" style="display:inline-block;margin-right:6px"></span>
+          Ejecutando… ${state.lines} líneas recibidas
+        </p>
+      </div>`;
+    }
+
+    const cardId = `pscard-${key}`;
+    return `<div class="ps-card ${state.done ? 'ps-card-done' : 'ps-card-running'}" id="${cardId}">
+      <div class="ps-card-header" onclick="togglePsCard('${cardId}')" style="cursor:pointer">
+        <span class="ps-badge" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
+          ${state.tool.toUpperCase()}
+        </span>
+        <span class="ps-name">${state.name}</span>
+        <span class="ps-status ${statusCls}">${statusIcon}</span>
+        ${elapsed}
+        <span class="ps-toggle-icon">▾</span>
+      </div>
+      <div class="ps-body-wrap">
+        ${bodyHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function launchParallel() {
-  const checked = [...document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]:checked')];
+  const checked = [...document.querySelectorAll('#parallel-subtool-grid .pg-checkbox:checked')];
   if (!checked.length) return;
 
+  // Reset state
+  Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
+  _parallelTotal = checked.length;
+  _parallelDone  = 0;
+
   const parallelOut = $('parallel-out');
-  parallelOut.innerHTML = '';
+  if (parallelOut) parallelOut.innerHTML = '';
+
+  const summary = $('parallel-summary');
+  if (summary) summary.innerHTML = '';
 
   const launchBtn = $('launch-parallel-btn');
   if (launchBtn) launchBtn.disabled = true;
 
+  // Request notification permission
+  if (Notification.permission === 'default') Notification.requestPermission();
+
+  _startParallelTimer();
+
   checked.forEach(checkbox => {
     const tool = checkbox.dataset.tool;
-    const idx = parseInt(checkbox.dataset.idx, 10);
+    const idx  = parseInt(checkbox.dataset.idx, 10);
+    const key  = _parallelKey(tool, idx);
     const subtool = SUBTOOLS[tool][idx];
-    const cmd = subtool.cmd(target || 'OBJETIVO');
+    const cmd  = subtool.cmd(target || 'OBJETIVO');
     const color = TOOL_COLORS[tool];
 
     if (cmd.includes('OBJETIVO')) {
       appendParallelLine(tool, `[ERROR] ${UI_TEXT.missingTarget}`, color, false);
+      _parallelTotal--;
       return;
     }
 
-    const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    _parallelState[key] = { tool, idx, name: subtool.name, cmd,
+      startTime: Date.now(), done: false, lines: 0, structured: null, elapsed: 0 };
+    _renderParallelSummary();
 
-    streamCmd(
-      cmd,
-      requestId,
+    const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    const allLines  = [];
+
+    streamCmd(cmd, requestId,
       (msg) => {
         if (msg.type === 'start') {
-          appendParallelLine(tool, `▶ Iniciando: ${msg.message}`, color, true);
+          appendParallelLine(tool, `▶ ${subtool.name}: ${cmd}`, color, true);
         } else if (msg.type === 'line') {
+          _parallelState[key].lines++;
           appendParallelLine(tool, msg.stream === 'stderr' ? `⚠ ${msg.message}` : msg.message, color, false);
+          allLines.push(msg.message); // collect all lines for text parsing
+        } else if (msg.type === 'structured') {
+          _parallelState[key].structured = msg.data;
         } else if (msg.type === 'exit') {
           appendParallelLine(tool, `⚠ Exit code: ${msg.message}`, color, false);
         } else if (msg.type === 'error') {
-          appendParallelLine(tool, `[ERROR] ${msg.message}`, color, false);
+          appendParallelLine(tool, `✖ ${msg.message}`, color, false);
         } else if (msg.type === 'done') {
-          appendParallelLine(tool, '✓ Completado', color, true);
+          _parallelState[key].done    = true;
+          _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
+          _parallelState[key].allLines = allLines;
+          _parallelDone++;
+          appendParallelLine(tool, `✓ ${subtool.name} completado en ${_fmtSecs(_parallelState[key].elapsed)}`, color, true);
+          _renderParallelSummary();
+          if (_parallelDone >= _parallelTotal) {
+            _stopParallelTimer();
+            _notifyParallelDone();
+            if (launchBtn) launchBtn.disabled = false;
+          }
         }
       },
-      (err) => appendParallelLine(tool, `[ERROR] ${err}`, color, false)
+      (err) => {
+        _parallelState[key].done    = true;
+        _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
+        _parallelState[key].allLines = allLines;
+        _parallelDone++;
+        appendParallelLine(tool, `[ERROR] ${err}`, color, false);
+        _renderParallelSummary();
+        if (_parallelDone >= _parallelTotal) {
+          _stopParallelTimer();
+          if (launchBtn) launchBtn.disabled = false;
+        }
+      }
     );
   });
+}
 
-  setTimeout(() => {
-    if (launchBtn) launchBtn.disabled = false;
-  }, 1000);
+function switchParallelTab(tab, btn) {
+  document.querySelectorAll('.parallel-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.output-section .out-tab').forEach(el => el.classList.remove('active'));
+  const el = $(`ptab-${tab}`);
+  if (el) el.classList.add('active');
+  if (btn) btn.classList.add('active');
 }
 
 function appendParallelLine(tool, message, color, isHeader = false) {
@@ -728,12 +1101,20 @@ function appendParallelLine(tool, message, color, isHeader = false) {
 }
 
 function clearParallel() {
-  document.querySelectorAll('#parallel-subtool-grid input[type=checkbox]').forEach(checkbox => {
-    checkbox.checked = false;
+  document.querySelectorAll('#parallel-subtool-grid .pg-checkbox').forEach(cb => {
+    cb.checked = false;
+    const card = cb.closest('.pg-card');
+    if (card) card.classList.remove('pg-selected');
   });
-
+  document.querySelectorAll('.pg-select-all').forEach(btn => { btn.textContent = 'Seleccionar todo'; });
+  // Reset parallel state
+  Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
+  _parallelTotal = 0;
+  _parallelDone  = 0;
+  _stopParallelTimer();
   updateParallelCount();
   setHtml('parallel-out', `<span class="empty-output-text">${UI_TEXT.emptyParallel}</span>`);
+  setHtml('parallel-summary', '<p class="ui-message">Selecciona herramientas arriba y pulsa Lanzar.</p>');
 }
 
 function goToPlan(tool, idx) {
@@ -759,7 +1140,7 @@ function runPlanStep(cmdTemplate, tool) {
   const cmdInput = $(`cmd-${tool}`);
   const cmdBox = $(`tb-${tool}`);
 
-  if (rawOutput) rawOutput.textContent = '';
+  if (rawOutput) rawOutput.innerHTML = '';
   if (cmdInput) cmdInput.value = cmd;
   if (cmdBox) cmdBox.style.display = 'block';
 
@@ -793,22 +1174,34 @@ function runPlanStep(cmdTemplate, tool) {
       }
 
       if (msg.type === 'error') {
-        writer.flushNow();
-        setHtml(`results-${tool}`, makeInfoText(`Error: ${msg.message}`, 'error'));
+        writer.write(`✖ ${msg.message}\n`);
+        return;
+      }
+
+      if (msg.type === 'structured') {
+        _structuredCache[tool] = msg.data;
         return;
       }
 
       if (msg.type === 'done') {
         writer.flushNow();
         setStatus(tool, 'done');
-        renderParsed(tool, parseOutput(tool, allLines));
+        const structured = _structuredCache[tool];
+        delete _structuredCache[tool];
+        if (structured && renderStructured(tool, structured)) {
+          // rendered from JSON ✓
+        } else {
+          const parsed = parseOutput(tool, allLines);
+          if (parsed.length) renderParsed(tool, parsed);
+          else setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptyStructured));
+        }
         resetBtn(tool);
         delete runningRequests[tool];
       }
     },
     (err) => {
       writer.flushNow();
-      setHtml(`results-${tool}`, makeInfoText(`Error: ${err}`, 'error'));
+      setHtml(`results-${tool}`, makeInfoText(`Error de conexión: ${err}`, 'error'));
       resetBtn(tool);
       delete runningRequests[tool];
     }
@@ -816,10 +1209,19 @@ function runPlanStep(cmdTemplate, tool) {
 }
 
 function streamCmd(cmd, requestId, onData, onError) {
+  // Abort controller so we can cancel the fetch if the stream hangs
+  const controller = new AbortController();
+  // Frontend hard-timeout: 310s (slightly over backend's 300s)
+  const frontendTimeout = setTimeout(() => {
+    controller.abort();
+    onError('Timeout del frontend: el stream no respondió a tiempo');
+  }, 310_000);
+
   fetch('/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cmd, request_id: requestId })
+    body: JSON.stringify({ cmd, request_id: requestId }),
+    signal: controller.signal
   })
     .then(async (res) => {
       if (!res.ok) {
@@ -830,12 +1232,23 @@ function streamCmd(cmd, requestId, onData, onError) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // Stall watchdog: if no bytes arrive in 60s, abort
+      let stallTimer = setTimeout(() => { controller.abort(); }, 60_000);
+      function resetStall() {
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => { controller.abort(); }, 60_000);
+      }
 
       function read() {
         reader.read()
           .then(({ done, value }) => {
-            if (done) return;
+            if (done) {
+              clearTimeout(frontendTimeout);
+              clearTimeout(stallTimer);
+              return;
+            }
 
+            resetStall();
             buffer += decoder.decode(value, { stream: true });
             const chunks = buffer.split('\n\n');
             buffer = chunks.pop();
@@ -843,21 +1256,31 @@ function streamCmd(cmd, requestId, onData, onError) {
             chunks.forEach(chunk => {
               const line = chunk.split('\n').find(item => item.startsWith('data:'));
               if (!line) return;
-
               try {
                 const msg = JSON.parse(line.slice(5).trim());
+                if (msg.type === 'done') {
+                  clearTimeout(frontendTimeout);
+                  clearTimeout(stallTimer);
+                }
                 onData(msg);
               } catch (_) {}
             });
 
             read();
           })
-          .catch(err => onError(err.message));
+          .catch(err => {
+            clearTimeout(frontendTimeout);
+            clearTimeout(stallTimer);
+            if (err.name !== 'AbortError') onError(err.message);
+          });
       }
 
       read();
     })
-    .catch(err => onError(err.message));
+    .catch(err => {
+      clearTimeout(frontendTimeout);
+      if (err.name !== 'AbortError') onError(err.message);
+    });
 }
 
 function setStatus(tool, state) {
@@ -865,22 +1288,27 @@ function setStatus(tool, state) {
   const done = $(`sd-${tool}`);
   const idle = $(`ss-${tool}`);
 
+  if (state === 'running') startTimer(tool);
+  if (state === 'done' || state === 'idle') stopTimer(tool);
+
   if (running) running.style.display = state === 'running' ? 'flex' : 'none';
-  if (done) done.style.display = state === 'done' ? 'inline' : 'none';
+  if (done) done.style.display = state === 'done' ? 'inline-flex' : 'none';
+  if (state === 'done') {
+    const et = $(`et-${tool}`);
+    if (et) et.textContent = `(${getElapsed(tool)})`;
+  }
   if (idle) idle.style.display = state === 'running' || state === 'done' ? 'none' : 'inline';
 }
 
 function stopTool(tool) {
   const requestId = runningRequests[tool];
+  stopTimer(tool);
 
   if (!requestId) {
     resetBtn(tool);
     const idle = $(`ss-${tool}`);
     if ($(`sr-${tool}`)) $(`sr-${tool}`).style.display = 'none';
-    if (idle) {
-      idle.style.display = 'inline';
-      idle.textContent = 'Detenido';
-    }
+    if (idle) { idle.style.display = 'inline'; idle.textContent = '⬛ Detenido'; }
     return;
   }
 
@@ -890,17 +1318,15 @@ function stopTool(tool) {
     body: JSON.stringify({ request_id: requestId })
   }).finally(() => {
     resetBtn(tool);
+    stopTimer(tool);
 
     const running = $(`sr-${tool}`);
-    const done = $(`sd-${tool}`);
-    const idle = $(`ss-${tool}`);
+    const done    = $(`sd-${tool}`);
+    const idle    = $(`ss-${tool}`);
 
     if (running) running.style.display = 'none';
-    if (done) done.style.display = 'none';
-    if (idle) {
-      idle.style.display = 'inline';
-      idle.textContent = 'Detenido';
-    }
+    if (done)    done.style.display    = 'none';
+    if (idle)    { idle.style.display = 'inline'; idle.textContent = '⬛ Detenido'; }
 
     delete runningRequests[tool];
   });
@@ -916,7 +1342,13 @@ function resetBtn(tool) {
 
 function clearOut(tool) {
   setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptySummary));
-  setText(`raw-out-${tool}`, '');
+  const _ro = $(`raw-out-${tool}`); if (_ro) _ro.innerHTML = '';
+  // reset line-count badge
+  const badge = document.querySelector(`#raw-${tool} .line-count-badge`);
+  if (badge) badge.textContent = '';
+  // reset elapsed done
+  const et = $(`et-${tool}`); if (et) et.textContent = '';
+  stopTimer(tool);
   setStatus(tool, 'idle');
 }
 

@@ -189,7 +189,7 @@
                   <span class="plan-item-name">theHarvester</span>
                   <span class="plan-item-desc">Emails, subdominios e IPs desde fuentes OSINT públicas</span>
                   <span class="plan-item-alert"><span class="alert-badge al-none">Sin alerta</span></span>
-                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('theHarvester -d OBJETIVO -b all','discover')">▶ Lanzar</button>
+                  <button class="run-plan-btn" onclick="event.stopPropagation();runPlanStep('script -q -c &quot;theHarvester -d OBJETIVO -b baidu,certspotter,crtsh,duckduckgo,hackertarget,urlscan&quot; /dev/null','discover')">▶ Lanzar</button>
                 </div>
 
                 <div class="plan-item" onclick="goToPlan('amass',1)">
@@ -353,11 +353,25 @@
 
           <div class="output-section">
             <div class="output-header">
-              <span class="output-title">Output unificado</span>
-              <button class="clr-btn" onclick="document.getElementById('parallel-out').innerHTML=''">Limpiar</button>
+              <span class="output-title">Resultados</span>
+              <button class="clr-btn" onclick="clearParallel()">Limpiar</button>
             </div>
-            <div class="parallel-output" id="parallel-out">
-              <span class="empty-output-text">Selecciona herramientas arriba y pulsa Lanzar.</span>
+
+            <div class="out-tabs">
+              <button class="out-tab active" onclick="switchParallelTab('summary', this)">Resumen</button>
+              <button class="out-tab" onclick="switchParallelTab('raw', this)">Output unificado</button>
+            </div>
+
+            <div class="parallel-tab-content active" id="ptab-summary">
+              <div class="parallel-summary-area" id="parallel-summary">
+                <p class="ui-message">Selecciona herramientas arriba y pulsa Lanzar.</p>
+              </div>
+            </div>
+
+            <div class="parallel-tab-content" id="ptab-raw">
+              <div class="parallel-output" id="parallel-out">
+                <span class="empty-output-text">Selecciona herramientas arriba y pulsa Lanzar.</span>
+              </div>
             </div>
           </div>
         </div>

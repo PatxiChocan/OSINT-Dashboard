@@ -4,8 +4,12 @@ import threading
 import queue
 import re
 import time
+import json
+import os
+import tempfile
 
 ALLOWED_BINARIES = {
+    "script",
     "amass",
     "katana",
     "gitleaks",
@@ -43,6 +47,7 @@ BINARY_PATHS = {
     "enum4linux": "/usr/bin/enum4linux",
     "smbclient": "/usr/bin/smbclient",
     "ike-scan": "/usr/bin/ike-scan",
+    "script": "/usr/bin/script",
     "amass": "/usr/bin/amass",
     "katana": "/usr/bin/katana",
     "theharvester": "/usr/bin/theHarvester",
@@ -88,6 +93,249 @@ def is_valid_command(cmd: str) -> tuple[bool, str]:
     return True, ""
 
 
+TMP_DIR = "/tmp/aletheia"
+
+# Ensure tmp dir exists
+os.makedirs(TMP_DIR, exist_ok=True)
+
+# Tools that support structured JSON output and how to inject the flag
+# Returns (tool_key, json_path) or (None, None)
+def _detect_tool(parts):
+    """Return the OSINT tool name regardless of wrappers like script/timeout."""
+    cmd_str = " ".join(parts).lower()
+    for tool in ("theharvester", "dnsrecon", "nmap", "amass"):
+        if tool in cmd_str:
+            return tool
+    return None
+
+
+def _already_has_flag(parts, flag):
+    """Check if flag already present anywhere in the command."""
+    return any(flag in p for p in parts)
+
+
+def setup_structured_output(parts, request_id):
+    if not parts:
+        return parts, None
+
+    tool = _detect_tool(parts)
+    if not tool:
+        return parts, None
+
+    json_path = os.path.join(TMP_DIR, f"{request_id}.json")
+    base      = os.path.join(TMP_DIR, request_id)
+
+    is_script_wrapped = parts[0].split("/")[-1].lower() == "script" and "-c" in parts
+
+    if is_script_wrapped:
+        try:
+            c_idx = parts.index("-c")
+            inner = parts[c_idx + 1]
+        except (ValueError, IndexError):
+            return parts, None
+
+        # Don't inject if flag already present in inner command
+        flag_map = {
+            "theharvester": ("-f", f"-f {base}"),
+            "dnsrecon":     ("-j", f"-j {json_path}"),
+            "nmap":         ("-oJ", f"-oJ {json_path}"),
+            "amass":        ("-json", f"-json {json_path}"),
+        }
+        check_flag, inject = flag_map.get(tool, (None, None))
+        if not check_flag:
+            return parts, None
+        if check_flag in inner:
+            # Already has the flag — extract existing json_path if possible
+            return parts, json_path
+        new_parts = list(parts)
+        new_parts[c_idx + 1] = inner + f" {inject}"
+        return new_parts, json_path
+
+    # Direct invocation — check if flag already present
+    flag_map = {
+        "theharvester": ("-f", ["-f", base]),
+        "dnsrecon":     ("-j", ["-j", json_path]),
+        "nmap":         ("-oJ", ["-oJ", json_path]),
+        "amass":        ("-json", ["-json", json_path]),
+    }
+    check_flag, inject = flag_map.get(tool, (None, None))
+    if not check_flag:
+        return parts, None
+    if _already_has_flag(parts, check_flag):
+        return parts, json_path
+    return list(parts) + inject, json_path
+
+
+def parse_structured_json(binary, json_path):
+    """Read and normalise the JSON file produced by the tool."""
+    if not json_path or not os.path.exists(json_path):
+        return None
+
+    try:
+        with open(json_path, "r", errors="replace") as fh:
+            raw = fh.read().strip()
+        if not raw:
+            return None
+    except Exception:
+        return None
+
+    binary = binary.lower()
+
+    # ── theHarvester ──────────────────────────────────────────────────────
+    if binary == "theharvester":
+        try:
+            data = json.loads(raw)
+            hosts_raw = data.get("hosts", [])
+
+            # Hosts field format: "subdomain.example.com:1.2.3.4" or just "subdomain.example.com"
+            _hex_seg = re.compile(r'^[0-9][A-F][a-z]')  # catches "2Fbrand", "3Adocs" etc. (URL-encoded path artifacts)
+
+            def _clean_host(raw):
+                """Return (host, ip) or (None, None) if invalid."""
+                raw = raw.strip()
+                if ":" in raw:
+                    parts_h = raw.split(":", 1)
+                    host, ip = parts_h[0].strip(), parts_h[1].strip()
+                else:
+                    host, ip = raw, None
+                # Filter hex-encoded path artifacts like "2Fbrand.github.com"
+                first_seg = host.lstrip('*.').split('.')[0]
+                if _hex_seg.match(first_seg):
+                    return None, None
+                return host, ip
+
+            hosts_only = []
+            ips_from_hosts = []
+            for h in hosts_raw:
+                host, ip = _clean_host(h)
+                if host:
+                    hosts_only.append(host)
+                if ip:
+                    ips_from_hosts.append(ip)
+
+            # Merge explicit ips field + ips extracted from hosts
+            explicit_ips = data.get("ips", [])
+            all_ips = list(dict.fromkeys(explicit_ips + ips_from_hosts))  # dedup preserving order
+
+            return {
+                "tool":             "theharvester",
+                "emails":           data.get("emails", []),
+                "ips":              all_ips,
+                "hosts":            hosts_only,
+                "hosts_with_ip":    hosts_raw,
+                "interesting_urls": data.get("interesting_urls", []),
+                "asns":             [str(a) for a in data.get("asns", [])],
+            }
+        except Exception:
+            return None
+
+    # ── DNSRecon ──────────────────────────────────────────────────────────
+    if binary == "dnsrecon":
+        try:
+            records = json.loads(raw)
+            by_type = {}
+            for r in records:
+                t = r.get("type", "OTHER").upper()
+                by_type.setdefault(t, [])
+                # Format nicely per record type
+                if t == "A":
+                    by_type[t].append(f"{r.get('name','')} → {r.get('address','')}")
+                elif t == "AAAA":
+                    by_type[t].append(f"{r.get('name','')} → {r.get('address','')}")
+                elif t == "MX":
+                    by_type[t].append(f"{r.get('name','')} (pri {r.get('preference','')}) → {r.get('exchange','')}")
+                elif t == "NS":
+                    by_type[t].append(f"{r.get('target','')}")
+                elif t == "TXT":
+                    by_type[t].append(f"{r.get('name','')} → {r.get('strings','')}")
+                elif t == "SOA":
+                    by_type[t].append(f"mname={r.get('mname','')} rname={r.get('rname','')}")
+                elif t == "CNAME":
+                    by_type[t].append(f"{r.get('name','')} → {r.get('target','')}")
+                elif t == "SRV":
+                    by_type[t].append(f"{r.get('name','')} → {r.get('target','')}:{r.get('port','')}")
+                else:
+                    by_type[t].append(str(r))
+            return {"tool": "dnsrecon", "records": by_type}
+        except Exception:
+            return None
+
+    # ── Nmap ──────────────────────────────────────────────────────────────
+    if binary == "nmap":
+        try:
+            data = json.loads(raw)
+            hosts_raw = data.get("nmaprun", {}).get("host", [])
+            if isinstance(hosts_raw, dict):
+                hosts_raw = [hosts_raw]
+            ports_open = []
+            ports_filtered = []
+            ips = []
+            os_detected = []
+            for host in hosts_raw:
+                # IPs
+                addrs = host.get("address", [])
+                if isinstance(addrs, dict):
+                    addrs = [addrs]
+                for a in addrs:
+                    if a.get("addrtype") in ("ipv4", "ipv6"):
+                        ips.append(a.get("addr", ""))
+                # Ports
+                ports_wrap = host.get("ports", {})
+                ports_list = ports_wrap.get("port", [])
+                if isinstance(ports_list, dict):
+                    ports_list = [ports_list]
+                for p in ports_list:
+                    state = p.get("state", {}).get("state", "")
+                    portid = p.get("portid", "")
+                    proto  = p.get("protocol", "tcp")
+                    svc    = p.get("service", {}).get("name", "")
+                    ver    = p.get("service", {}).get("product", "")
+                    extra  = p.get("service", {}).get("version", "")
+                    full_ver = " ".join(filter(None, [ver, extra]))
+                    entry = {"port": portid, "proto": proto, "state": state,
+                             "service": svc, "version": full_ver}
+                    if state == "open":
+                        ports_open.append(entry)
+                    elif state in ("filtered", "closed"):
+                        ports_filtered.append(entry)
+                # OS
+                os_matches = host.get("os", {}).get("osmatch", [])
+                if isinstance(os_matches, dict):
+                    os_matches = [os_matches]
+                for om in os_matches[:1]:
+                    os_detected.append(f"{om.get('name','')} ({om.get('accuracy','')}%)")
+            return {"tool": "nmap", "ips": ips,
+                    "ports_open": ports_open, "ports_filtered": ports_filtered,
+                    "os": os_detected}
+        except Exception:
+            return None
+
+    # ── Amass (NDJSON) ────────────────────────────────────────────────────
+    if binary == "amass":
+        try:
+            subdomains = []
+            ips = []
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                name = obj.get("name", "")
+                if name:
+                    subdomains.append(name)
+                for addr in obj.get("addresses", []):
+                    ip = addr.get("ip", "")
+                    if ip:
+                        ips.append(ip)
+            return {"tool": "amass",
+                    "subdomains": list(dict.fromkeys(subdomains)),
+                    "ips":        list(dict.fromkeys(ips))}
+        except Exception:
+            return None
+
+    return None
+
+
 def stop_command(request_id: str) -> bool:
     with ACTIVE_LOCK:
         process = ACTIVE_PROCESSES.get(request_id)
@@ -118,6 +366,15 @@ def run_command(cmd: str, request_id: str):
             elif binary_lower in BINARY_PATHS:
                 parts[0] = BINARY_PATHS[binary_lower]
 
+            # Inject structured output flag if supported
+            json_path = None
+            try:
+                parts, json_path = setup_structured_output(parts, request_id)
+            except Exception:
+                pass
+
+
+
             process = subprocess.Popen(
                 parts,
                 stdout=subprocess.PIPE,
@@ -135,7 +392,10 @@ def run_command(cmd: str, request_id: str):
             def read_stream(stream, stream_type="stdout"):
                 try:
                     for line in iter(stream.readline, ''):
-                        clean_line = ANSI_ESCAPE.sub('', line).rstrip()
+                        try:
+                            clean_line = ANSI_ESCAPE.sub('', line).rstrip()
+                        except Exception:
+                            clean_line = repr(line).strip("'")
                         if clean_line:
                             q.put({
                                 "type": "line",
@@ -144,9 +404,11 @@ def run_command(cmd: str, request_id: str):
                                 "request_id": request_id
                             })
                 except Exception as e:
+                    # Don't propagate read errors as fatal — log as a warning line
                     q.put({
-                        "type": "error",
-                        "message": f"Error leyendo {stream_type}: {e}",
+                        "type": "line",
+                        "stream": "stderr",
+                        "message": f"[read error: {e}]",
                         "request_id": request_id
                     })
                 finally:
@@ -170,31 +432,46 @@ def run_command(cmd: str, request_id: str):
             t_err.start()
 
             finished_streams = 0
+            timed_out = False
 
             while True:
-                # Timeout duro del proceso
+                # Hard timeout
                 if process.poll() is None and (time.time() - process_start) > COMMAND_TIMEOUT:
                     process.kill()
+                    timed_out = True
                     yield {
                         "type": "error",
                         "message": "Timeout: el proceso tardó demasiado",
                         "request_id": request_id
                     }
+                    # Drain remaining queue items
+                    t_out.join(timeout=2)
+                    t_err.join(timeout=2)
+                    while True:
+                        try:
+                            item = q.get_nowait()
+                            if item["type"] not in ("_stream_end",):
+                                yield item
+                        except queue.Empty:
+                            break
                     break
 
                 try:
                     item = q.get(timeout=0.2)
-
                     if item["type"] == "_stream_end":
                         finished_streams += 1
+                        # Both streams done — safe to exit loop
+                        if finished_streams >= 2:
+                            break
                     else:
                         yield item
-
                 except queue.Empty:
                     pass
 
-                # Si el proceso terminó, vaciamos cola y cerramos
+                # Process finished; wait for threads to flush, then drain
                 if process.poll() is not None:
+                    t_out.join(timeout=3)
+                    t_err.join(timeout=3)
                     while True:
                         try:
                             item = q.get_nowait()
@@ -206,34 +483,45 @@ def run_command(cmd: str, request_id: str):
                             break
                     break
 
-            try:
-                process.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                yield {
-                    "type": "error",
-                    "message": "Timeout: el proceso tardó demasiado en cerrarse",
-                    "request_id": request_id
-                }
-
-            if process.stdout:
+            if not timed_out:
                 try:
-                    process.stdout.close()
-                except Exception:
-                    pass
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
 
-            if process.stderr:
-                try:
-                    process.stderr.close()
-                except Exception:
-                    pass
+            for stream in (process.stdout, process.stderr):
+                if stream:
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
 
-            if process.returncode not in (0, None, -9):
+            rc = process.returncode
+            if rc not in (0, None, -9):
                 yield {
                     "type": "exit",
-                    "message": str(process.returncode),
+                    "message": str(rc),
                     "request_id": request_id
                 }
+
+            # Emit structured JSON event if tool produced one
+            if json_path:
+                binary_name = _detect_tool(parts) or (parts[0].split("/")[-1].lower() if parts else "")
+                try:
+                    structured = parse_structured_json(binary_name, json_path)
+                    if structured:
+                        yield {
+                            "type": "structured",
+                            "data": structured,
+                            "request_id": request_id
+                        }
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        os.remove(json_path)
+                    except Exception:
+                        pass
 
             yield {"type": "done", "request_id": request_id}
 
