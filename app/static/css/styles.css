@@ -1800,3 +1800,67 @@ body {
 @media (max-width: 640px) {
   .pg-cards-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Toast notification ───────────────────────────────────────────────────── */
+
+.aletheia-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-radius: var(--radius-lg);
+  background: #1e2130;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  min-width: 280px;
+  max-width: 480px;
+}
+
+.aletheia-toast.toast-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+.aletheia-toast-success { border-left: 4px solid #22c55e; }
+.aletheia-toast-error   { border-left: 4px solid var(--red); }
+.aletheia-toast-info    { border-left: 4px solid var(--accent); }
+
+.toast-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.aletheia-toast-success .toast-icon { color: #22c55e; }
+.aletheia-toast-error   .toast-icon { color: #f87171; }
+.aletheia-toast-info    .toast-icon { color: #60a5fa; }
+
+.toast-msg {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.toast-close:hover { color: #fff; }

@@ -72,10 +72,10 @@ const SUBTOOLS = {
     { name: 'sslyze', func: 'Análisis profundo TLS: ROBOT, Heartbleed', alert: 'med', cmd: t => `sslyze ${t}` }
   ],
   amass: [
-    { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -d ${t}` },
-    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t}` },
-    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t}` },
-    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -dns-qps 30 -d ${t}` },
+    { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -whois -d ${t}` },
+    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t} -ip` },
+    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t} -ip` },
+    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t} -ip` },
     { name: 'track', func: 'Nuevos subdominios vs escaneos anteriores', alert: 'none', cmd: t => `amass track -d ${t}` },
     { name: 'db', func: 'Consulta base de datos local', alert: 'none', cmd: t => `amass db -d ${t}` }
   ],
@@ -1056,6 +1056,7 @@ function launchParallel() {
           if (_parallelDone >= _parallelTotal) {
             _stopParallelTimer();
             _notifyParallelDone();
+            showToast(`Modo paralelo completado — ${_parallelTotal} herramienta${_parallelTotal === 1 ? '' : 's'} finalizadas`, 'success', 5000);
             if (launchBtn) launchBtn.disabled = false;
           }
         }
@@ -1283,6 +1284,36 @@ function streamCmd(cmd, requestId, onData, onError) {
     });
 }
 
+
+// ── Toast notification ────────────────────────────────────────────────────────
+function showToast(message, type = 'success', duration = 4000) {
+  // Remove any existing toast
+  const existing = document.getElementById('aletheia-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'aletheia-toast';
+  toast.className = `aletheia-toast aletheia-toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✖' : 'ℹ'}</span>
+    <span class="toast-msg">${escHtml(message)}</span>
+    <button class="toast-close" onclick="this.closest('.aletheia-toast').remove()">×</button>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+  });
+
+  // Auto-dismiss
+  setTimeout(() => {
+    toast.classList.remove('toast-visible');
+    setTimeout(() => toast.remove(), 350);
+  }, duration);
+}
+
 function setStatus(tool, state) {
   const running = $(`sr-${tool}`);
   const done = $(`sd-${tool}`);
@@ -1295,7 +1326,11 @@ function setStatus(tool, state) {
   if (done) done.style.display = state === 'done' ? 'inline-flex' : 'none';
   if (state === 'done') {
     const et = $(`et-${tool}`);
-    if (et) et.textContent = `(${getElapsed(tool)})`;
+    const elapsed = getElapsed(tool);
+    if (et) et.textContent = `(${elapsed})`;
+    // Show toast for individual tool completion
+    const toolName = document.querySelector(`#panel-${tool} .page-title`)?.childNodes[0]?.textContent?.trim() || tool;
+    showToast(`${toolName} completado en ${elapsed}`, 'success');
   }
   if (idle) idle.style.display = state === 'running' || state === 'done' ? 'none' : 'inline';
 }

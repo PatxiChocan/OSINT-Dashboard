@@ -48,7 +48,7 @@ BINARY_PATHS = {
     "smbclient": "/usr/bin/smbclient",
     "ike-scan": "/usr/bin/ike-scan",
     "script": "/usr/bin/script",
-    "amass": "/usr/bin/amass",
+    "amass": "/usr/local/bin/amass",
     "katana": "/usr/bin/katana",
     "theharvester": "/usr/bin/theHarvester",
     "theHarvester": "/usr/bin/theHarvester",
@@ -139,7 +139,7 @@ def setup_structured_output(parts, request_id):
             "theharvester": ("-f", f"-f {base}"),
             "dnsrecon":     ("-j", f"-j {json_path}"),
             "nmap":         ("-oJ", f"-oJ {json_path}"),
-            "amass":        ("-json", f"-json {json_path}"),
+            # "amass":      ("-json", ...) — not supported in v4.2.0
         }
         check_flag, inject = flag_map.get(tool, (None, None))
         if not check_flag:
@@ -156,7 +156,7 @@ def setup_structured_output(parts, request_id):
         "theharvester": ("-f", ["-f", base]),
         "dnsrecon":     ("-j", ["-j", json_path]),
         "nmap":         ("-oJ", ["-oJ", json_path]),
-        "amass":        ("-json", ["-json", json_path]),
+        # amass -json not supported in v4.2.0
     }
     check_flag, inject = flag_map.get(tool, (None, None))
     if not check_flag:
