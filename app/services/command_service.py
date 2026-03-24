@@ -7,6 +7,7 @@ import time
 import json
 import os
 import uuid
+import signal
 
 
 ALLOWED_BINARIES = {
@@ -58,10 +59,10 @@ BINARY_PATHS = {
 MAX_PROCESSES = 4
 PROCESS_SEMAPHORE = threading.Semaphore(MAX_PROCESSES)
 
-# Timeout general + timeout por herramienta
 DEFAULT_COMMAND_TIMEOUT = 300
 TOOL_TIMEOUTS = {
     "amass": 900,
+    "katana": 900,
     "default": DEFAULT_COMMAND_TIMEOUT,
 }
 
@@ -125,10 +126,6 @@ def _extract_inner_parts(parts):
 
 
 def _resolve_binary_path(binary_name: str) -> str:
-    """
-    Devuelve la ruta absoluta del binario si existe en BINARY_PATHS.
-    Si no, deja el nombre tal cual.
-    """
     if not binary_name:
         return binary_name
 
@@ -143,9 +140,6 @@ def _resolve_binary_path(binary_name: str) -> str:
 
 
 def _detect_tool(parts):
-    """
-    Devuelve la herramienta OSINT real, incluso si viene envuelta en script -c.
-    """
     if not parts:
         return None
 
@@ -176,6 +170,28 @@ def _get_command_timeout(parts):
     return TOOL_TIMEOUTS["default"]
 
 
+def _is_safe_output_path(path: str) -> bool:
+    """Verifica que un path de output apunte solo a TMP_DIR."""
+    try:
+        return os.path.realpath(path).startswith(os.path.realpath(TMP_DIR) + os.sep)
+    except Exception:
+        return False
+
+
+def _validate_output_flags(parts: list) -> tuple[bool, str]:
+    """
+    Bloquea flags de escritura que apunten fuera de TMP_DIR
+    para evitar sobrescritura de archivos arbitrarios.
+    """
+    OUTPUT_FLAGS = {"-oN", "-oJ", "-oX", "-oG", "-oA", "-oS", "-f", "-j"}
+    for i, part in enumerate(parts):
+        if part in OUTPUT_FLAGS and i + 1 < len(parts):
+            target_path = parts[i + 1]
+            if not _is_safe_output_path(target_path):
+                return False, f"Flag {part} apunta a una ruta no permitida: {target_path}"
+    return True, ""
+
+
 def setup_structured_output(parts, request_id):
     if not parts:
         return parts, None
@@ -200,7 +216,6 @@ def setup_structured_output(parts, request_id):
             "theharvester": ("-f", f"-f {base}"),
             "dnsrecon": ("-j", f"-j {json_path}"),
             "nmap": ("-oJ", f"-oJ {json_path}"),
-            # amass: no inyectamos -json aquí por compatibilidad con tu versión actual
         }
 
         check_flag, inject = flag_map.get(tool, (None, None))
@@ -218,7 +233,6 @@ def setup_structured_output(parts, request_id):
         "theharvester": ("-f", ["-f", base]),
         "dnsrecon": ("-j", ["-j", json_path]),
         "nmap": ("-oJ", ["-oJ", json_path]),
-        # amass: no inyectamos -json aquí por compatibilidad con tu versión actual
     }
 
     check_flag, inject = flag_map.get(tool, (None, None))
@@ -431,10 +445,19 @@ def stop_command(request_id: str) -> bool:
         return False
 
     try:
-        process.kill()
-        return True
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
     except Exception:
-        return False
+        pass
+
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        except Exception:
+            pass
+
+    return True
 
 
 def run_command(cmd: str, request_id: str):
@@ -463,6 +486,12 @@ def run_command(cmd: str, request_id: str):
             except Exception:
                 pass
 
+            path_ok, path_err = _validate_output_flags(parts)
+            if not path_ok:
+                yield {"type": "error", "message": path_err, "request_id": request_id}
+                yield {"type": "done", "request_id": request_id}
+                return
+
             effective_timeout = _get_command_timeout(parts)
 
             process = subprocess.Popen(
@@ -470,7 +499,8 @@ def run_command(cmd: str, request_id: str):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                bufsize=1
+                bufsize=1,
+                start_new_session=True,
             )
 
             with ACTIVE_LOCK:
@@ -531,7 +561,10 @@ def run_command(cmd: str, request_id: str):
 
             while True:
                 if process.poll() is None and (time.time() - process_start) > effective_timeout:
-                    process.kill()
+                    try:
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    except Exception:
+                        process.kill()
                     timed_out = True
 
                     yield {
@@ -569,194 +602,6 @@ def run_command(cmd: str, request_id: str):
                             "request_id": request_id
                         }
                         last_heartbeat = time.time()
-
-                if process.poll() is not None:
-                    t_out.join(timeout=3)
-                    t_err.join(timeout=3)
-
-                    while True:
-                        try:
-                            item = q.get_nowait()
-                            if item["type"] == "_stream_end":
-                                finished_streams += 1
-                            else:
-                                yield item
-                        except queue.Empty:
-                            break
-                    break
-
-            if not timed_out:
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-
-            for stream in (process.stdout, process.stderr):
-                if stream:
-                    try:
-                        stream.close()
-                    except Exception:
-                        pass
-
-            rc = process.returncode
-            if rc not in (0, None, -9):
-                yield {
-                    "type": "exit",
-                    "message": str(rc),
-                    "request_id": request_id
-                }
-
-            if json_path:
-                binary_name = _detect_tool(parts) or (parts[0].split("/")[-1].lower() if parts else "")
-                try:
-                    structured = parse_structured_json(binary_name, json_path)
-                    if structured:
-                        yield {
-                            "type": "structured",
-                            "data": structured,
-                            "request_id": request_id
-                        }
-                except Exception:
-                    pass
-                finally:
-                    try:
-                        os.remove(json_path)
-                    except Exception:
-                        pass
-
-            yield {"type": "done", "request_id": request_id}
-
-        except Exception as e:
-            yield {
-                "type": "error",
-                "message": str(e),
-                "request_id": request_id
-            }
-            yield {"type": "done", "request_id": request_id}
-
-        finally:
-            with ACTIVE_LOCK:
-                ACTIVE_PROCESSES.pop(request_id, None)
-    with PROCESS_SEMAPHORE:
-        process = None
-
-        try:
-            yield {"type": "start", "message": cmd, "request_id": request_id}
-
-            parts = shlex.split(cmd)
-            if not parts:
-                yield {
-                    "type": "error",
-                    "message": "Comando vacío",
-                    "request_id": request_id
-                }
-                yield {"type": "done", "request_id": request_id}
-                return
-
-            binary = parts[0].split("/")[-1]
-            parts[0] = _resolve_binary_path(binary)
-
-            json_path = None
-            try:
-                parts, json_path = setup_structured_output(parts, request_id)
-            except Exception:
-                pass
-
-            effective_timeout = _get_command_timeout(parts)
-
-            process = subprocess.Popen(
-                parts,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1
-            )
-
-            with ACTIVE_LOCK:
-                ACTIVE_PROCESSES[request_id] = process
-
-            q = queue.Queue()
-            process_start = time.time()
-
-            def read_stream(stream, stream_type="stdout"):
-                try:
-                    for line in iter(stream.readline, ''):
-                        try:
-                            clean_line = ANSI_ESCAPE.sub('', line).rstrip()
-                        except Exception:
-                            clean_line = repr(line).strip("'")
-
-                        if clean_line:
-                            q.put({
-                                "type": "line",
-                                "stream": stream_type,
-                                "message": clean_line,
-                                "request_id": request_id
-                            })
-                except Exception as e:
-                    q.put({
-                        "type": "line",
-                        "stream": "stderr",
-                        "message": f"[read error: {e}]",
-                        "request_id": request_id
-                    })
-                finally:
-                    q.put({
-                        "type": "_stream_end",
-                        "stream": stream_type,
-                        "request_id": request_id
-                    })
-
-            t_out = threading.Thread(
-                target=read_stream,
-                args=(process.stdout, "stdout"),
-                daemon=True
-            )
-            t_err = threading.Thread(
-                target=read_stream,
-                args=(process.stderr, "stderr"),
-                daemon=True
-            )
-
-            t_out.start()
-            t_err.start()
-
-            finished_streams = 0
-            timed_out = False
-
-            while True:
-                if process.poll() is None and (time.time() - process_start) > effective_timeout:
-                    process.kill()
-                    timed_out = True
-
-                    yield {
-                        "type": "error",
-                        "message": f"Timeout: el proceso tardó demasiado ({effective_timeout}s)",
-                        "request_id": request_id
-                    }
-
-                    t_out.join(timeout=2)
-                    t_err.join(timeout=2)
-
-                    while True:
-                        try:
-                            item = q.get_nowait()
-                            if item["type"] != "_stream_end":
-                                yield item
-                        except queue.Empty:
-                            break
-                    break
-
-                try:
-                    item = q.get(timeout=0.2)
-                    if item["type"] == "_stream_end":
-                        finished_streams += 1
-                        if finished_streams >= 2:
-                            break
-                    else:
-                        yield item
-                except queue.Empty:
-                    pass
 
                 if process.poll() is not None:
                     t_out.join(timeout=3)
