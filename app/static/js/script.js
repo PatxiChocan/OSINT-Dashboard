@@ -23,7 +23,10 @@ function startTimer(tool) {
 }
 
 function stopTimer(tool) {
-  if (_runTimers[tool]) { clearInterval(_runTimers[tool]); delete _runTimers[tool]; }
+  if (_runTimers[tool]) {
+    clearInterval(_runTimers[tool]);
+    delete _runTimers[tool];
+  }
 }
 
 function getElapsed(tool) {
@@ -73,9 +76,9 @@ const SUBTOOLS = {
   ],
   amass: [
     { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -whois -d ${t}` },
-    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t} -ip` },
-    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t} -ip` },
-    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t} -ip` },
+    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t}` },
+    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t}` },
+    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t}` },
     { name: 'track', func: 'Nuevos subdominios vs escaneos anteriores', alert: 'none', cmd: t => `amass track -d ${t}` },
     { name: 'db', func: 'Consulta base de datos local', alert: 'none', cmd: t => `amass db -d ${t}` }
   ],
@@ -781,6 +784,8 @@ function runTool(tool) {
   setHtml(`results-${tool}`, makeInfoText(UI_TEXT.running));
 
   const allLines = [];
+  let hadError = false;
+
   const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
   runningRequests[tool] = requestId;
 
@@ -788,6 +793,9 @@ function runTool(tool) {
     cmd,
     requestId,
     (msg) => {
+
+      if (msg.type === 'heartbeat') return;
+
       if (msg.type === 'start') {
         writer.write(`▶ ${msg.message}\n`);
         return;
@@ -804,35 +812,53 @@ function runTool(tool) {
       }
 
       if (msg.type === 'exit') {
-        writer.write(`⚠ Process finished with code ${msg.message}\n`);
+        hadError = true;
+        writer.write(`✖ Process finished with code ${msg.message}\n`);
         return;
       }
 
       if (msg.type === 'error') {
-        // Log to raw output but don't overwrite summary — process may still be running
+        hadError = true;
         writer.write(`✖ ${msg.message}\n`);
         return;
       }
 
       if (msg.type === 'structured') {
-        // Store structured data — will be rendered on 'done'
         _structuredCache[tool] = msg.data;
         return;
       }
 
       if (msg.type === 'done') {
         writer.flushNow();
+
+        if (hadError) {
+          if ($(`sr-${tool}`)) $(`sr-${tool}`).style.display = 'none';
+          if ($(`sd-${tool}`)) $(`sd-${tool}`).style.display = 'none';
+
+          const idle = $(`ss-${tool}`);
+          if (idle) {
+            idle.style.display = 'inline';
+            idle.textContent = '✖ Error';
+          }
+
+          resetBtn(tool);
+          delete runningRequests[tool];
+          return;
+        }
+
         setStatus(tool, 'done');
-        // Prefer structured JSON over text parsing
+
         const structured = _structuredCache[tool];
         delete _structuredCache[tool];
+
         if (structured && renderStructured(tool, structured)) {
-          // rendered from JSON ✓
+          // rendered from JSON
         } else {
           const parsed = parseOutput(tool, allLines);
           if (parsed.length) renderParsed(tool, parsed);
           else setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptyStructured));
         }
+
         resetBtn(tool);
         delete runningRequests[tool];
       }
@@ -992,7 +1018,6 @@ function launchParallel() {
   const checked = [...document.querySelectorAll('#parallel-subtool-grid .pg-checkbox:checked')];
   if (!checked.length) return;
 
-  // Reset state
   Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
   _parallelTotal = checked.length;
   _parallelDone  = 0;
@@ -1006,7 +1031,6 @@ function launchParallel() {
   const launchBtn = $('launch-parallel-btn');
   if (launchBtn) launchBtn.disabled = true;
 
-  // Request notification permission
   if (Notification.permission === 'default') Notification.requestPermission();
 
   _startParallelTimer();
@@ -1025,34 +1049,56 @@ function launchParallel() {
       return;
     }
 
-    _parallelState[key] = { tool, idx, name: subtool.name, cmd,
-      startTime: Date.now(), done: false, lines: 0, structured: null, elapsed: 0 };
+    _parallelState[key] = {
+      tool,
+      idx,
+      name: subtool.name,
+      cmd,
+      startTime: Date.now(),
+      done: false,
+      lines: 0,
+      structured: null,
+      elapsed: 0,
+      hadError: false
+    };
     _renderParallelSummary();
 
     const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
-    const allLines  = [];
+    const allLines = [];
 
-    streamCmd(cmd, requestId,
+    streamCmd(
+      cmd,
+      requestId,
       (msg) => {
+        if (msg.type === 'heartbeat') return;
         if (msg.type === 'start') {
           appendParallelLine(tool, `▶ ${subtool.name}: ${cmd}`, color, true);
         } else if (msg.type === 'line') {
           _parallelState[key].lines++;
           appendParallelLine(tool, msg.stream === 'stderr' ? `⚠ ${msg.message}` : msg.message, color, false);
-          allLines.push(msg.message); // collect all lines for text parsing
+          allLines.push(msg.message);
         } else if (msg.type === 'structured') {
           _parallelState[key].structured = msg.data;
         } else if (msg.type === 'exit') {
-          appendParallelLine(tool, `⚠ Exit code: ${msg.message}`, color, false);
+          _parallelState[key].hadError = true;
+          appendParallelLine(tool, `✖ Exit code: ${msg.message}`, color, false);
         } else if (msg.type === 'error') {
+          _parallelState[key].hadError = true;
           appendParallelLine(tool, `✖ ${msg.message}`, color, false);
         } else if (msg.type === 'done') {
-          _parallelState[key].done    = true;
+          _parallelState[key].done = true;
           _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
           _parallelState[key].allLines = allLines;
           _parallelDone++;
-          appendParallelLine(tool, `✓ ${subtool.name} completado en ${_fmtSecs(_parallelState[key].elapsed)}`, color, true);
+
+          if (_parallelState[key].hadError) {
+            appendParallelLine(tool, `✖ ${subtool.name} finalizó con error en ${_fmtSecs(_parallelState[key].elapsed)}`, color, true);
+          } else {
+            appendParallelLine(tool, `✓ ${subtool.name} completado en ${_fmtSecs(_parallelState[key].elapsed)}`, color, true);
+          }
+
           _renderParallelSummary();
+
           if (_parallelDone >= _parallelTotal) {
             _stopParallelTimer();
             _notifyParallelDone();
@@ -1062,12 +1108,15 @@ function launchParallel() {
         }
       },
       (err) => {
-        _parallelState[key].done    = true;
+        _parallelState[key].done = true;
+        _parallelState[key].hadError = true;
         _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
         _parallelState[key].allLines = allLines;
         _parallelDone++;
+
         appendParallelLine(tool, `[ERROR] ${err}`, color, false);
         _renderParallelSummary();
+
         if (_parallelDone >= _parallelTotal) {
           _stopParallelTimer();
           if (launchBtn) launchBtn.disabled = false;
@@ -1154,6 +1203,8 @@ function runPlanStep(cmdTemplate, tool) {
   setHtml(`results-${tool}`, makeInfoText(UI_TEXT.runningFromPlan));
 
   const allLines = [];
+  let hadError = false;
+
   const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
   runningRequests[tool] = requestId;
 
@@ -1161,6 +1212,9 @@ function runPlanStep(cmdTemplate, tool) {
     cmd,
     requestId,
     (msg) => {
+
+      if (msg.type === 'heartbeat') return;
+
       if (msg.type === 'start') {
         writer.write(`▶ ${msg.message}\n`);
         return;
@@ -1174,7 +1228,14 @@ function runPlanStep(cmdTemplate, tool) {
         return;
       }
 
+      if (msg.type === 'exit') {
+        hadError = true;
+        writer.write(`✖ Process finished with code ${msg.message}\n`);
+        return;
+      }
+
       if (msg.type === 'error') {
+        hadError = true;
         writer.write(`✖ ${msg.message}\n`);
         return;
       }
@@ -1186,16 +1247,35 @@ function runPlanStep(cmdTemplate, tool) {
 
       if (msg.type === 'done') {
         writer.flushNow();
+
+        if (hadError) {
+          if ($(`sr-${tool}`)) $(`sr-${tool}`).style.display = 'none';
+          if ($(`sd-${tool}`)) $(`sd-${tool}`).style.display = 'none';
+
+          const idle = $(`ss-${tool}`);
+          if (idle) {
+            idle.style.display = 'inline';
+            idle.textContent = '✖ Error';
+          }
+
+          resetBtn(tool);
+          delete runningRequests[tool];
+          return;
+        }
+
         setStatus(tool, 'done');
+
         const structured = _structuredCache[tool];
         delete _structuredCache[tool];
+
         if (structured && renderStructured(tool, structured)) {
-          // rendered from JSON ✓
+          // rendered from JSON
         } else {
           const parsed = parseOutput(tool, allLines);
           if (parsed.length) renderParsed(tool, parsed);
           else setHtml(`results-${tool}`, makeInfoText(UI_TEXT.emptyStructured));
         }
+
         resetBtn(tool);
         delete runningRequests[tool];
       }
@@ -1210,13 +1290,19 @@ function runPlanStep(cmdTemplate, tool) {
 }
 
 function streamCmd(cmd, requestId, onData, onError) {
-  // Abort controller so we can cancel the fetch if the stream hangs
   const controller = new AbortController();
-  // Frontend hard-timeout: 310s (slightly over backend's 300s)
+
+  // Debe estar por encima del timeout del backend para Amass
+  const frontendTimeoutMs = 930_000; // 15m 30s
+  const stallTimeoutMs = 240_000;    // 4 min sin datos antes de abortar
+
+  let finished = false;
+
   const frontendTimeout = setTimeout(() => {
+    if (finished) return;
     controller.abort();
-    onError('Timeout del frontend: el stream no respondió a tiempo');
-  }, 310_000);
+    onError('Timeout del frontend: la ejecución tardó demasiado');
+  }, frontendTimeoutMs);
 
   fetch('/run', {
     method: 'POST',
@@ -1230,57 +1316,94 @@ function streamCmd(cmd, requestId, onData, onError) {
         throw new Error(txt || 'Error HTTP');
       }
 
+      if (!res.body) {
+        throw new Error('La respuesta no contiene stream');
+      }
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      // Stall watchdog: if no bytes arrive in 60s, abort
-      let stallTimer = setTimeout(() => { controller.abort(); }, 60_000);
-      function resetStall() {
+
+      let stallTimer = null;
+
+      function clearAllTimers() {
+        clearTimeout(frontendTimeout);
         clearTimeout(stallTimer);
-        stallTimer = setTimeout(() => { controller.abort(); }, 60_000);
       }
 
-      function read() {
-        reader.read()
-          .then(({ done, value }) => {
+      function resetStall() {
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => {
+          if (finished) return;
+          controller.abort();
+          onError('Timeout por inactividad: no llegaron datos del stream durante demasiado tiempo');
+        }, stallTimeoutMs);
+      }
+
+      resetStall();
+
+      function processChunk(chunk) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        events.forEach(eventBlock => {
+          const dataLines = eventBlock
+            .split('\n')
+            .filter(line => line.startsWith('data:'))
+            .map(line => line.slice(5).trim());
+
+          if (!dataLines.length) return;
+
+          const payload = dataLines.join('\n');
+
+          try {
+            const msg = JSON.parse(payload);
+
+            onData(msg);
+
+            if (msg.type === 'done') {
+              finished = true;
+              clearAllTimers();
+              try { reader.cancel(); } catch (_) {}
+            }
+          } catch (_) {
+            // Ignorar eventos mal formados sin romper el stream
+          }
+        });
+      }
+
+      async function readLoop() {
+        try {
+          while (!finished) {
+            const { done, value } = await reader.read();
+
             if (done) {
-              clearTimeout(frontendTimeout);
-              clearTimeout(stallTimer);
-              return;
+              if (!finished && buffer.trim()) {
+                processChunk(new Uint8Array());
+              }
+              clearAllTimers();
+              break;
             }
 
             resetStall();
-            buffer += decoder.decode(value, { stream: true });
-            const chunks = buffer.split('\n\n');
-            buffer = chunks.pop();
-
-            chunks.forEach(chunk => {
-              const line = chunk.split('\n').find(item => item.startsWith('data:'));
-              if (!line) return;
-              try {
-                const msg = JSON.parse(line.slice(5).trim());
-                if (msg.type === 'done') {
-                  clearTimeout(frontendTimeout);
-                  clearTimeout(stallTimer);
-                }
-                onData(msg);
-              } catch (_) {}
-            });
-
-            read();
-          })
-          .catch(err => {
-            clearTimeout(frontendTimeout);
-            clearTimeout(stallTimer);
-            if (err.name !== 'AbortError') onError(err.message);
-          });
+            processChunk(value);
+          }
+        } catch (err) {
+          clearAllTimers();
+          if (err.name !== 'AbortError' && !finished) {
+            onError(err.message || 'Error leyendo el stream');
+          }
+        }
       }
 
-      read();
+      readLoop();
     })
     .catch(err => {
       clearTimeout(frontendTimeout);
-      if (err.name !== 'AbortError') onError(err.message);
+      if (err.name !== 'AbortError') {
+        onError(err.message || 'Error de red');
+      }
     });
 }
 
@@ -1320,18 +1443,26 @@ function setStatus(tool, state) {
   const idle = $(`ss-${tool}`);
 
   if (state === 'running') startTimer(tool);
-  if (state === 'done' || state === 'idle') stopTimer(tool);
+
+  let elapsed = '';
+  if (state === 'done') {
+    elapsed = getElapsed(tool);
+    stopTimer(tool);
+  }
+
+  if (state === 'idle') stopTimer(tool);
 
   if (running) running.style.display = state === 'running' ? 'flex' : 'none';
   if (done) done.style.display = state === 'done' ? 'inline-flex' : 'none';
+
   if (state === 'done') {
     const et = $(`et-${tool}`);
-    const elapsed = getElapsed(tool);
-    if (et) et.textContent = `(${elapsed})`;
-    // Show toast for individual tool completion
+    if (et) et.textContent = elapsed ? `(${elapsed})` : '';
+
     const toolName = document.querySelector(`#panel-${tool} .page-title`)?.childNodes[0]?.textContent?.trim() || tool;
-    showToast(`${toolName} completado en ${elapsed}`, 'success');
+    showToast(`${toolName} completado${elapsed ? ` en ${elapsed}` : ''}`, 'success');
   }
+
   if (idle) idle.style.display = state === 'running' || state === 'done' ? 'none' : 'inline';
 }
 
