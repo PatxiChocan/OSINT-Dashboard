@@ -474,10 +474,86 @@ function parseOutput(tool, lines) {
     if (groups.length) return groups;
   }
 
+  // ── WHOIS (discover) ─────────────────────────────────────────────────────
+  const isWhoisOutput = /Domain Name:|Registrar:|Name Server:|WHOIS/i.test(joined);
+
+  if (isWhoisOutput && tool === 'discover') {
+
+    const getAll = (regex) =>
+      [...joined.matchAll(regex)].map(m => m[1].trim());
+
+    const domain    = getAll(/Domain Name:\s*([^\n]+)/gi);
+    const registrar = getAll(/Registrar:\s*([^\n]+)/gi);
+    const creation  = getAll(/Creation Date:\s*([^\n]+)/gi);
+    const expiry = getAll(/(?:Expiry Date|Expiration Date|Registry Expiry Date|Registrar Registration Expiration Date):\s*([^\n]+)/gi);
+
+    const org       = getAll(/Registrant Organization:\s*([^\n]+)/gi);
+    const country   = getAll(/Registrant Country:\s*([^\n]+)/gi);
+
+    const nameservers = getAll(/Name Server:\s*([^\n]+)/gi)
+      .map(ns => ns.toLowerCase());
+
+    const status = getAll(/Domain Status:\s*([^\n]+)/gi);
+
+    const emails = [...new Set(
+      joined.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []
+    )];
+
+    const whoisItems = [];
+
+    if (domain.length)    whoisItems.push(`Dominio: ${domain[0]}`);
+    if (registrar.length) whoisItems.push(`Registrador: ${registrar[0]}`);
+    if (org.length)       whoisItems.push(`Organización: ${org[0]}`);
+    if (country.length)   whoisItems.push(`País: ${country[0]}`);
+    if (creation.length)  whoisItems.push(`Creado: ${creation[0]}`);
+    if (expiry.length)    whoisItems.push(`Expira: ${expiry[0]}`);
+
+    if (whoisItems.length) {
+      groups.push({
+        title: 'Resumen WHOIS',
+        icon: '📇',
+        type: 'generic',
+        items: whoisItems
+      });
+    }
+
+    if (nameservers.length) {
+      groups.push({
+        title: `Name Servers (${nameservers.length})`,
+        icon: '🧭',
+        type: 'host',
+        items: [...new Set(nameservers)]
+      });
+    }
+
+    if (emails.length) {
+      groups.push({
+        title: `Emails (${emails.length})`,
+        icon: '✉️',
+        type: 'email',
+        items: emails
+      });
+    }
+
+    if (status.length) {
+      groups.push({
+        title: 'Estados del dominio',
+        icon: '🛡️',
+        type: 'generic',
+        items: [...new Set(status)]
+      });
+    }
+
+    return groups;
+  }
+
   // ── WhatWeb ──────────────────────────────────────────────────────────────
   const whatwebData = collectWhatWebData(lines);
-  const looksLikeWhatWeb = whatwebData.urls.length || whatwebData.ips.length ||
-    whatwebData.titles.length || whatwebData.servers.length || whatwebData.technologies.length;
+  const looksLikeWhatWeb =
+    whatwebData.urls.length ||
+    whatwebData.ips.length ||
+    whatwebData.titles.length ||
+    whatwebData.servers.length;
 
   if (looksLikeWhatWeb) {
     if (whatwebData.urls.length) groups.push({ title: 'URLs analizadas', icon: '🔗', type: 'url', items: whatwebData.urls });
@@ -485,36 +561,6 @@ function parseOutput(tool, lines) {
     if (whatwebData.titles.length) groups.push({ title: 'Títulos', icon: '📰', type: 'generic', items: whatwebData.titles });
     if (whatwebData.servers.length) groups.push({ title: 'Servidor web', icon: '🖥️', type: 'generic', items: whatwebData.servers });
     if (whatwebData.technologies.length) groups.push({ title: 'Tecnologías detectadas', icon: '🧩', type: 'generic', items: whatwebData.technologies });
-    return groups;
-  }
-
-  // ── WHOIS (discover) ─────────────────────────────────────────────────────
-  const isWhoisOutput = /Domain Name:|Registrar:|Name Server:|WHOIS/i.test(joined);
-  if (isWhoisOutput && tool === 'discover') {
-    const domainMatch    = joined.match(/Domain Name:\s*([^\n]+)/i);
-    const registrarMatch = joined.match(/Registrar:\s*([^\n]+)/i);
-    const creationMatch  = joined.match(/Creation Date:\s*([^\n]+)/i);
-    const expiryMatch    = joined.match(/Registry Expiry Date:\s*([^\n]+)/i) ||
-                           joined.match(/Registrar Registration Expiration Date:\s*([^\n]+)/i);
-    const orgMatch       = joined.match(/Registrant Organization:\s*([^\n]+)/i) ||
-                           joined.match(/org:\s*([^\n]+)/i);
-    const countryMatch   = joined.match(/Registrant Country:\s*([^\n]+)/i) ||
-                           joined.match(/country:\s*([^\n]+)/i);
-    const nsMatches      = [...joined.matchAll(/Name Server:\s*([^\n]+)/gi)].map(m => m[1].trim().toLowerCase());
-    const statusMatches  = [...joined.matchAll(/Domain Status:\s*([^\n]+)/gi)].map(m => m[1].trim());
-    const dnssecMatch    = joined.match(/DNSSEC:\s*([^\n]+)/i);
-
-    const whoisItems = [];
-    if (domainMatch)    whoisItems.push(`Dominio: ${domainMatch[1].trim()}`);
-    if (registrarMatch) whoisItems.push(`Registrador: ${registrarMatch[1].trim()}`);
-    if (orgMatch)       whoisItems.push(`Organización: ${orgMatch[1].trim()}`);
-    if (countryMatch)   whoisItems.push(`País: ${countryMatch[1].trim()}`);
-    if (creationMatch)  whoisItems.push(`Creado: ${creationMatch[1].trim()}`);
-    if (expiryMatch)    whoisItems.push(`Expira: ${expiryMatch[1].trim()}`);
-    if (dnssecMatch)    whoisItems.push(`DNSSEC: ${dnssecMatch[1].trim()}`);
-    if (whoisItems.length) groups.push({ title: 'Resumen WHOIS', icon: '📇', type: 'generic', items: whoisItems });
-    if (nsMatches.length)  groups.push({ title: 'Name Servers', icon: '🧭', type: 'host', items: [...new Set(nsMatches)] });
-    if (statusMatches.length) groups.push({ title: 'Estados del dominio', icon: '🛡️', type: 'generic', items: [...new Set(statusMatches)] });
     return groups;
   }
 
