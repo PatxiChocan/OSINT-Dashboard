@@ -7,6 +7,8 @@ import time
 import json
 import os
 import tempfile
+import uuid
+
 
 ALLOWED_BINARIES = {
     "script",
@@ -56,7 +58,7 @@ BINARY_PATHS = {
 
 MAX_PROCESSES = 4
 PROCESS_SEMAPHORE = threading.Semaphore(MAX_PROCESSES)
-COMMAND_TIMEOUT = 300
+COMMAND_TIMEOUT = 1000 
 
 ANSI_ESCAPE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
