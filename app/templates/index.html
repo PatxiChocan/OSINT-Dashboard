@@ -4,50 +4,70 @@
   <meta charset="UTF-8">
   <title>Aletheia OSINT Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='img/logo.png') }}">
 </head>
 <body>
   <div class="layout">
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-title">ALETHEIA</div>
-        <div class="logo-sub">OSINT Dashboard</div>
+        <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo-img">
       </div>
 
       <div class="sidebar-section">Navegación</div>
-      <button class="nav-btn active" onclick="show('home',this)"><span class="icon">⌂</span>Inicio</button>
-      <button class="nav-btn" onclick="show('plan',this)"><span class="icon">📋</span>Plan de prueba</button>
-      <button class="nav-btn" onclick="show('parallel',this)"><span class="icon">⚡</span>Modo paralelo</button>
+      <button class="nav-btn active" onclick="show('home',this)">
+        <span class="icon">⌂</span>
+        <span>Inicio</span>
+      </button>
+      <button class="nav-btn" onclick="show('plan',this)">
+        <span class="icon">📋</span>
+        <span>Plan de prueba</span>
+      </button>
+      <button class="nav-btn" onclick="show('parallel',this)">
+        <span class="icon">⚡</span>
+        <span>Modo paralelo</span>
+      </button>
 
       <div class="nav-divider"></div>
 
       <div class="sidebar-section">Herramientas</div>
-      <button class="nav-btn" onclick="show('discover',this)"><span class="icon">🔍</span>Discover</button>
-      <button class="nav-btn" onclick="show('amass',this)"><span class="icon">🌐</span>Amass</button>
-      <button class="nav-btn" onclick="show('katana',this)"><span class="icon">🕷</span>Katana</button>
+      <button class="nav-btn" onclick="show('discover',this)">
+        <span class="icon">🔍</span>
+        <span>Discover</span>
+      </button>
+      <button class="nav-btn" onclick="show('amass',this)">
+        <span class="icon">🌐</span>
+        <span>Amass</span>
+      </button>
+      <button class="nav-btn" onclick="show('katana',this)">
+        <span class="icon">🕷</span>
+        <span>Katana</span>
+      </button>
 
-      <!-- Ocultas para la demo
-      <button class="nav-btn" onclick="show('gitleaks',this)"><span class="icon">🔑</span>GitLeaks</button>
-      <button class="nav-btn" onclick="show('wayback',this)"><span class="icon">🕰</span>Wayback DL</button>
-      <button class="nav-btn" onclick="show('spiderfoot',this)"><span class="icon">🕸</span>SpiderFoot</button>
-      -->
-
-      <div class="sidebar-status">
-        <span class="status-dot"></span>
-        Kali Linux · localhost:5000
+      <div class="sidebar-status sidebar-status-card">
+        <div class="sidebar-status-row">
+          <span class="status-dot"></span>
+          <span>Backend online</span>
+        </div>
+        <div class="sidebar-status-meta">Host: localhost:5000</div>
+        <div class="sidebar-status-meta">Entorno: Kali Linux</div>
       </div>
     </nav>
 
     <div class="main">
       <div class="topbar">
-        <span class="topbar-label">🎯 Objetivo</span>
-        <input
-          class="target-input"
-          id="targetInput"
-          placeholder="ej: example.com"
-          oninput="updateTarget(this.value)"
-        >
+        <div class="topbar-left">
+          <span class="topbar-label">🎯 Objetivo</span>
+          <input
+            class="target-input"
+            id="targetInput"
+            placeholder="ej: example.com"
+            oninput="updateTarget(this.value)"
+          >
+        </div>
+
         <div class="topbar-right">
           <span class="target-chip" id="targetChip"></span>
           <span id="clock" class="clock-label"></span>
@@ -55,115 +75,311 @@
       </div>
 
       <div class="content">
-
         <div class="panel active" id="panel-home">
-          <div class="page-header">
-            <div class="page-title">Análisis OSINT guiado</div>
-            <div class="page-desc">
-              Introduce un dominio y ejecuta reconocimiento pasivo, enumeración y crawling desde una única interfaz.
+          <div class="page-header page-header-home">
+            <div>
+              <div class="page-title">Análisis OSINT guiado</div>
+              <div class="page-desc">
+                Introduce un dominio y ejecuta reconocimiento pasivo, enumeración y crawling desde una única interfaz.
+              </div>
             </div>
           </div>
 
-          <div class="hero-box">
+          <div class="target-context">
+            <div class="target-context-header">
+              <div>
+                <div class="target-context-eyebrow">Contexto activo</div>
+                <div class="target-context-title">Objetivo actual</div>
+              </div>
+
+              <div class="context-status-badge">
+                <span class="context-dot"></span>
+                <span id="homeTargetStatus">READY</span>
+              </div>
+            </div>
+
+            <div class="target-context-body">
+              <div class="target-context-domain">
+                <span class="target-context-label">Dominio / IP</span>
+                <div class="target-context-value" id="homeTargetValue">Sin objetivo definido</div>
+              </div>
+
+              <div class="target-context-stats">
+                <div class="context-mini-card">
+                  <span class="context-mini-k">Última acción</span>
+                  <span class="context-mini-v">Esperando ejecución</span>
+                </div>
+
+                <div class="context-mini-card">
+                  <span class="context-mini-k">Herramientas</span>
+                  <span class="context-mini-v">3 módulos</span>
+                </div>
+
+                <div class="context-mini-card">
+                  <span class="context-mini-k">Estado motor</span>
+                  <span class="context-mini-v ok">Nominal</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-box hero-box-compact">
             <div class="hero-box-left">
               <div class="hero-box-title">Empieza por Discover</div>
               <div class="hero-box-desc">
-                Es la mejor opción para la demo: agrupa comprobaciones rápidas y visibles como WHOIS, DNSRecon y WhatWeb.
+                La mejor opción para demo y reconocimiento inicial: WHOIS, DNSRecon, WhatWeb, TLS, Nmap y otras comprobaciones rápidas desde un único punto de entrada.
               </div>
+
               <div class="hero-actions">
                 <button class="run-btn" onclick="show('discover', null)">🚀 Ir a Discover</button>
                 <button class="secondary-btn" onclick="show('plan', null)">📋 Ver plan guiado</button>
               </div>
             </div>
+
             <div class="hero-box-right">
-              <div class="quick-steps">
+              <div class="quick-steps quick-steps-compact">
                 <div class="quick-step">
                   <span class="quick-step-num">1</span>
-                  <span class="quick-step-text">Escribe un dominio objetivo arriba</span>
+                  <span class="quick-step-text">Define el dominio o IP objetivo</span>
                 </div>
                 <div class="quick-step">
                   <span class="quick-step-num">2</span>
-                  <span class="quick-step-text">Abre Discover o el Plan de prueba</span>
+                  <span class="quick-step-text">Abre Discover o el plan de prueba</span>
                 </div>
                 <div class="quick-step">
                   <span class="quick-step-num">3</span>
-                  <span class="quick-step-text">Lanza una herramienta y revisa el output</span>
+                  <span class="quick-step-text">Ejecuta una herramienta y revisa findings + raw output</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="stats-row">
-            <div class="stat-card">
+          <div class="stats-row stats-row-ops">
+            <div class="stat-card stat-card-ops">
+              <div class="stat-label stat-label-mono">TOOLS</div>
               <div class="stat-val">3</div>
-              <div class="stat-label">Herramientas destacadas</div>
+              <div class="stat-sub">Módulos principales</div>
             </div>
-            <div class="stat-card">
+
+            <div class="stat-card stat-card-ops">
+              <div class="stat-label stat-label-mono">COMMANDS</div>
               <div class="stat-val">40+</div>
-              <div class="stat-label">Subcomandos preparados</div>
+              <div class="stat-sub">Subcomandos preparados</div>
             </div>
-            <div class="stat-card">
+
+            <div class="stat-card stat-card-ops">
+              <div class="stat-label stat-label-mono">PARALLEL</div>
               <div class="stat-val">⚡</div>
-              <div class="stat-label">Ejecución en paralelo</div>
+              <div class="stat-sub">Ejecución concurrente</div>
             </div>
-            <div class="stat-card">
+
+            <div class="stat-card stat-card-ops">
+              <div class="stat-label stat-label-mono">WORKFLOW</div>
               <div class="stat-val">📋</div>
-              <div class="stat-label">Flujo de prueba guiado</div>
+              <div class="stat-sub">Flujo guiado</div>
             </div>
           </div>
 
-          <div class="section-title">Inicio rápido</div>
-          <div class="home-grid">
-            <div class="home-card home-card-primary" onclick="show('discover',null)">
-              <div class="home-card-icon">🔍</div>
-              <div class="home-card-name">Discover</div>
-              <div class="home-card-desc">
-                WHOIS, DNSRecon, WhatWeb, Nmap, Nikto y otras comprobaciones rápidas para reconocimiento inicial.
+          <div class="home-main-grid">
+            <div class="home-main-left">
+              <div class="section-title">Inicio rápido</div>
+
+              <div class="tool-overview-grid">
+                <div class="tool-overview-card tool-overview-primary" onclick="show('discover',null)">
+                  <div class="tool-overview-head">
+                    <div class="tool-overview-head-left">
+                      <div class="tool-overview-icon">🔍</div>
+                      <div>
+                        <div class="tool-overview-name">Discover</div>
+                        <div class="tool-overview-subtitle">Recon inicial visible</div>
+                      </div>
+                    </div>
+                    <span class="tag tag-primary">Recomendado</span>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Descripción</div>
+                    <div class="tool-overview-desc">
+                      Reconocimiento inicial del objetivo con salida rápida y visible.
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Cobertura</div>
+                    <div class="tool-overview-meta">
+                      <span class="tool-meta-chip">WHOIS</span>
+                      <span class="tool-meta-chip">DNS</span>
+                      <span class="tool-meta-chip">WhatWeb</span>
+                      <span class="tool-meta-chip">TLS</span>
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-footer">
+                    <div>
+                      <div class="tool-section-title">Salida esperada</div>
+                      <span class="tool-overview-out">Dominio, IPs, stack, puertos</span>
+                    </div>
+                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('discover',null)">Abrir</button>
+                  </div>
+                </div>
+
+                <div class="tool-overview-card" onclick="show('amass',null)">
+                  <div class="tool-overview-head">
+                    <div class="tool-overview-head-left">
+                      <div class="tool-overview-icon">🌐</div>
+                      <div>
+                        <div class="tool-overview-name">Amass</div>
+                        <div class="tool-overview-subtitle">Superficie externa</div>
+                      </div>
+                    </div>
+                    <span class="tag tag-apache">Apache 2.0</span>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Descripción</div>
+                    <div class="tool-overview-desc">
+                      Expansión de superficie externa mediante enumeración pasiva y activa.
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Cobertura</div>
+                    <div class="tool-overview-meta">
+                      <span class="tool-meta-chip">Subdominios</span>
+                      <span class="tool-meta-chip">IPs</span>
+                      <span class="tool-meta-chip">Passive</span>
+                      <span class="tool-meta-chip">Active</span>
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-footer">
+                    <div>
+                      <div class="tool-section-title">Salida esperada</div>
+                      <span class="tool-overview-out">Subdominios y resolución</span>
+                    </div>
+                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('amass',null)">Abrir</button>
+                  </div>
+                </div>
+
+                <div class="tool-overview-card" onclick="show('katana',null)">
+                  <div class="tool-overview-head">
+                    <div class="tool-overview-head-left">
+                      <div class="tool-overview-icon">🕷</div>
+                      <div>
+                        <div class="tool-overview-name">Katana</div>
+                        <div class="tool-overview-subtitle">Crawling y endpoints</div>
+                      </div>
+                    </div>
+                    <span class="tag tag-mit">MIT</span>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Descripción</div>
+                    <div class="tool-overview-desc">
+                      Crawling web para descubrir rutas, JS y endpoints expuestos.
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-section">
+                    <div class="tool-section-title">Cobertura</div>
+                    <div class="tool-overview-meta">
+                      <span class="tool-meta-chip">Routes</span>
+                      <span class="tool-meta-chip">JS</span>
+                      <span class="tool-meta-chip">API</span>
+                      <span class="tool-meta-chip">Headless</span>
+                    </div>
+                  </div>
+
+                  <div class="tool-overview-footer">
+                    <div>
+                      <div class="tool-section-title">Salida esperada</div>
+                      <span class="tool-overview-out">Endpoints y recursos</span>
+                    </div>
+                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('katana',null)">Abrir</button>
+                  </div>
+                </div>
               </div>
-              <div class="home-card-tag">
-                <span class="tag tag-primary">Recomendado</span>
+
+              <div class="section-title">Flujos disponibles</div>
+
+              <div class="home-grid">
+                <div class="home-card" onclick="show('plan',null)">
+                  <div class="home-card-icon">📋</div>
+                  <div class="home-card-name">Plan de prueba</div>
+                  <div class="home-card-desc">
+                    Secuencia guiada de menor a mayor impacto para presentar el análisis paso a paso.
+                  </div>
+                </div>
+
+                <div class="home-card" onclick="show('parallel',null)">
+                  <div class="home-card-icon">⚡</div>
+                  <div class="home-card-name">Modo paralelo</div>
+                  <div class="home-card-desc">
+                    Lanza varias subherramientas a la vez y revisa resultados unificados.
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="home-card" onclick="show('amass',null)">
-              <div class="home-card-icon">🌐</div>
-              <div class="home-card-name">Amass</div>
-              <div class="home-card-desc">
-                Enumeración de subdominios con fuentes pasivas y activas, ideal para ampliar superficie de ataque.
+            <div class="home-main-right">
+              <div class="section-title">Actividad reciente</div>
+
+            <div class="activity-panel">
+              <div class="activity-panel-title">Eventos recientes</div>
+
+              <div class="activity-item">
+                <div class="activity-item-top">
+                  <span class="activity-tool">Discover</span>
+                  <span class="activity-time">Última ejecución</span>
+                </div>
+                <div class="activity-text">
+                  Reconocimiento inicial completado. Revisa findings estructurados y output raw.
+                </div>
               </div>
-              <div class="home-card-tag">
-                <span class="tag tag-apache">Apache 2.0</span>
+
+              <div class="activity-item">
+                <div class="activity-item-top">
+                  <span class="activity-tool">Plan de prueba</span>
+                  <span class="activity-time">Disponible</span>
+                </div>
+                <div class="activity-text">
+                  Flujo recomendado: passive → low contact → active moderate → noisy.
+                </div>
+              </div>
+
+              <div class="activity-item">
+                <div class="activity-item-top">
+                  <span class="activity-tool">Modo paralelo</span>
+                  <span class="activity-time">Ready</span>
+                </div>
+                <div class="activity-text">
+                  Preparado para ejecutar múltiples subherramientas con resumen unificado.
+                </div>
               </div>
             </div>
 
-            <div class="home-card" onclick="show('katana',null)">
-              <div class="home-card-icon">🕷</div>
-              <div class="home-card-name">Katana</div>
-              <div class="home-card-desc">
-                Crawling web para descubrir rutas, endpoints y recursos expuestos en aplicaciones modernas.
+            <div class="section-title">Estado operativo</div>
+
+            <div class="ops-panel">
+              <div class="ops-panel-title">Estado del sistema</div>
+
+              <div class="ops-row">
+                <span class="ops-key">Motor</span>
+                <span class="ops-value ok">Nominal</span>
               </div>
-              <div class="home-card-tag">
-                <span class="tag tag-mit">MIT</span>
+              <div class="ops-row">
+                <span class="ops-key">Streaming</span>
+                <span class="ops-value ok">Disponible</span>
+              </div>
+              <div class="ops-row">
+                <span class="ops-key">Parseo</span>
+                <span class="ops-value ok">Activo</span>
+              </div>
+              <div class="ops-row">
+                <span class="ops-key">Modo paralelo</span>
+                <span class="ops-value">Listo</span>
               </div>
             </div>
-          </div>
-
-          <div class="section-title">Flujos disponibles</div>
-          <div class="home-grid">
-            <div class="home-card" onclick="show('plan',null)">
-              <div class="home-card-icon">📋</div>
-              <div class="home-card-name">Plan de prueba</div>
-              <div class="home-card-desc">
-                Secuencia guiada de menor a mayor impacto para presentar el flujo de análisis paso a paso.
-              </div>
-            </div>
-
-            <div class="home-card" onclick="show('parallel',null)">
-              <div class="home-card-icon">⚡</div>
-              <div class="home-card-name">Modo paralelo</div>
-              <div class="home-card-desc">
-                Ejecuta varias subherramientas al mismo tiempo y muestra el output unificado en una sola vista.
-              </div>
             </div>
           </div>
         </div>
@@ -364,13 +580,21 @@
 
             <div class="parallel-tab-content active" id="ptab-summary">
               <div class="parallel-summary-area" id="parallel-summary">
-                <p class="ui-message">Selecciona herramientas arriba y pulsa Lanzar.</p>
+                <div class="parallel-empty-state">
+                  <div class="parallel-empty-icon">⚡</div>
+                  <div class="parallel-empty-title">Sin ejecución activa</div>
+                  <div class="parallel-empty-text">
+                    Selecciona varias subherramientas y pulsa Lanzar para ver el resumen unificado.
+                  </div>
+                </div>
               </div>
             </div>
 
             <div class="parallel-tab-content" id="ptab-raw">
               <div class="parallel-output" id="parallel-out">
-                <span class="empty-output-text">Selecciona herramientas arriba y pulsa Lanzar.</span>
+                <div class="parallel-empty-terminal">
+                  <span class="empty-output-text">Esperando selección de herramientas...</span>
+                </div>
               </div>
             </div>
           </div>
@@ -382,5 +606,27 @@
   </div>
 
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script>
+    (function () {
+      const targetInput = document.getElementById('targetInput');
+      const homeTargetValue = document.getElementById('homeTargetValue');
+      const homeTargetStatus = document.getElementById('homeTargetStatus');
+
+      function syncHomeTarget() {
+        const value = targetInput && targetInput.value ? targetInput.value.trim() : '';
+        if (homeTargetValue) {
+          homeTargetValue.textContent = value || 'Sin objetivo definido';
+        }
+        if (homeTargetStatus) {
+          homeTargetStatus.textContent = value ? 'READY' : 'WAITING TARGET';
+        }
+      }
+
+      if (targetInput) {
+        targetInput.addEventListener('input', syncHomeTarget);
+        syncHomeTarget();
+      }
+    })();
+  </script>
 </body>
 </html>

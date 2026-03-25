@@ -154,21 +154,41 @@ function updateTarget(value) {
 }
 
 function show(id, btn) {
-  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(button => button.classList.remove('active'));
+  const currentPanel = document.querySelector('.panel.active');
+  const nextPanel = document.getElementById(`panel-${id}`);
 
-  const panel = $(`panel-${id}`);
-  if (panel) panel.classList.add('active');
-
-  if (btn) {
-    btn.classList.add('active');
+  if (!nextPanel || currentPanel === nextPanel) {
+    document.querySelectorAll('.nav-btn').forEach(button => button.classList.remove('active'));
+    if (btn) {
+      btn.classList.add('active');
+    } else {
+      const matching = [...document.querySelectorAll('.nav-btn')].find(button =>
+        button.textContent.trim().toLowerCase().includes(id.toLowerCase())
+      );
+      if (matching) matching.classList.add('active');
+    }
     return;
   }
 
-  const matching = [...document.querySelectorAll('.nav-btn')].find(button =>
-    button.textContent.trim().toLowerCase().includes(id.toLowerCase())
-  );
-  if (matching) matching.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(button => button.classList.remove('active'));
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const matching = [...document.querySelectorAll('.nav-btn')].find(button =>
+      button.textContent.trim().toLowerCase().includes(id.toLowerCase())
+    );
+    if (matching) matching.classList.add('active');
+  }
+
+  if (currentPanel) {
+    currentPanel.classList.remove('active');
+  }
+
+  nextPanel.classList.add('active');
+  nextPanel.scrollTop = 0;
+
+  const content = document.querySelector('.content');
+  if (content) content.scrollTop = 0;
 }
 
 function alertBadge(level) {
@@ -278,7 +298,7 @@ function buildParallelGrid() {
       <span class="pg-tool-badge" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
         ${tool.toUpperCase()}
       </span>
-      <span class="pg-tool-name">${toolMeta[tool].title.replace(/^.\s*/, '')}</span>
+      <span class="pg-tool-name">${toolMeta[tool].title}</span>
       <button class="pg-select-all" data-tool="${tool}" onclick="toggleSelectAll('${tool}')">Seleccionar todo</button>
     `;
     parallelGrid.appendChild(header);
@@ -1209,8 +1229,21 @@ function clearParallel() {
   _parallelDone  = 0;
   _stopParallelTimer();
   updateParallelCount();
-  setHtml('parallel-out', `<span class="empty-output-text">${UI_TEXT.emptyParallel}</span>`);
-  setHtml('parallel-summary', '<p class="ui-message">Selecciona herramientas arriba y pulsa Lanzar.</p>');
+  setHtml('parallel-summary', `
+  <div class="parallel-empty-state">
+    <div class="parallel-empty-icon">⚡</div>
+    <div class="parallel-empty-title">Sin ejecución activa</div>
+    <div class="parallel-empty-text">
+      Selecciona varias subherramientas y pulsa Lanzar para ver el resumen unificado.
+    </div>
+  </div>
+`);
+
+setHtml('parallel-out', `
+  <div class="parallel-empty-terminal">
+    <span class="empty-output-text">Esperando selección de herramientas...</span>
+  </div>
+`);
 }
 
 function goToPlan(tool, idx) {
