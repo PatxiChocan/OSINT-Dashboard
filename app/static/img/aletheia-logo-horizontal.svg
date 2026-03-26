@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 110" width="520" height="110">
+  <defs>
+    <clipPath id="hcut1"><rect x="195" y="36" width="300" height="13"/></clipPath>
+    <clipPath id="hcut2"><rect x="195" y="52" width="300" height="9"/></clipPath>
+  </defs>
+  <rect width="520" height="110" fill="#08090D"/>
+
+  <!-- SYMBOL — izquierda, escalado a 0.6x, centrado verticalmente -->
+  <!-- hex original 160x160 → escalado 0.6 = 96x96, centrado en y=(110-96)/2=7 -->
+  <g transform="translate(7, 7) scale(0.6)">
+    <polygon points="80,6 146,43 146,117 80,154 14,117 14,43"
+      stroke="#F0EDE6" stroke-opacity="0.82" stroke-width="1.6" fill="none"/>
+    <polygon points="80,22 130,51 130,109 80,138 30,109 30,51"
+      stroke="#F0EDE6" stroke-opacity="0.07" stroke-width="0.8" fill="none"/>
+    <line x1="80"  y1="6"   x2="80"  y2="18"  stroke="#7F77DD" stroke-width="2"   stroke-linecap="square" stroke-opacity="0.9"/>
+    <line x1="80"  y1="142" x2="80"  y2="154" stroke="#F0EDE6" stroke-width="1.6" stroke-linecap="square" stroke-opacity="0.8"/>
+    <line x1="146" y1="43"  x2="135" y2="49"  stroke="#F0EDE6" stroke-width="1.6" stroke-linecap="square" stroke-opacity="0.8"/>
+    <line x1="146" y1="117" x2="135" y2="111" stroke="#F0EDE6" stroke-width="1.6" stroke-linecap="square" stroke-opacity="0.8"/>
+    <line x1="14"  y1="43"  x2="25"  y2="49"  stroke="#F0EDE6" stroke-width="1.6" stroke-linecap="square" stroke-opacity="0.8"/>
+    <line x1="14"  y1="117" x2="25"  y2="111" stroke="#F0EDE6" stroke-width="1.6" stroke-linecap="square" stroke-opacity="0.8"/>
+    <line x1="50"  y1="114" x2="80"  y2="50"  stroke="#F0EDE6" stroke-width="3.2" stroke-linecap="square"/>
+    <line x1="110" y1="114" x2="82"  y2="54"  stroke="#F0EDE6" stroke-width="3.2" stroke-linecap="square"/>
+    <line x1="58"  y1="90"  x2="73"  y2="90"  stroke="#F0EDE6" stroke-width="2.8" stroke-linecap="square"/>
+    <line x1="87"  y1="90"  x2="102" y2="90"  stroke="#F0EDE6" stroke-width="2.8" stroke-linecap="square"/>
+    <line x1="50"  y1="114" x2="66"  y2="114" stroke="#F0EDE6" stroke-width="2.8" stroke-linecap="square"/>
+    <line x1="94"  y1="114" x2="110" y2="114" stroke="#F0EDE6" stroke-width="2.8" stroke-linecap="square"/>
+    <polygon points="80,85 84,90 80,95 76,90"     fill="#7F77DD" fill-opacity="0.95"/>
+    <polygon points="80,81 88,90 80,99 72,90"     fill="#534AB7" fill-opacity="0.2"/>
+    <polygon points="80,44 84,50 80,56 76,50"     fill="#7F77DD" fill-opacity="0.7"/>
+    <polygon points="80,110 83,114 80,118 77,114" fill="#7F77DD" fill-opacity="0.45"/>
+    <path d="M 124 22 L 138 22 L 138 36" stroke="#7F77DD" stroke-width="1.3" stroke-linecap="square" stroke-opacity="0.6" fill="none"/>
+    <path d="M 36 138 L 22 138 L 22 124" stroke="#7F77DD" stroke-width="1.3" stroke-linecap="square" stroke-opacity="0.6" fill="none"/>
+    <polygon points="146,80 150,84 146,88 142,84" fill="#7F77DD" fill-opacity="0.35"/>
+    <polygon points="14,80  18,84  14,88  10,84"  fill="#7F77DD" fill-opacity="0.35"/>
+  </g>
+
+  <!-- Vertical divider — después del símbolo (96px * 0.6 + 7 offset = ~104px) -->
+  <line x1="108" y1="18" x2="108" y2="92" stroke="#7F77DD" stroke-opacity="0.2" stroke-width="1"/>
+
+  <!-- WORDMARK — comienza en x=128, bien separado del símbolo -->
+  <text x="128" y="66"
+    font-family="'VT323', monospace" font-size="52" letter-spacing="7"
+    fill="#F0EDE6">ALETHEIA</text>
+  <text x="125" y="66"
+    font-family="'VT323', monospace" font-size="52" letter-spacing="7"
+    fill="#7F77DD" opacity="0.38" clip-path="url(#hcut1)">ALETHEIA</text>
+  <text x="131" y="66"
+    font-family="'VT323', monospace" font-size="52" letter-spacing="7"
+    fill="#AFA9EC" opacity="0.25" clip-path="url(#hcut2)">ALETHEIA</text>
+  <rect x="124" y="37" width="380" height="1.5" fill="#08090D" opacity="0.85"/>
+  <rect x="124" y="51" width="380" height="1"   fill="#08090D" opacity="0.6"/>
+
+  <!-- Rule + tagline -->
+  <line x1="128" y1="78" x2="490" y2="78" stroke="#7F77DD" stroke-opacity="0.35" stroke-width="0.7"/>
+  <text x="128" y="91"
+    font-family="'Share Tech Mono', monospace" font-size="8.5" letter-spacing="3"
+    fill="#AFA9EC" opacity="0.45">OSINT INTELLIGENCE DASHBOARD</text>
+</svg>

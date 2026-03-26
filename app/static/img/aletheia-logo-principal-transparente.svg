@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320" width="400" height="320">
+  <defs>
+    <clipPath id="cut1"><rect x="60" y="228" width="280" height="14"/></clipPath>
+    <clipPath id="cut2"><rect x="60" y="244" width="280" height="10"/></clipPath>
+  </defs>
+
+  <!-- NO background rect — fully transparent -->
+
+  <!-- SYMBOL — centrado, parte superior -->
+  <g transform="translate(120, 10)">
+    <polygon points="80,6 146,43 146,117 80,154 14,117 14,43"
+      stroke="#F0EDE6" stroke-opacity="0.92" stroke-width="1.4" fill="none"/>
+    <polygon points="80,22 130,51 130,109 80,138 30,109 30,51"
+      stroke="#F0EDE6" stroke-opacity="0.08" stroke-width="0.6" fill="none"/>
+    <line x1="80"  y1="6"   x2="80"  y2="18"  stroke="#7F77DD" stroke-width="1.8" stroke-linecap="square" stroke-opacity="0.95"/>
+    <line x1="80"  y1="142" x2="80"  y2="154" stroke="#F0EDE6" stroke-width="1.4" stroke-linecap="square" stroke-opacity="0.85"/>
+    <line x1="146" y1="43"  x2="135" y2="49"  stroke="#F0EDE6" stroke-width="1.4" stroke-linecap="square" stroke-opacity="0.85"/>
+    <line x1="146" y1="117" x2="135" y2="111" stroke="#F0EDE6" stroke-width="1.4" stroke-linecap="square" stroke-opacity="0.85"/>
+    <line x1="14"  y1="43"  x2="25"  y2="49"  stroke="#F0EDE6" stroke-width="1.4" stroke-linecap="square" stroke-opacity="0.85"/>
+    <line x1="14"  y1="117" x2="25"  y2="111" stroke="#F0EDE6" stroke-width="1.4" stroke-linecap="square" stroke-opacity="0.85"/>
+    <line x1="14"  y1="80"  x2="146" y2="80"  stroke="#F0EDE6" stroke-width="0.4" stroke-opacity="0.07"/>
+    <line x1="80"  y1="6"   x2="80"  y2="154" stroke="#F0EDE6" stroke-width="0.4" stroke-opacity="0.07"/>
+    <!-- Fragmented A -->
+    <line x1="50"  y1="114" x2="80"  y2="50"  stroke="#F0EDE6" stroke-width="3"   stroke-linecap="square"/>
+    <line x1="110" y1="114" x2="82"  y2="54"  stroke="#F0EDE6" stroke-width="3"   stroke-linecap="square"/>
+    <line x1="58"  y1="90"  x2="73"  y2="90"  stroke="#F0EDE6" stroke-width="2.6" stroke-linecap="square"/>
+    <line x1="87"  y1="90"  x2="102" y2="90"  stroke="#F0EDE6" stroke-width="2.6" stroke-linecap="square"/>
+    <line x1="50"  y1="114" x2="66"  y2="114" stroke="#F0EDE6" stroke-width="2.6" stroke-linecap="square"/>
+    <line x1="94"  y1="114" x2="110" y2="114" stroke="#F0EDE6" stroke-width="2.6" stroke-linecap="square"/>
+    <!-- Purple diamonds -->
+    <polygon points="80,85 84,90 80,95 76,90"     fill="#7F77DD" fill-opacity="0.95"/>
+    <polygon points="80,81 88,90 80,99 72,90"     fill="#534AB7" fill-opacity="0.25"/>
+    <polygon points="80,44 84,50 80,56 76,50"     fill="#7F77DD" fill-opacity="0.8"/>
+    <polygon points="80,110 83,114 80,118 77,114" fill="#7F77DD" fill-opacity="0.5"/>
+    <path d="M 124 22 L 138 22 L 138 36" stroke="#7F77DD" stroke-width="1.2" stroke-linecap="square" stroke-opacity="0.65" fill="none"/>
+    <path d="M 36 138 L 22 138 L 22 124" stroke="#7F77DD" stroke-width="1.2" stroke-linecap="square" stroke-opacity="0.65" fill="none"/>
+    <polygon points="146,80 150,84 146,88 142,84" fill="#7F77DD" fill-opacity="0.4"/>
+    <polygon points="14,80  18,84  14,88  10,84"  fill="#7F77DD" fill-opacity="0.4"/>
+  </g>
+
+  <!-- WORDMARK — debajo del símbolo -->
+  <text x="200" y="255" text-anchor="middle"
+    font-family="'VT323', monospace" font-size="62" letter-spacing="8"
+    fill="#F0EDE6">ALETHEIA</text>
+  <text x="197" y="255" text-anchor="middle"
+    font-family="'VT323', monospace" font-size="62" letter-spacing="8"
+    fill="#7F77DD" opacity="0.38" clip-path="url(#cut1)">ALETHEIA</text>
+  <text x="203" y="255" text-anchor="middle"
+    font-family="'VT323', monospace" font-size="62" letter-spacing="8"
+    fill="#AFA9EC" opacity="0.28" clip-path="url(#cut2)">ALETHEIA</text>
+
+  <!-- Scan line cuts — use white with low opacity instead of dark bg color -->
+  <rect x="50" y="229" width="300" height="1.8" fill="white" opacity="0.04"/>
+  <rect x="50" y="242" width="300" height="1.2" fill="white" opacity="0.03"/>
+
+  <!-- Rule -->
+  <line x1="120" y1="268" x2="280" y2="268" stroke="#7F77DD" stroke-opacity="0.5" stroke-width="0.8"/>
+  <!-- Tagline -->
+  <text x="200" y="284" text-anchor="middle"
+    font-family="'Share Tech Mono', monospace" font-size="9" letter-spacing="3"
+    fill="#AFA9EC" opacity="0.6">OSINT INTELLIGENCE DASHBOARD</text>
+</svg>

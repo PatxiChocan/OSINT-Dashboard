@@ -6,14 +6,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
-  <link rel="shortcut icon" href="{{ url_for('static', filename='img/logo.png') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/aletheia-favicon.svg') }}">
 </head>
 <body>
   <div class="layout">
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo-img">
+        <img 
+          src="{{ url_for('static', filename='img/aletheia-logo-principal-transparente.svg') }}" 
+          class="logo-img"
+          loading="lazy"
+          alt="Aletheia Logo"
+        >
       </div>
 
       <div class="sidebar-section">Navegación</div>

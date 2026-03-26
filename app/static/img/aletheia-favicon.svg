@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#08090D"/>
+  <!-- Hexagon -->
+  <polygon points="32,2.4 57.6,17.2 57.6,46.8 32,61.6 6.4,46.8 6.4,17.2"
+    stroke="#F0EDE6" stroke-opacity="0.82" stroke-width="0.7" fill="none"/>
+  <!-- Vertex ticks -->
+  <line x1="32"  y1="2.4"  x2="32"  y2="7.2"  stroke="#7F77DD" stroke-width="0.9" stroke-linecap="square" stroke-opacity="0.9"/>
+  <line x1="32"  y1="56.8" x2="32"  y2="61.6" stroke="#F0EDE6" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.8"/>
+  <line x1="57.6" y1="17.2" x2="53.2" y2="19.6" stroke="#F0EDE6" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.8"/>
+  <line x1="57.6" y1="46.8" x2="53.2" y2="44.4" stroke="#F0EDE6" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.8"/>
+  <line x1="6.4"  y1="17.2" x2="10.8" y2="19.6" stroke="#F0EDE6" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.8"/>
+  <line x1="6.4"  y1="46.8" x2="10.8" y2="44.4" stroke="#F0EDE6" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.8"/>
+  <!-- Fragmented A -->
+  <line x1="20" y1="45.6" x2="32" y2="20" stroke="#F0EDE6" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="44" y1="45.6" x2="32.8" y2="21.6" stroke="#F0EDE6" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="23.2" y1="36" x2="29.2" y2="36" stroke="#F0EDE6" stroke-width="1.3" stroke-linecap="square"/>
+  <line x1="34.8" y1="36" x2="40.8" y2="36" stroke="#F0EDE6" stroke-width="1.3" stroke-linecap="square"/>
+  <line x1="20"   y1="45.6" x2="26.4" y2="45.6" stroke="#F0EDE6" stroke-width="1.3" stroke-linecap="square"/>
+  <line x1="37.6" y1="45.6" x2="44"   y2="45.6" stroke="#F0EDE6" stroke-width="1.3" stroke-linecap="square"/>
+  <!-- Purple diamonds -->
+  <polygon points="32,33.4 33.6,36 32,38.6 30.4,36" fill="#7F77DD" fill-opacity="0.95"/>
+  <polygon points="32,32 35.2,36 32,40 28.8,36"      fill="#534AB7" fill-opacity="0.2"/>
+  <polygon points="32,17.6 33.6,20 32,22.4 30.4,20"  fill="#7F77DD" fill-opacity="0.7"/>
+  <!-- Brackets -->
+  <path d="M 45.6 8.8 L 51.2 8.8 L 51.2 14.4" stroke="#7F77DD" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.6" fill="none"/>
+  <path d="M 18.4 55.2 L 12.8 55.2 L 12.8 49.6" stroke="#7F77DD" stroke-width="0.7" stroke-linecap="square" stroke-opacity="0.6" fill="none"/>
+  <!-- Side diamonds -->
+  <polygon points="57.6,32 59.2,33.6 57.6,35.2 56,33.6" fill="#7F77DD" fill-opacity="0.35"/>
+  <polygon points="6.4,32  8,33.6   6.4,35.2 4.8,33.6"  fill="#7F77DD" fill-opacity="0.35"/>
+</svg>
