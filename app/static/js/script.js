@@ -1600,3 +1600,138 @@ function clearOut(tool) {
 buildToolPanels();
 buildParallelGrid();
 updateParallelCount();
+
+/* ═══════════════════════════════════════════════
+   CYBERNEWS MODULE
+═══════════════════════════════════════════════ */
+
+const _news = {
+  all: [],
+  region: 'all',
+  query: '',
+  category: 'all',
+  loaded: false,
+};
+
+const CAT_LABELS = {
+  vulnerability: 'Vulnerabilidad',
+  malware: 'Malware',
+  phishing: 'Phishing',
+  breach: 'Brecha',
+  apt: 'APT',
+  compliance: 'Compliance',
+  tools: 'Herramientas',
+  general: 'General',
+};
+
+function fmtNewsDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  const now = new Date();
+  const diffH = Math.floor((now - d) / 3600000);
+  if (diffH < 1) return 'hace menos de 1h';
+  if (diffH < 24) return `hace ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `hace ${diffD}d`;
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+
+function renderNewsCards() {
+  const grid = document.getElementById('news-grid');
+  const empty = document.getElementById('news-empty');
+  const status = document.getElementById('news-status');
+  if (!grid) return;
+
+  let items = _news.all;
+  if (_news.region !== 'all') items = items.filter(n => n.region === _news.region);
+  if (_news.category !== 'all') items = items.filter(n => n.category === _news.category);
+  if (_news.query) {
+    const q = _news.query;
+    items = items.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      n.description.toLowerCase().includes(q) ||
+      n.source.toLowerCase().includes(q)
+    );
+  }
+
+  if (status) {
+    status.style.display = 'block';
+    status.textContent = `${items.length} noticias · ${_news.all.length} total`;
+  }
+
+  if (items.length === 0) {
+    grid.innerHTML = '';
+    if (empty) empty.style.display = 'flex';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  grid.innerHTML = items.map(n => {
+    const regionClass = `news-region-${n.region}`;
+    const catClass = `news-cat-${n.category}`;
+    const catLabel = CAT_LABELS[n.category] || n.category;
+    const date = fmtNewsDate(n.date);
+    const desc = n.description ? n.description.substring(0, 200) : '';
+    return `<a class="news-card" href="${n.link}" target="_blank" rel="noopener noreferrer">
+      <div class="news-card-meta">
+        <span class="news-region-dot ${regionClass}"></span>
+        <span class="news-card-source">${n.source}</span>
+        <span class="news-card-date">${date}</span>
+      </div>
+      <div class="news-card-title">${n.title}</div>
+      ${desc ? `<div class="news-card-desc">${desc}</div>` : ''}
+      <span class="news-cat-badge ${catClass}">${catLabel}</span>
+    </a>`;
+  }).join('');
+}
+
+async function loadNews() {
+  const loading = document.getElementById('news-loading');
+  const grid = document.getElementById('news-grid');
+  const btn = document.getElementById('news-refresh-btn');
+  const status = document.getElementById('news-status');
+
+  if (loading) loading.style.display = 'flex';
+  if (grid) grid.innerHTML = '';
+  if (btn) btn.disabled = true;
+  if (status) status.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/news');
+    const data = await res.json();
+    _news.all = data.news || [];
+    _news.loaded = true;
+    renderNewsCards();
+  } catch (e) {
+    if (grid) grid.innerHTML = '<div style="color:var(--red);padding:20px 0;font-size:.85rem;">⚠️ Error al cargar noticias. Comprueba la conexión.</div>';
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setNewsRegion(region, el) {
+  _news.region = region;
+  document.querySelectorAll('.news-filter-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderNewsCards();
+}
+
+function onNewsSearch(val) {
+  _news.query = val.trim().toLowerCase();
+  renderNewsCards();
+}
+
+function onNewsCat(val) {
+  _news.category = val;
+  renderNewsCards();
+}
+
+const _origShow = show;
+window.show = function (panel, btn) {
+  _origShow(panel, btn);
+  if (panel === 'news' && !_news.loaded) {
+    loadNews();
+  }
+};

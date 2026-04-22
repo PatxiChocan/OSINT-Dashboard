@@ -36,6 +36,14 @@
 
       <div class="nav-divider"></div>
 
+      <div class="sidebar-section">Inteligencia</div>
+      <button class="nav-btn" onclick="show('news',this)">
+        <span class="icon">📰</span>
+        <span>CyberNews</span>
+      </button>
+
+      <div class="nav-divider"></div>
+
       <div class="sidebar-section">Herramientas</div>
       <button class="nav-btn" onclick="show('discover',this)">
         <span class="icon">🔍</span>
@@ -605,6 +613,57 @@
         </div>
 
         <div id="tool-panels"></div>
+
+        <div class="panel" id="panel-news">
+          <div class="page-header">
+            <div>
+              <div class="page-title">📰 CyberNews Portal</div>
+              <div class="page-desc">Noticias de ciberseguridad en tiempo real desde fuentes OSINT públicas.</div>
+            </div>
+            <button class="run-btn" id="news-refresh-btn" onclick="loadNews()">⟳ Actualizar</button>
+          </div>
+
+          <div class="news-toolbar">
+            <div class="news-search-wrap">
+              <span class="news-search-icon">🔍</span>
+              <input type="text" id="news-search" placeholder="Buscar noticias..." oninput="onNewsSearch(this.value)">
+            </div>
+            <div class="news-region-filters">
+              <button class="news-filter-btn active" data-region="all" onclick="setNewsRegion('all',this)">Todas</button>
+              <button class="news-filter-btn" data-region="spain" onclick="setNewsRegion('spain',this)">🇪🇸 España</button>
+              <button class="news-filter-btn" data-region="europe" onclick="setNewsRegion('europe',this)">🇪🇺 Europa</button>
+              <button class="news-filter-btn" data-region="world" onclick="setNewsRegion('world',this)">🌍 Mundo</button>
+            </div>
+            <div class="news-cat-wrap">
+              <select id="news-cat-select" onchange="onNewsCat(this.value)">
+                <option value="all">Todas las categorías</option>
+                <option value="vulnerability">Vulnerabilidad</option>
+                <option value="malware">Malware</option>
+                <option value="phishing">Phishing</option>
+                <option value="breach">Brecha</option>
+                <option value="apt">APT</option>
+                <option value="compliance">Compliance</option>
+                <option value="tools">Herramientas</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="news-status" class="news-status-bar" style="display:none"></div>
+
+          <div id="news-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div>
+            <span>Cargando noticias de ciberseguridad...</span>
+          </div>
+
+          <div id="news-grid" class="news-card-grid"></div>
+
+          <div id="news-empty" class="news-empty-state" style="display:none">
+            <div class="news-empty-icon">📭</div>
+            <div class="news-empty-title">Sin resultados</div>
+            <div class="news-empty-text">No se encontraron noticias con los filtros actuales.</div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
