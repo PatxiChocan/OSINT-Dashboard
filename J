@@ -1,31 +1,5 @@
-# Nmap 7.98 scan initiated Wed Mar 25 12:45:47 2026 as: /usr/lib/nmap/nmap --privileged -sC -sV -T3 -oJ maristak.com /tmp/aletheia/a911f973-f1b3-40ab-abd8-426cf5b811fd.json
-Unable to split netmask from target expression: "/tmp/aletheia/a911f973-f1b3-40ab-abd8-426cf5b811fd.json"
-Nmap scan report for maristak.com (217.76.142.206)
-Host is up (0.013s latency).
-rDNS record for 217.76.142.206: llgm715.servidoresdns.net
-Not shown: 996 filtered tcp ports (no-response)
-PORT    STATE SERVICE  VERSION
-21/tcp  open  ftp      vsftpd 2.0.8 or later
-22/tcp  open  ssh      OpenSSH 8.0 (protocol 2.0)
-| ssh-hostkey: 
-|   3072 6f:08:c1:db:d0:12:fa:50:22:ef:c3:6b:12:56:a0:d1 (RSA)
-|   256 1a:0c:52:0a:f5:c4:45:13:79:5c:a7:22:59:2a:27:35 (ECDSA)
-|_  256 72:f9:dc:e0:9a:db:ae:e7:78:8a:f8:99:2e:a2:a5:47 (ED25519)
-80/tcp  open  http     Apache httpd
-|_http-title: 403 Forbidden
-|_http-server-header: Apache
-443/tcp open  ssl/http Apache httpd
-| ssl-cert: Subject: commonName=maristak.com
-| Subject Alternative Name: DNS:maristak.com, DNS:www.maristak.com
-| Not valid before: 2026-03-10T00:00:00
-|_Not valid after:  2026-09-25T23:59:59
-|_http-server-header: Apache
-|_http-title: 403 Forbidden
-| tls-alpn: 
-|   http/1.1
-|_  h2
-|_ssl-date: TLS randomness does not represent time
-Service Info: Host: Welcome
-
-Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
-# Nmap done at Wed Mar 25 12:46:13 2026 -- 1 IP address (1 host up) scanned in 25.74 seconds
+# Nmap 7.98 scan initiated Mon Apr 27 12:34:40 2026 as: /usr/lib/nmap/nmap --privileged -sV -T3 -oJ semanticsystems /tmp/aletheia/cd03aa7d-db09-4c4c-9b4d-e4e9bf1224f9.json
+Unable to split netmask from target expression: "/tmp/aletheia/cd03aa7d-db09-4c4c-9b4d-e4e9bf1224f9.json"
+Failed to resolve "semanticsystems".
+WARNING: No targets were specified, so 0 hosts scanned.
+# Nmap done at Mon Apr 27 12:34:41 2026 -- 0 IP addresses (0 hosts up) scanned in 1.12 seconds

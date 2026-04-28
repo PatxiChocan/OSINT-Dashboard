@@ -1731,7 +1731,447 @@ function onNewsCat(val) {
 const _origShow = show;
 window.show = function (panel, btn) {
   _origShow(panel, btn);
-  if (panel === 'news' && !_news.loaded) {
-    loadNews();
-  }
+  if (panel === 'overview' && !_overview.loaded) loadOverview();
+  if (panel === 'news' && !_news.loaded) loadNews();
+  if (panel === 'cves' && !_cves.loaded) loadCVEs();
+  if (panel === 'iocs' && !_iocs.loaded) loadIOCs();
+  if (panel === 'sources' && !_sources.loaded) loadSources();
 };
+
+/* ═══════════════════════════════════════════════
+   OVERVIEW MODULE
+═══════════════════════════════════════════════ */
+
+const _overview = { loaded: false };
+
+function _setEl(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function renderOverview(d) {
+  const risk = d.risk || {};
+  const kev  = d.kev  || {};
+  const iocs = d.iocs || {};
+  const news = d.news || {};
+
+  // Risk card
+  const riskCard = document.getElementById('ov-risk-card');
+  if (riskCard) {
+    riskCard.className = `ov-risk-card ov-risk-${risk.level || 'BAJO'}`;
+  }
+  _setEl('ov-risk-score', risk.score ?? '—');
+  _setEl('ov-risk-level', risk.level ?? '—');
+
+  // KPIs
+  _setEl('ov-kev-total', (kev.total ?? '—').toLocaleString?.() ?? kev.total);
+  _setEl('ov-kev-7d', `${kev.new_7d ?? 0} nuevos esta semana`);
+  _setEl('ov-ioc-total', (iocs.total ?? '—').toLocaleString?.() ?? iocs.total);
+  _setEl('ov-ransom-total', kev.ransomware_count ?? '—');
+  _setEl('ov-news-total', news.count ?? '—');
+
+  // Recent KEV list
+  const kevList = document.getElementById('ov-kev-list');
+  if (kevList) {
+    kevList.innerHTML = (d.recent_kev || []).map(c => `
+      <div class="ov-kev-item">
+        <span class="ov-kev-id">${c.id}</span>
+        <span class="ov-kev-product">${[c.vendor, c.product].filter(Boolean).join(' · ')}</span>
+        ${c.ransomware ? '<span class="ov-kev-ransom">⚠ Ransom</span>' : ''}
+        <span class="ov-kev-date">${c.date}</span>
+      </div>`).join('') || '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>';
+  }
+
+  // Recent IOCs list
+  const iocList = document.getElementById('ov-ioc-list');
+  if (iocList) {
+    iocList.innerHTML = (d.recent_iocs || []).map(i => `
+      <div class="ov-ioc-item">
+        <span class="ioc-type-badge ioc-type-${i.indicator?.includes('http') ? 'url' : 'ip'}">${i.indicator?.includes('http') ? 'URL' : 'IP'}</span>
+        <span class="ov-ioc-indicator">${i.indicator || '—'}</span>
+        <span class="ov-ioc-threat">${i.threat || ''}</span>
+      </div>`).join('') || '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>';
+  }
+
+  // Source status
+  const sourcesList = document.getElementById('ov-sources-list');
+  if (sourcesList) {
+    sourcesList.innerHTML = Object.entries(d.sources || {}).map(([name, ok]) => `
+      <div class="ov-source-row">
+        <span class="ov-source-dot ${ok ? 'ok' : 'err'}"></span>
+        <span class="ov-source-name">${name}</span>
+        <span class="ov-source-status ${ok ? 'ok' : 'err'}">${ok ? 'ONLINE' : 'ERROR'}</span>
+      </div>`).join('');
+  }
+
+  // IOC breakdown bars
+  const breakdown = document.getElementById('ov-ioc-breakdown');
+  if (breakdown && iocs.total > 0) {
+    const bars = [
+      { label: 'URLs (URLhaus)', val: iocs.urlhaus || 0, color: '#3498db' },
+      { label: 'Hashes (Bazaar)', val: iocs.bazaar || 0, color: '#9b59b6' },
+      { label: 'IPs C2 (Feodo)', val: iocs.feodo || 0, color: '#e74c3c' },
+    ];
+    const max = Math.max(...bars.map(b => b.val), 1);
+    breakdown.innerHTML = bars.map(b => `
+      <div class="ov-breakdown-row">
+        <span class="ov-breakdown-label">${b.label}</span>
+        <div class="ov-breakdown-bar-wrap">
+          <div class="ov-breakdown-bar" style="width:${Math.round(b.val/max*100)}%;background:${b.color}"></div>
+        </div>
+        <span class="ov-breakdown-val">${b.val}</span>
+      </div>`).join('');
+  }
+
+  // Recent news
+  const newsList = document.getElementById('ov-news-list');
+  if (newsList) {
+    newsList.innerHTML = (d.recent_news || []).map(n => `
+      <div class="ov-news-item">
+        <div class="ov-news-title">${n.title || '—'}</div>
+        <div class="ov-news-meta">${n.source || ''} · ${n.date ? new Date(n.date).toLocaleDateString('es-ES') : ''}</div>
+      </div>`).join('') || '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>';
+  }
+
+  // Show sections
+  const kpiRow = document.getElementById('ov-kpi-row');
+  const mainGrid = document.getElementById('ov-main-grid');
+  if (kpiRow) kpiRow.style.display = 'grid';
+  if (mainGrid) mainGrid.style.display = 'grid';
+}
+
+async function loadOverview() {
+  const loading = document.getElementById('overview-loading');
+  const btn = document.getElementById('overview-refresh-btn');
+  const kpiRow = document.getElementById('ov-kpi-row');
+  const mainGrid = document.getElementById('ov-main-grid');
+
+  if (loading) loading.style.display = 'flex';
+  if (kpiRow) kpiRow.style.display = 'none';
+  if (mainGrid) mainGrid.style.display = 'none';
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/overview');
+    const data = await res.json();
+    _overview.loaded = true;
+    renderOverview(data);
+  } catch (e) {
+    const mainGrid = document.getElementById('ov-main-grid');
+    if (mainGrid) {
+      mainGrid.style.display = 'block';
+      mainGrid.innerHTML = '<div style="color:var(--red);padding:20px;font-size:.85rem">⚠️ Error al cargar el overview. Comprueba la conexión.</div>';
+    }
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   CVEs MODULE
+═══════════════════════════════════════════════ */
+
+const _cves = { all: [], sev: 'all', query: '', loaded: false };
+
+function renderCVEs() {
+  const grid = document.getElementById('cves-grid');
+  const empty = document.getElementById('cves-empty');
+  if (!grid) return;
+
+  let items = _cves.all;
+  if (_cves.sev === 'exploited') items = items.filter(c => c.actively_exploited);
+  else if (_cves.sev === 'CRITICAL') items = items.filter(c => c.severity === 'CRITICAL');
+  else if (_cves.sev === 'HIGH') items = items.filter(c => c.severity === 'HIGH');
+  if (_cves.query) {
+    const q = _cves.query;
+    items = items.filter(c =>
+      c.id.toLowerCase().includes(q) ||
+      c.description.toLowerCase().includes(q) ||
+      c.vendor.toLowerCase().includes(q) ||
+      c.product.toLowerCase().includes(q)
+    );
+  }
+
+  if (items.length === 0) {
+    grid.innerHTML = '';
+    if (empty) empty.style.display = 'flex';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  grid.innerHTML = items.map(c => {
+    const score = c.score != null ? c.score.toFixed(1) : '—';
+    const sev = c.severity || 'UNKNOWN';
+    const exploitedBadge = c.actively_exploited
+      ? '<span class="cve-badge cve-badge-kev">🔴 CISA KEV</span>' : '';
+    const ransomBadge = c.ransomware && c.ransomware !== 'Unknown'
+      ? '<span class="cve-badge cve-badge-ransom">⚠ Ransomware</span>' : '';
+    const dateBadge = c.kev_date_added || c.published
+      ? `<span class="cve-badge cve-badge-date">${c.kev_date_added || c.published}</span>` : '';
+    const product = [c.vendor, c.product].filter(Boolean).join(' · ');
+
+    return `<div class="cve-card ${c.actively_exploited ? 'cve-exploited' : ''}">
+      <div class="cve-score-badge sev-${sev}">
+        <span class="cve-score-num">${score}</span>
+        <span class="cve-score-sev">${sev}</span>
+      </div>
+      <div class="cve-body">
+        <div class="cve-header">
+          <span class="cve-id">${c.id}</span>
+          ${product ? `<span class="cve-product">${product}</span>` : ''}
+        </div>
+        <div class="cve-desc">${c.description || 'Sin descripción disponible.'}</div>
+      </div>
+      <div class="cve-badges">
+        ${exploitedBadge}
+        ${ransomBadge}
+        ${dateBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCVEs() {
+  const loading = document.getElementById('cves-loading');
+  const grid = document.getElementById('cves-grid');
+  const btn = document.getElementById('cves-refresh-btn');
+  const stats = document.getElementById('cves-stats');
+
+  if (loading) loading.style.display = 'flex';
+  if (grid) grid.innerHTML = '';
+  if (btn) btn.disabled = true;
+  if (stats) stats.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/cves');
+    const data = await res.json();
+    _cves.all = data.cves || [];
+    _cves.loaded = true;
+
+    const exploited = _cves.all.filter(c => c.actively_exploited).length;
+    const ransom = _cves.all.filter(c => c.ransomware && c.ransomware !== 'Unknown').length;
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setEl('cves-stat-total', _cves.all.length);
+    setEl('cves-stat-kev', exploited);
+    setEl('cves-stat-ransom', ransom);
+    if (stats) stats.style.display = 'grid';
+
+    renderCVEs();
+  } catch (e) {
+    if (grid) grid.innerHTML = '<div style="color:var(--red);padding:20px 0;font-size:.85rem;">⚠️ Error al cargar CVEs.</div>';
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setCVESev(sev, el) {
+  _cves.sev = sev;
+  document.querySelectorAll('[data-sev]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderCVEs();
+}
+
+function onCVESearch(val) {
+  _cves.query = val.trim().toLowerCase();
+  renderCVEs();
+}
+
+/* ═══════════════════════════════════════════════
+   IOCs MODULE
+═══════════════════════════════════════════════ */
+
+const _iocs = { all: [], itype: 'all', query: '', loaded: false };
+
+function fmtIOCDate(d) {
+  if (!d) return '—';
+  const parsed = new Date(d);
+  if (isNaN(parsed)) return d.substring(0, 10);
+  return parsed.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
+function renderIOCs() {
+  const tbody = document.getElementById('iocs-tbody');
+  const empty = document.getElementById('iocs-empty');
+  const wrap = document.getElementById('iocs-table-wrap');
+  if (!tbody) return;
+
+  let items = _iocs.all;
+  if (_iocs.itype !== 'all') items = items.filter(i => i.type === _iocs.itype);
+  if (_iocs.query) {
+    const q = _iocs.query;
+    items = items.filter(i =>
+      i.indicator.toLowerCase().includes(q) ||
+      (i.threat || '').toLowerCase().includes(q) ||
+      (i.tags || []).some(t => t.toLowerCase().includes(q))
+    );
+  }
+
+  if (items.length === 0) {
+    tbody.innerHTML = '';
+    if (wrap) wrap.style.display = 'none';
+    if (empty) empty.style.display = 'flex';
+    return;
+  }
+  if (wrap) wrap.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+
+  tbody.innerHTML = items.slice(0, 200).map(i => {
+    const tags = (i.tags || []).slice(0, 4).map(t => `<span class="ioc-tag">${t}</span>`).join('');
+    return `<tr>
+      <td><span class="ioc-type-badge ioc-type-${i.type}">${i.type.toUpperCase()}</span></td>
+      <td><span class="ioc-indicator">${i.indicator}</span></td>
+      <td style="color:var(--text);font-size:.75rem">${i.threat || '—'}</td>
+      <td><div class="ioc-tags">${tags || '—'}</div></td>
+      <td style="white-space:nowrap;font-size:.72rem">${fmtIOCDate(i.date)}</td>
+      <td><span class="ioc-source">${i.source}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadIOCs() {
+  const loading = document.getElementById('iocs-loading');
+  const btn = document.getElementById('iocs-refresh-btn');
+  const stats = document.getElementById('iocs-stats');
+  const wrap = document.getElementById('iocs-table-wrap');
+
+  if (loading) loading.style.display = 'flex';
+  if (wrap) wrap.style.display = 'none';
+  if (btn) btn.disabled = true;
+  if (stats) stats.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/iocs');
+    const data = await res.json();
+    _iocs.all = data.iocs || [];
+    _iocs.loaded = true;
+
+    const urls = _iocs.all.filter(i => i.type === 'url').length;
+    const ips = _iocs.all.filter(i => i.type === 'ip').length;
+    const hashes = _iocs.all.filter(i => i.type === 'hash').length;
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setEl('iocs-stat-total', _iocs.all.length);
+    setEl('iocs-stat-urls', urls);
+    setEl('iocs-stat-ips', ips);
+    setEl('iocs-stat-hashes', hashes);
+    if (stats) stats.style.display = 'grid';
+
+    renderIOCs();
+  } catch (e) {
+    const tbody = document.getElementById('iocs-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red);padding:20px">⚠️ Error al cargar IOCs.</td></tr>';
+    if (wrap) wrap.style.display = 'block';
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setIOCType(itype, el) {
+  _iocs.itype = itype;
+  document.querySelectorAll('[data-itype]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderIOCs();
+}
+
+function onIOCSearch(val) {
+  _iocs.query = val.trim().toLowerCase();
+  renderIOCs();
+}
+
+/* ═══════════════════════════════════════════════
+   SOURCES MODULE
+═══════════════════════════════════════════════ */
+
+const _sources = { all: [], cat: 'all', loaded: false };
+
+const _SRC_CAT_COLORS = {
+  'CVE':  { bg: 'rgba(255,140,0,0.15)',   color: '#ff8c00' },
+  'IOC':  { bg: 'rgba(231,76,60,0.15)',   color: '#e74c3c' },
+  'News': { bg: 'rgba(41,128,185,0.15)',  color: '#3498db' },
+};
+
+function setSrcCat(cat, el) {
+  _sources.cat = cat;
+  document.querySelectorAll('[data-scat]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderSources();
+}
+
+function renderSources() {
+  const grid = document.getElementById('src-grid');
+  if (!grid) return;
+
+  let items = _sources.all;
+  if (_sources.cat !== 'all') items = items.filter(s => s.category === _sources.cat);
+
+  if (!items.length) {
+    grid.innerHTML = '<div style="color:var(--text3);padding:40px 0;text-align:center;font-size:.85rem">Sin fuentes para mostrar.</div>';
+    return;
+  }
+
+  grid.innerHTML = items.map(s => {
+    const cat = _SRC_CAT_COLORS[s.category] || { bg: 'rgba(173,198,255,0.1)', color: 'var(--accent)' };
+    const msClass = s.response_ms < 500 ? 'ms-fast' : s.response_ms < 2000 ? 'ms-ok' : 'ms-slow';
+    const statusLabel = s.ok
+      ? 'ONLINE'
+      : (s.error || (s.status_code ? 'HTTP ' + s.status_code : 'ERROR'));
+    return `<div class="src-card ${s.ok ? 'src-ok' : 'src-err'}">
+      <div class="src-card-header">
+        <span class="src-status-dot ${s.ok ? 'ok' : 'err'}"></span>
+        <span class="src-name">${escHtml(s.name)}</span>
+        <span class="src-cat-badge" style="background:${cat.bg};color:${cat.color}">${s.category}</span>
+      </div>
+      <div class="src-desc">${escHtml(s.description)}</div>
+      <div class="src-meta">
+        <span class="src-status-label ${s.ok ? 'ok' : 'err'}">${escHtml(statusLabel)}</span>
+        ${s.ok ? `<span class="src-ms ${msClass}">${s.response_ms} ms</span>` : ''}
+        ${s.status_code && !s.ok ? `<span class="src-code">HTTP ${s.status_code}</span>` : ''}
+        ${s.ok && s.status_code ? `<span class="src-code" style="margin-left:auto">HTTP ${s.status_code}</span>` : ''}
+      </div>
+      <div class="src-url">${escHtml(s.url)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadSources() {
+  const loading = document.getElementById('sources-loading');
+  const grid = document.getElementById('src-grid');
+  const btn = document.getElementById('sources-refresh-btn');
+  const summary = document.getElementById('src-summary');
+  const filters = document.getElementById('src-filters');
+
+  if (loading) loading.style.display = 'flex';
+  if (grid) grid.innerHTML = '';
+  if (btn) btn.disabled = true;
+  if (summary) summary.style.display = 'none';
+  if (filters) filters.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/sources');
+    const data = await res.json();
+    _sources.all = data.sources || [];
+    _sources.loaded = true;
+
+    const sum = data.summary || {};
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setEl('src-total',   sum.total ?? '—');
+    setEl('src-online',  sum.online ?? '—');
+    setEl('src-offline', sum.offline ?? '—');
+    setEl('src-avg-ms',  sum.avg_response_ms ?? '—');
+    setEl('src-checked-at', data.checked_at
+      ? new Date(data.checked_at).toLocaleTimeString('es-ES')
+      : '—');
+
+    if (summary) summary.style.display = 'grid';
+    if (filters) filters.style.display = 'flex';
+
+    renderSources();
+  } catch (e) {
+    if (grid) grid.innerHTML = '<div style="color:var(--red);padding:20px;font-size:.85rem">⚠️ Error al comprobar las fuentes. Comprueba la conexión.</div>';
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
