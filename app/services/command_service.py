@@ -54,6 +54,8 @@ BINARY_PATHS = {
     "katana": "/home/kali/go/bin/katana",
     "theharvester": "/usr/bin/theHarvester",
     "theHarvester": "/usr/bin/theHarvester",
+    "gitleaks": "/home/kali/.local/bin/gitleaks",
+    "wayback_machine_downloader": "/home/kali/.local/bin/wayback_machine_downloader",
 }
 
 MAX_PROCESSES = 4

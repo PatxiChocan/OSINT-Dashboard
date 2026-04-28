@@ -89,10 +89,20 @@ const SUBTOOLS = {
     { name: 'robots + sitemap', func: 'Lee robots.txt y sitemap.xml', alert: 'low', cmd: t => `katana -u https://${t} -kf robotstxt,sitemapxml -rl 20 -silent` },
     { name: 'Deep crawl', func: 'Crawling profundo depth 5', alert: 'med', cmd: t => `katana -u https://${t} -jc -kf robotstxt,sitemapxml -rl 10 -depth 5 -silent` },
     { name: 'Con sesión', func: 'Crawling autenticado con cookie', alert: 'med', cmd: t => `katana -u https://${t} -H "Cookie: session=PEGAR_AQUI" -headless -rl 10` }
+  ],
+  gitleaks: [
+    { name: 'Detectar secretos (dir actual)', func: 'Busca credenciales y tokens en el directorio de trabajo', alert: 'none', cmd: _t => `gitleaks detect --source . --no-git -v` },
+    { name: 'Detectar secretos (repo git)', func: 'Escanea historial completo del repositorio git local', alert: 'none', cmd: _t => `gitleaks git --source . -v` },
+    { name: 'Directorio /tmp/aletheia', func: 'Escanea ficheros descargados en sesión actual', alert: 'none', cmd: _t => `gitleaks detect --source /tmp/aletheia --no-git -v` }
+  ],
+  wayback: [
+    { name: 'Listar snapshots', func: 'Muestra todas las versiones archivadas del sitio (sin descargar)', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -p 1` },
+    { name: 'Snapshots desde 2020', func: 'Versiones archivadas a partir de enero 2020', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -f 20200101000000 -p 1` },
+    { name: 'Descargar sitio completo', func: 'Descarga la última versión archivada del sitio', alert: 'low', cmd: t => `wayback_machine_downloader https://${t} -d /tmp/aletheia -c 5` }
   ]
 };
 
-const toolList = ['discover', 'amass', 'katana'];
+const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback'];
 
 const toolMeta = {
   discover: {
@@ -108,6 +118,16 @@ const toolMeta = {
   katana: {
     title: '🕷 Katana',
     desc: 'Crawling web estático, JS y headless.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  gitleaks: {
+    title: '🔑 Gitleaks',
+    desc: 'Detecta credenciales, tokens y secretos filtrados en repositorios y directorios.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  wayback: {
+    title: '📼 Wayback Machine',
+    desc: 'Accede a versiones archivadas de sitios web a través de Internet Archive.',
     tags: '<span class="tag tag-mit">MIT</span>'
   }
 };
