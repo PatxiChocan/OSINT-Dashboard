@@ -9,6 +9,10 @@ def create_app():
     from .routes.threat import threat_bp
     from .routes.overview import overview_bp
     from .routes.sources import sources_bp
+    from .routes.exposure import exposure_bp
+    from .routes.breaches import breaches_bp
+    from .routes.intelx import intelx_bp
+    from .routes.harvest_breaches import harvest_bp
 
     app.register_blueprint(main)
     app.register_blueprint(runner)
@@ -16,5 +20,9 @@ def create_app():
     app.register_blueprint(threat_bp)
     app.register_blueprint(overview_bp)
     app.register_blueprint(sources_bp)
+    app.register_blueprint(exposure_bp)
+    app.register_blueprint(breaches_bp)
+    app.register_blueprint(intelx_bp)
+    app.register_blueprint(harvest_bp)
 
     return app

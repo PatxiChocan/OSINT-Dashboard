@@ -46,6 +46,29 @@ SOURCES = [
         "description": "Recent malware sample hashes (abuse.ch)",
         "url": "https://bazaar.abuse.ch/export/csv/recent/",
     },
+    # ── Exposición ───────────────────────────────────────────────────────────
+    {
+        "id": "shodan_internetdb",
+        "name": "Shodan InternetDB",
+        "category": "Exposure",
+        "description": "Información de puertos, servicios y CVEs por IP (Shodan, sin auth)",
+        "url": "https://internetdb.shodan.io/1.1.1.1",
+    },
+    # ── Filtraciones ─────────────────────────────────────────────────────────
+    {
+        "id": "intelx",
+        "name": "Intelligence X",
+        "category": "Breaches",
+        "description": "Búsqueda en pastes, dark web y filtraciones — intelx.io (API key requerida)",
+        "url": "https://2.intelx.io/hello",
+    },
+    {
+        "id": "h8mail_leaklookup",
+        "name": "h8mail / Leak-Lookup",
+        "category": "Breaches",
+        "description": "Brechas por email vía h8mail + Leak-Lookup public API (sin auth)",
+        "url": "https://leak-lookup.com",
+    },
     # ── News RSS ──────────────────────────────────────────────────────────────
     {
         "id": "incibe",

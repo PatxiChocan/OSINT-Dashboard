@@ -53,6 +53,14 @@
         <span class="icon">☣</span>
         <span>IOCs</span>
       </button>
+      <button class="nav-btn" onclick="show('exposure',this)">
+        <span class="icon">🖥</span>
+        <span>Exposición</span>
+      </button>
+      <button class="nav-btn" onclick="show('breaches',this)">
+        <span class="icon">💧</span>
+        <span>Filtraciones</span>
+      </button>
       <button class="nav-btn" onclick="show('sources',this)">
         <span class="icon">📡</span>
         <span>Fuentes</span>
@@ -879,10 +887,151 @@
             <button class="news-filter-btn active" data-scat="all" onclick="setSrcCat('all',this)">Todas</button>
             <button class="news-filter-btn" data-scat="CVE" onclick="setSrcCat('CVE',this)">CVE</button>
             <button class="news-filter-btn" data-scat="IOC" onclick="setSrcCat('IOC',this)">IOC</button>
+            <button class="news-filter-btn" data-scat="Exposure" onclick="setSrcCat('Exposure',this)">Exposición</button>
+            <button class="news-filter-btn" data-scat="Breaches" onclick="setSrcCat('Breaches',this)">Filtraciones</button>
             <button class="news-filter-btn" data-scat="News" onclick="setSrcCat('News',this)">News</button>
           </div>
 
           <div class="src-grid" id="src-grid"></div>
+        </div>
+
+        <!-- ── Exposure Panel ────────────────────────────── -->
+        <div class="panel" id="panel-exposure">
+          <div class="page-header">
+            <div>
+              <div class="page-title">🖥 Exposición — Servicios y puertos públicos</div>
+              <div class="page-desc">Hosts y servicios expuestos vía Shodan InternetDB (sin API key requerida).</div>
+            </div>
+          </div>
+
+          <div class="exp-search-bar">
+            <div class="news-search-wrap" style="flex:1">
+              <span class="news-search-icon">🎯</span>
+              <input type="text" id="exp-target-input" placeholder="Dominio o IP (ej: example.com, 1.2.3.4)" spellcheck="false">
+            </div>
+            <button class="run-btn" id="exp-search-btn" onclick="searchExposure()">🔍 Analizar</button>
+          </div>
+
+          <div id="exp-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div>
+            <span>Consultando Shodan InternetDB...</span>
+          </div>
+
+          <div id="exp-error" class="exp-error-msg" style="display:none"></div>
+
+          <div id="exp-summary" class="exp-summary-row" style="display:none">
+            <div class="exp-stat-card">
+              <div class="exp-stat-label">IPs encontradas</div>
+              <div class="exp-stat-val" id="exp-stat-ips">—</div>
+            </div>
+            <div class="exp-stat-card">
+              <div class="exp-stat-label">Puertos abiertos</div>
+              <div class="exp-stat-val" id="exp-stat-ports">—</div>
+            </div>
+            <div class="exp-stat-card exp-stat-danger">
+              <div class="exp-stat-label">CVEs detectados</div>
+              <div class="exp-stat-val" id="exp-stat-vulns">—</div>
+            </div>
+            <div class="exp-stat-card">
+              <div class="exp-stat-label">Tags</div>
+              <div class="exp-stat-tags" id="exp-stat-tags"></div>
+            </div>
+          </div>
+
+          <div id="exp-vulns-row" class="exp-vulns-row" style="display:none">
+            <div class="exp-section-title">CVEs detectados</div>
+            <div class="exp-vuln-chips" id="exp-vuln-chips"></div>
+          </div>
+
+          <div id="exp-ip-grid" class="exp-ip-grid"></div>
+
+          <div id="exp-empty" class="news-empty-state" style="display:none">
+            <div class="news-empty-icon">🖥</div>
+            <div class="news-empty-title">Sin datos de exposición</div>
+            <div class="news-empty-text">Introduce un dominio o IP y pulsa Analizar.</div>
+          </div>
+        </div>
+
+        <!-- ── Breaches Panel ────────────────────────────── -->
+        <div class="panel" id="panel-breaches">
+          <div class="page-header">
+            <div>
+              <div class="page-title">💧 Filtraciones</div>
+              <div class="page-desc">Busca brechas y filtraciones por dominio, IP, email o cualquier término. IntelX indexa pastes, dark web y fuentes filtradas.</div>
+            </div>
+          </div>
+
+          <div class="br-section-tabs">
+            <button class="out-tab active" id="br-tab-domain" onclick="switchBreachTab('domain',this)">🌐 Dominio</button>
+            <button class="out-tab" id="br-tab-h8mail" onclick="switchBreachTab('h8mail',this)">📧 Email</button>
+          </div>
+
+          <!-- Dominio tab: theHarvester + h8mail -->
+          <div id="br-pane-domain" class="br-tab-pane">
+            <div class="exp-search-bar">
+              <div class="news-search-wrap" style="flex:1">
+                <span class="news-search-icon">🎯</span>
+                <input type="text" id="harvest-target-input"
+                  placeholder="Dominio (ej: empresa.com)"
+                  spellcheck="false"
+                  onkeydown="if(event.key==='Enter') searchHarvestBreaches()">
+              </div>
+              <button class="run-btn" id="harvest-search-btn" onclick="searchHarvestBreaches()">🔍 Buscar</button>
+            </div>
+
+            <div id="harvest-error" class="exp-error-msg" style="display:none"></div>
+
+            <div id="harvest-loading" class="news-loading-state" style="display:none">
+              <div class="news-spinner"></div>
+              <span id="harvest-loading-msg">Buscando emails del dominio...</span>
+            </div>
+
+            <div id="harvest-stats" class="br-ix-stats" style="display:none">
+              <span id="harvest-stat-emails" class="br-ix-stat-badge">—</span>
+              <span class="br-ix-stat-label">emails encontrados vía theHarvester</span>
+            </div>
+
+            <div id="harvest-results" style="display:none">
+              <div id="harvest-results-list" class="br-results-list"></div>
+            </div>
+
+            <div id="harvest-empty" class="news-empty-state" style="display:none">
+              <div class="news-empty-icon">🌐</div>
+              <div class="news-empty-title">Sin objetivo definido</div>
+              <div class="news-empty-text">Introduce un dominio y pulsa Buscar.</div>
+            </div>
+          </div>
+
+          <!-- h8mail tab -->
+          <div id="br-pane-h8mail" class="br-tab-pane" style="display:none">
+            <div class="exp-search-bar">
+              <div class="news-search-wrap" style="flex:1">
+                <span class="news-search-icon">🎯</span>
+                <input type="text" id="breaches-target-input"
+                  placeholder="Email (ej: usuario@empresa.com)"
+                  spellcheck="false"
+                  onkeydown="if(event.key==='Enter') searchBreaches()">
+              </div>
+              <button class="run-btn" id="breaches-search-btn" onclick="searchBreaches()">🔍 Buscar</button>
+            </div>
+
+            <div id="breaches-error" class="exp-error-msg" style="display:none"></div>
+
+            <div id="breaches-loading" class="news-loading-state" style="display:none">
+              <div class="news-spinner"></div>
+              <span>Consultando h8mail + Leak-Lookup...</span>
+            </div>
+
+            <div id="breaches-results" style="display:none">
+              <div id="br-results-list" class="br-results-list"></div>
+            </div>
+
+            <div id="breaches-empty" class="news-empty-state" style="display:none">
+              <div class="news-empty-icon">💧</div>
+              <div class="news-empty-title">Sin objetivo definido</div>
+              <div class="news-empty-text">Introduce un email y pulsa Buscar.</div>
+            </div>
+          </div>
         </div>
 
         <div id="tool-panels"></div>

@@ -1736,6 +1736,18 @@ window.show = function (panel, btn) {
   if (panel === 'cves' && !_cves.loaded) loadCVEs();
   if (panel === 'iocs' && !_iocs.loaded) loadIOCs();
   if (panel === 'sources' && !_sources.loaded) loadSources();
+  if (panel === 'exposure') {
+    const topTarget = (document.getElementById('targetInput') || {}).value || '';
+    const inp = document.getElementById('exp-target-input');
+    if (inp && !inp.value && topTarget) inp.value = topTarget;
+    const emptyEl = document.getElementById('exp-empty');
+    if (emptyEl && !document.getElementById('exp-ip-grid').innerHTML) emptyEl.style.display = 'flex';
+  }
+  if (panel === 'breaches') {
+    const emptyEl = document.getElementById('harvest-empty');
+    const results = document.getElementById('harvest-results');
+    if (emptyEl && results && results.style.display === 'none') emptyEl.style.display = 'flex';
+  }
 };
 
 /* ═══════════════════════════════════════════════
@@ -2174,4 +2186,285 @@ async function loadSources() {
     if (loading) loading.style.display = 'none';
     if (btn) btn.disabled = false;
   }
+}
+
+/* ═══════════════════════════════════════════════
+   EXPOSURE MODULE  (Shodan InternetDB)
+═══════════════════════════════════════════════ */
+
+async function searchExposure() {
+  const inp     = document.getElementById('exp-target-input');
+  const target  = inp ? inp.value.trim() : '';
+  const loading = document.getElementById('exp-loading');
+  const summary = document.getElementById('exp-summary');
+  const vulnsRow = document.getElementById('exp-vulns-row');
+  const grid    = document.getElementById('exp-ip-grid');
+  const emptyEl = document.getElementById('exp-empty');
+  const errEl   = document.getElementById('exp-error');
+  const btn     = document.getElementById('exp-search-btn');
+
+  if (!target) { if (inp) inp.focus(); return; }
+
+  if (loading) loading.style.display = 'flex';
+  if (summary) summary.style.display = 'none';
+  if (vulnsRow) vulnsRow.style.display = 'none';
+  if (grid) grid.innerHTML = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (errEl) errEl.style.display = 'none';
+  if (btn) btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/exposure?target=${encodeURIComponent(target)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (errEl) { errEl.textContent = '⚠️ ' + (data.error || 'Error desconocido'); errEl.style.display = 'block'; }
+      return;
+    }
+
+    const sum = data.summary || {};
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setEl('exp-stat-ips',   sum.found_ips ?? '—');
+    setEl('exp-stat-ports', sum.total_ports ?? '—');
+    setEl('exp-stat-vulns', sum.total_vulns ?? '—');
+
+    const tagsEl = document.getElementById('exp-stat-tags');
+    if (tagsEl) {
+      tagsEl.innerHTML = (sum.all_tags || []).map(t =>
+        `<span class="exp-tag-chip">${escHtml(t)}</span>`
+      ).join('') || '<span style="color:var(--text3);font-size:.75rem">—</span>';
+    }
+
+    if (summary) summary.style.display = 'grid';
+
+    if ((sum.all_vulns || []).length) {
+      const chipsEl = document.getElementById('exp-vuln-chips');
+      if (chipsEl) {
+        chipsEl.innerHTML = sum.all_vulns.map(v =>
+          `<span class="exp-vuln-chip">${escHtml(v)}</span>`
+        ).join('');
+      }
+      if (vulnsRow) vulnsRow.style.display = 'block';
+    }
+
+    if (grid) {
+      grid.innerHTML = (data.ips || []).map(ip => _renderIPCard(ip)).join('');
+    }
+
+    if (!data.ips || !data.ips.length) {
+      if (emptyEl) emptyEl.style.display = 'flex';
+    }
+  } catch (e) {
+    if (errEl) { errEl.textContent = '⚠️ Error de conexión al consultar Shodan InternetDB.'; errEl.style.display = 'block'; }
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _renderIPCard(ip) {
+  const found = ip.found;
+  const ports = ip.ports || [];
+  const vulns = ip.vulns || [];
+  const tags  = ip.tags  || [];
+  const hosts = ip.hostnames || [];
+  const cpes  = ip.cpes  || [];
+
+  const portChips = ports.slice(0, 20).map(p =>
+    `<span class="exp-port-chip">${p}</span>`
+  ).join('');
+  const morePortsLabel = ports.length > 20
+    ? `<span class="exp-port-more">+${ports.length - 20} más</span>` : '';
+
+  const vulnChips = vulns.slice(0, 8).map(v =>
+    `<span class="exp-vuln-chip-sm">${escHtml(v)}</span>`
+  ).join('');
+
+  const tagChips = tags.map(t =>
+    `<span class="exp-tag-chip-sm">${escHtml(t)}</span>`
+  ).join('');
+
+  const hostnamesHtml = hosts.length
+    ? `<div class="exp-ip-row"><span class="exp-ip-key">Hostnames</span><span class="exp-ip-val">${hosts.slice(0,4).map(h => escHtml(h)).join(', ')}</span></div>`
+    : '';
+
+  if (!found) {
+    return `
+      <div class="exp-ip-card exp-ip-notfound">
+        <div class="exp-ip-header">
+          <span class="exp-ip-addr">${escHtml(ip.ip)}</span>
+          <span class="exp-ip-badge notfound">Sin datos</span>
+        </div>
+        <div class="exp-ip-nodesc">No encontrado en Shodan InternetDB${ip.error ? ` — ${escHtml(ip.error)}` : ''}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="exp-ip-card">
+      <div class="exp-ip-header">
+        <span class="exp-ip-addr">${escHtml(ip.ip)}</span>
+        ${vulns.length ? `<span class="exp-ip-badge vuln">${vulns.length} CVE${vulns.length > 1 ? 's' : ''}</span>` : ''}
+        ${tags.length  ? `<span class="exp-ip-badge tag">${tags.join(', ')}</span>` : ''}
+      </div>
+      ${hostnamesHtml}
+      ${ports.length ? `
+        <div class="exp-ip-row">
+          <span class="exp-ip-key">Puertos (${ports.length})</span>
+          <div class="exp-port-list">${portChips}${morePortsLabel}</div>
+        </div>` : ''}
+      ${vulns.length ? `
+        <div class="exp-ip-row">
+          <span class="exp-ip-key">CVEs</span>
+          <div class="exp-port-list">${vulnChips}${vulns.length > 8 ? `<span class="exp-port-more">+${vulns.length - 8} más</span>` : ''}</div>
+        </div>` : ''}
+      ${tags.length ? `
+        <div class="exp-ip-row">
+          <span class="exp-ip-key">Tags</span>
+          <div class="exp-port-list">${tagChips}</div>
+        </div>` : ''}
+      ${cpes.length ? `
+        <div class="exp-ip-row">
+          <span class="exp-ip-key">CPEs</span>
+          <span class="exp-ip-val exp-ip-val-mono">${cpes.slice(0,2).map(c => escHtml(c)).join(', ')}</span>
+        </div>` : ''}
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════
+   BREACHES TABS
+═══════════════════════════════════════════════ */
+
+function switchBreachTab(tab, btn) {
+  document.querySelectorAll('#panel-breaches .out-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.br-tab-pane').forEach(p => { p.style.display = 'none'; });
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('br-pane-' + tab);
+  if (pane) pane.style.display = 'block';
+}
+
+/* ═══════════════════════════════════════════════
+   HARVEST + BREACHES MODULE  (theHarvester → h8mail)
+═══════════════════════════════════════════════ */
+
+async function searchHarvestBreaches() {
+  const inp      = document.getElementById('harvest-target-input');
+  const domain   = inp ? inp.value.trim() : '';
+  const loading  = document.getElementById('harvest-loading');
+  const loadMsg  = document.getElementById('harvest-loading-msg');
+  const results  = document.getElementById('harvest-results');
+  const list     = document.getElementById('harvest-results-list');
+  const emptyEl  = document.getElementById('harvest-empty');
+  const errEl    = document.getElementById('harvest-error');
+  const stats    = document.getElementById('harvest-stats');
+  const statEl   = document.getElementById('harvest-stat-emails');
+  const btn      = document.getElementById('harvest-search-btn');
+
+  if (!domain) { if (inp) inp.focus(); return; }
+
+  if (loading) { loadMsg.textContent = 'Buscando emails del dominio con theHarvester...'; loading.style.display = 'flex'; }
+  if (results) results.style.display = 'none';
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (errEl)   errEl.style.display   = 'none';
+  if (stats)   stats.style.display   = 'none';
+  if (btn)     btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/harvest-breaches?target=${encodeURIComponent(domain)}`);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      if (errEl) { errEl.textContent = '⚠️ ' + (data.error || 'Error desconocido'); errEl.style.display = 'block'; }
+      return;
+    }
+
+    if (statEl) statEl.textContent = data.emails_found ?? 0;
+    if (stats)  stats.style.display = 'flex';
+
+    if (!data.results || data.results.length === 0) {
+      if (emptyEl) {
+        emptyEl.querySelector('.news-empty-title').textContent = 'Sin emails encontrados';
+        emptyEl.querySelector('.news-empty-text').textContent =
+          data.note || `theHarvester no encontró emails para "${escHtml(domain)}" en fuentes pasivas.`;
+        emptyEl.style.display = 'flex';
+      }
+      return;
+    }
+
+    if (list)    list.innerHTML = data.results.map(_renderH8mailResult).join('');
+    if (results) results.style.display = 'block';
+
+  } catch (e) {
+    if (errEl) { errEl.textContent = '⚠️ Error de conexión.'; errEl.style.display = 'block'; }
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn)     btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   BREACHES MODULE  (h8mail + Leak-Lookup)
+═══════════════════════════════════════════════ */
+
+async function searchBreaches() {
+  const inp     = document.getElementById('breaches-target-input');
+  const target  = inp ? inp.value.trim() : '';
+  const loading = document.getElementById('breaches-loading');
+  const results = document.getElementById('breaches-results');
+  const emptyEl = document.getElementById('breaches-empty');
+  const errEl   = document.getElementById('breaches-error');
+  const btn     = document.getElementById('breaches-search-btn');
+  const list    = document.getElementById('br-results-list');
+
+  if (!target) { if (inp) inp.focus(); return; }
+
+  if (loading) loading.style.display = 'flex';
+  if (results) results.style.display = 'none';
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (errEl)   errEl.style.display   = 'none';
+  if (btn)     btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/breaches?target=${encodeURIComponent(target)}`);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      if (errEl) { errEl.textContent = '⚠️ ' + (data.error || 'Error desconocido'); errEl.style.display = 'block'; }
+      return;
+    }
+
+    if (list) list.innerHTML = (data.results || []).map(_renderH8mailResult).join('');
+    if (results) results.style.display = 'block';
+
+  } catch (e) {
+    if (errEl) { errEl.textContent = '⚠️ Error de conexión al ejecutar h8mail.'; errEl.style.display = 'block'; }
+  } finally {
+    if (loading) loading.style.display = 'none';
+    if (btn)     btn.disabled = false;
+  }
+}
+
+function _renderH8mailResult(r) {
+  const pwned   = r.pwn_num > 0;
+  const sources = r.sources || [];
+
+  const sourceChips = sources.map(s => {
+    const label = s.breach || s.source;
+    const src   = (s.source || '').replace('LEAKLOOKUP_PUB', 'Leak-Lookup').replace('HUNTER_PUB', 'Hunter.io');
+    return `<div class="br-source-row">
+      <span class="br-source-tag">${escHtml(src)}</span>
+      <span class="br-source-breach">${escHtml(label)}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="br-result-card ${pwned ? 'br-pwned' : 'br-clean'}">
+      <div class="br-result-header">
+        <span class="br-result-target">${escHtml(r.target)}</span>
+        ${pwned
+          ? `<span class="br-result-badge pwned">💥 ${r.pwn_num} brecha${r.pwn_num > 1 ? 's' : ''}</span>`
+          : `<span class="br-result-badge clean">✅ Sin brechas</span>`
+        }
+      </div>
+      ${pwned ? `<div class="br-source-list">${sourceChips}</div>` : ''}
+    </div>`;
 }
