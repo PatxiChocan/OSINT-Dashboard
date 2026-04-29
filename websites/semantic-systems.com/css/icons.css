@@ -1,0 +1,2325 @@
+@font-face {
+  font-family: "icons";
+  src: url("../fonts/icons.eot");
+  src: url("../fonts/icons.eot?#iefix") format("eot"), url("../fonts/icons.woff2") format("woff2"), url("../fonts/icons.woff") format("woff"), url("../fonts/icons.ttf") format("truetype"), url("../fonts/icons.svg#icons") format("svg");
+}
+
+[class*="-font-icon"]:before,
+[class*="-font-icon"]:after {
+  font-family: icons;
+  font-size: 1rem;
+}
+
+.cube3-font-icon:before {
+  content: "\F101" !important;
+}
+
+.airplane-font-icon:before {
+  content: "\F102" !important;
+}
+
+.airplane-line-font-icon:before {
+  content: "\F103" !important;
+}
+
+.alert-line-font-icon:before {
+  content: "\F104" !important;
+}
+
+.aliance-font-icon:before {
+  content: "\F105" !important;
+}
+
+.arrow-left-font-icon:before {
+  content: "\F106" !important;
+}
+
+.arrow-right-font-icon:before {
+  content: "\F107" !important;
+}
+
+.answer-font-icon:before {
+  content: "\F108" !important;
+}
+
+.app-font-icon:before {
+  content: "\F109" !important;
+}
+
+.panel_left-font-icon:before {
+  content: "\F10A" !important;
+}
+
+.arrow-combo-font-icon:before {
+  content: "\F10B" !important;
+}
+
+.arrow-ccw-font-icon:before {
+  content: "\F10C" !important;
+}
+
+.article-alt-font-icon:before {
+  content: "\F10D" !important;
+}
+
+.attach-font-icon:before {
+  content: "\F10E" !important;
+}
+
+.alert-font-icon:before {
+  content: "\F10F" !important;
+}
+
+.award-font-icon:before {
+  content: "\F110" !important;
+}
+
+.award-line-font-icon:before {
+  content: "\F111" !important;
+}
+
+.back-font-icon:before {
+  content: "\F112" !important;
+}
+
+.back-in-time-font-icon:before {
+  content: "\F113" !important;
+}
+
+.basket-font-icon:before {
+  content: "\F114" !important;
+}
+
+.bat-full-font-icon:before {
+  content: "\F115" !important;
+}
+
+.bell-font-icon:before {
+  content: "\F116" !important;
+}
+
+.bell_2-font-icon:before {
+  content: "\F117" !important;
+}
+
+.bell-alt-font-icon:before {
+  content: "\F118" !important;
+}
+
+.bell-line-font-icon:before {
+  content: "\F119" !important;
+}
+
+.bell-off-font-icon:before {
+  content: "\F11A" !important;
+}
+
+.bell-off-line-font-icon:before {
+  content: "\F11B" !important;
+}
+
+.blind-font-icon:before {
+  content: "\F11C" !important;
+}
+
+.book-font-icon:before {
+  content: "\F11D" !important;
+}
+
+.book_1-font-icon:before {
+  content: "\F11E" !important;
+}
+
+.box-font-icon:before {
+  content: "\F11F" !important;
+}
+
+.calendar-font-icon:before {
+  content: "\F120" !important;
+}
+
+.calendar-empty-font-icon:before {
+  content: "\F121" !important;
+}
+
+.camera-font-icon:before {
+  content: "\F122" !important;
+}
+
+.camera-line-font-icon:before {
+  content: "\F123" !important;
+}
+
+.cancel-font-icon:before {
+  content: "\F124" !important;
+}
+
+.car-font-icon:before {
+  content: "\F125" !important;
+}
+
+.chart-line-font-icon:before {
+  content: "\F126" !important;
+}
+
+.chat-font-icon:before {
+  content: "\F127" !important;
+}
+
+.chat-line-font-icon:before {
+  content: "\F128" !important;
+}
+
+.clipboard-font-icon:before {
+  content: "\F129" !important;
+}
+
+.clipboard-ok-font-icon:before {
+  content: "\F12A" !important;
+}
+
+.clock-font-icon:before {
+  content: "\F12B" !important;
+}
+
+.code-font-icon:before {
+  content: "\F12C" !important;
+}
+
+.cog-font-icon:before,
+.config-font-icon:before {
+  content: "\F12D" !important;
+}
+
+.cog-alt-font-icon:before {
+  content: "\F12E" !important;
+}
+
+.cog-alt-line-font-icon:before {
+  content: "\F12F" !important;
+}
+
+.cog-line-font-icon:before,
+.config2-font-icon:before {
+  content: "\F130" !important;
+}
+
+.college-font-icon:before {
+  content: "\F131" !important;
+}
+
+.columns-font-icon:before {
+  content: "\F132" !important;
+}
+
+.comment-font-icon:before {
+  content: "\F133" !important;
+}
+
+.comment-line-font-icon:before {
+  content: "\F134" !important;
+}
+
+.conect-font-icon:before {
+  content: "\F135" !important;
+}
+
+.copy-font-icon:before {
+  content: "\F136" !important;
+}
+
+.database-font-icon:before {
+  content: "\F137" !important;
+}
+
+.database1-font-icon:before {
+  content: "\F138" !important;
+}
+
+.dinamic-font-icon:before {
+  content: "\F139" !important;
+}
+
+.doc-inv-font-icon:before {
+  content: "\F13A" !important;
+}
+
+.doc-text-inv-font-icon:before {
+  content: "\F13B" !important;
+}
+
+.document-font-icon:before {
+  content: "\F13C" !important;
+}
+
+.dot-circled-font-icon:before {
+  content: "\F13D" !important;
+}
+
+.down-circled-font-icon:before {
+  content: "\F13E" !important;
+}
+
+.down-circled-line-font-icon:before {
+  content: "\F13F" !important;
+}
+
+.download-font-icon:before {
+  content: "\F140" !important;
+}
+
+.download-line-font-icon:before {
+  content: "\F141" !important;
+}
+
+.arrow-down-font-icon:before {
+  content: "\F142" !important;
+}
+
+.ellipsis-font-icon:before {
+  content: "\F143" !important;
+}
+
+.email-font-icon:before {
+  content: "\F144" !important;
+}
+
+.email-line-font-icon:before {
+  content: "\F145" !important;
+}
+
+.eraser-font-icon:before {
+  content: "\F146" !important;
+}
+
+.eye-font-icon:before {
+  content: "\F147" !important;
+}
+
+.facebook-font-icon:before {
+  content: "\F148" !important;
+}
+
+.facebook-squared-font-icon:before {
+  content: "\F149" !important;
+}
+
+.file-code-font-icon:before {
+  content: "\F14A" !important;
+}
+
+.file-image-font-icon:before {
+  content: "\F14B" !important;
+}
+
+.file-video-font-icon:before {
+  content: "\F14C" !important;
+}
+
+.filter-font-icon:before {
+  content: "\F14D" !important;
+}
+
+.filter-line-font-icon:before {
+  content: "\F14E" !important;
+}
+
+.flag-font-icon:before {
+  content: "\F14F" !important;
+}
+
+.flag-line-font-icon:before {
+  content: "\F150" !important;
+}
+
+.flickr-font-icon:before {
+  content: "\F151" !important;
+}
+
+.floppy-font-icon:before,
+.save-font-icon:before {
+  content: "\F152" !important;
+}
+
+.floppy-line-font-icon:before,
+.save2-font-icon:before {
+  content: "\F153" !important;
+}
+
+.flow-split-font-icon:before {
+  content: "\F154" !important;
+}
+
+.flow-split1-font-icon:before {
+  content: "\F155" !important;
+}
+
+.folder-font-icon:before {
+  content: "\F156" !important;
+}
+
+.folder-line-font-icon:before {
+  content: "\F157" !important;
+}
+
+.folder-open-font-icon:before {
+  content: "\F158" !important;
+}
+
+.folder-open-line-font-icon:before {
+  content: "\F159" !important;
+}
+
+.gplus-font-icon:before {
+  content: "\F15A" !important;
+}
+
+.gplus-squared-font-icon:before {
+  content: "\F15B" !important;
+}
+
+.graph-font-icon:before {
+  content: "\F15C" !important;
+}
+
+.grid-font-icon:before {
+  content: "\F15D" !important;
+}
+
+.group-font-icon:before {
+  content: "\F15E" !important;
+}
+
+.help-font-icon:before {
+  content: "\F15F" !important;
+}
+
+.add-font-icon:before {
+  content: "\F160" !important;
+}
+
+.include-font-icon:before {
+  content: "\F161" !important;
+}
+
+.info-font-icon:before {
+  content: "\F162" !important;
+}
+
+.integrate-font-icon:before {
+  content: "\F163" !important;
+}
+
+.investigation-font-icon:before {
+  content: "\F164" !important;
+}
+
+.invoices-font-icon:before {
+  content: "\F165" !important;
+}
+
+.invoices-line-font-icon:before {
+  content: "\F166" !important;
+}
+
+.key-font-icon:before {
+  content: "\F167" !important;
+}
+
+.layout-font-icon:before {
+  content: "\F168" !important;
+}
+
+.left-circled-font-icon:before {
+  content: "\F169" !important;
+}
+
+.left-circled-line-font-icon:before {
+  content: "\F16A" !important;
+}
+
+.left-dir-font-icon:before {
+  content: "\F16B" !important;
+}
+
+.level-up-font-icon:before {
+  content: "\F16C" !important;
+}
+
+.link-font-icon:before {
+  content: "\F16D" !important;
+}
+
+.linkedin-font-icon:before {
+  content: "\F16E" !important;
+}
+
+.linkedin-squared-font-icon:before {
+  content: "\F16F" !important;
+}
+
+.list-font-icon:before {
+  content: "\F170" !important;
+}
+
+.list-add-font-icon:before {
+  content: "\F171" !important;
+}
+
+.list-alt-font-icon:before {
+  content: "\F172" !important;
+}
+
+.lock-font-icon:before {
+  content: "\F173" !important;
+}
+
+.lock-line-font-icon:before {
+  content: "\F174" !important;
+}
+
+.logout-font-icon:before {
+  content: "\F175" !important;
+}
+
+.magic-font-icon:before {
+  content: "\F176" !important;
+}
+
+.megaphone-font-icon:before {
+  content: "\F177" !important;
+}
+
+.megaphone-line-font-icon:before {
+  content: "\F178" !important;
+}
+
+.menu-font-icon:before {
+  content: "\F179" !important;
+}
+
+.moving-camera-font-icon:before {
+  content: "\F17A" !important;
+}
+
+.moving-camera-line-font-icon:before {
+  content: "\F17B" !important;
+}
+
+.ok-font-icon:before {
+  content: "\F17C" !important;
+}
+
+.on-font-icon:before {
+  content: "\F17D" !important;
+}
+
+.paper-font-icon:before {
+  content: "\F17E" !important;
+}
+
+.params-font-icon:before {
+  content: "\F17F" !important;
+}
+
+.paste-font-icon:before {
+  content: "\F180" !important;
+}
+
+.pencil-font-icon:before,
+.edit-font-icon:before {
+  content: "\F181" !important;
+}
+
+.photo-font-icon:before {
+  content: "\F182" !important;
+}
+
+.play-font-icon:before {
+  content: "\F183" !important;
+}
+
+.progress_3-font-icon:before {
+  content: "\F184" !important;
+}
+
+.project-font-icon:before {
+  content: "\F185" !important;
+}
+
+.puzzle-font-icon:before {
+  content: "\F186" !important;
+}
+
+.puzzle-line-font-icon:before {
+  content: "\F187" !important;
+}
+
+.quote-font-icon:before {
+  content: "\F188" !important;
+}
+
+.reply-font-icon:before {
+  content: "\F189" !important;
+}
+
+.restart-camera-font-icon:before {
+  content: "\F18A" !important;
+}
+
+.right-dir-font-icon:before {
+  content: "\F18B" !important;
+}
+
+.rocket-font-icon:before {
+  content: "\F18C" !important;
+}
+
+.rocket-line-font-icon:before {
+  content: "\F18D" !important;
+}
+
+.rotate-camera-font-icon:before {
+  content: "\F18E" !important;
+}
+
+.rss-font-icon:before {
+  content: "\F18F" !important;
+}
+
+.rss-squared-font-icon:before {
+  content: "\F190" !important;
+}
+
+.scissors-font-icon:before {
+  content: "\F191" !important;
+}
+
+.scissors-line-font-icon:before {
+  content: "\F192" !important;
+}
+
+.search-font-icon:before {
+  content: "\F193" !important;
+}
+
+.share-font-icon:before {
+  content: "\F194" !important;
+}
+
+.share2-font-icon:before {
+  content: "\F195" !important;
+}
+
+.sliders-font-icon:before {
+  content: "\F196" !important;
+}
+
+.slideshare-font-icon:before {
+  content: "\F197" !important;
+}
+
+.slideshare-squared-font-icon:before {
+  content: "\F198" !important;
+}
+
+.sort-font-icon:before {
+  content: "\F199" !important;
+}
+
+.sort-alt-down-font-icon:before {
+  content: "\F19A" !important;
+}
+
+.sort-alt-up-font-icon:before {
+  content: "\F19B" !important;
+}
+
+.sort-name-down-font-icon:before {
+  content: "\F19C" !important;
+}
+
+.sort-name-up-font-icon:before {
+  content: "\F19D" !important;
+}
+
+.sort-number-down-font-icon:before {
+  content: "\F19E" !important;
+}
+
+.sort-number-up-font-icon:before {
+  content: "\F19F" !important;
+}
+
+.spread-font-icon:before {
+  content: "\F1A0" !important;
+}
+
+.star-font-icon:before {
+  content: "\F1A1" !important;
+}
+
+.star-line-font-icon:before {
+  content: "\F1A2" !important;
+}
+
+.stopwatch-font-icon:before {
+  content: "\F1A3" !important;
+}
+
+.support-font-icon:before {
+  content: "\F1A4" !important;
+}
+
+.table-font-icon:before {
+  content: "\F1A5" !important;
+}
+
+.tag-line-font-icon:before {
+  content: "\F1A6" !important;
+}
+
+.task-font-icon:before {
+  content: "\F1A7" !important;
+}
+
+.thumbs-up-font-icon:before {
+  content: "\F1A8" !important;
+}
+
+.thumbs-up-alt-font-icon:before {
+  content: "\F1A9" !important;
+}
+
+.trash-font-icon:before,
+.delete-font-icon:before {
+  content: "\F1AA" !important;
+}
+
+.twitter-font-icon:before {
+  content: "\F1AB" !important;
+}
+
+.twitter-squared-font-icon:before {
+  content: "\F1AC" !important;
+}
+
+.unlink-font-icon:before {
+  content: "\F1AD" !important;
+}
+
+.upload-font-icon:before {
+  content: "\F1AE" !important;
+}
+
+.upload-line-font-icon:before {
+  content: "\F1AF" !important;
+}
+
+.arrow-up-font-icon:before {
+  content: "\F1B0" !important;
+}
+
+.user-line-font-icon:before {
+  content: "\F1B1" !important;
+}
+
+.user-add-font-icon:before {
+  content: "\F1B2" !important;
+}
+
+.user-add-line-font-icon:before {
+  content: "\F1B3" !important;
+}
+
+.video-font-icon:before {
+  content: "\F1B4" !important;
+}
+
+.video-line-font-icon:before {
+  content: "\F1B5" !important;
+}
+
+.perspective1-font-icon:before {
+  content: "\F1B6" !important;
+}
+
+.perspective2-font-icon:before {
+  content: "\F1B7" !important;
+}
+
+.perspective3-font-icon:before {
+  content: "\F1B8" !important;
+}
+
+.perspective4-font-icon:before {
+  content: "\F1B9" !important;
+}
+
+.w3c-font-icon:before {
+  content: "\F1BA" !important;
+}
+
+.wheelbarrow-font-icon:before {
+  content: "\F1BB" !important;
+}
+
+.user-font-icon:before {
+  content: "\F1BC" !important;
+}
+
+.tag-font-icon:before {
+  content: "\F1BD" !important;
+}
+
+.mobile-font-icon:before {
+  content: "\F1BE" !important;
+}
+
+.mobile-line-font-icon:before {
+  content: "\F1BF" !important;
+}
+
+.computer-font-icon:before {
+  content: "\F1C0" !important;
+}
+
+.phone-font-icon:before {
+  content: "\F1C1" !important;
+}
+
+.phone-line-font-icon:before {
+  content: "\F1C2" !important;
+}
+
+.group2-font-icon:before {
+  content: "\F1C3" !important;
+}
+
+.ray-line-font-icon:before {
+  content: "\F1C4" !important;
+}
+
+.weights-font-icon:before {
+  content: "\F1C5" !important;
+}
+
+.wrench-font-icon:before {
+  content: "\F1C6" !important;
+}
+
+.ray-font-icon:before {
+  content: "\F1C7" !important;
+}
+
+.menu2-font-icon:before {
+  content: "\F1C8" !important;
+}
+
+.youtube-font-icon:before {
+  content: "\F1C9" !important;
+}
+
+.home-font-icon:before {
+  content: "\F1CA" !important;
+}
+
+.abacus-font-icon:before {
+  content: "\F1CB" !important;
+}
+
+.abacus-line-font-icon:before {
+  content: "\F1CC" !important;
+}
+
+.fabric-font-icon:before {
+  content: "\F1CD" !important;
+}
+
+.fabric-line-font-icon:before {
+  content: "\F1CE" !important;
+}
+
+.light-font-icon:before {
+  content: "\F1CF" !important;
+}
+
+.light-line-font-icon:before {
+  content: "\F1D0" !important;
+}
+
+.camion-font-icon:before {
+  content: "\F1D1" !important;
+}
+
+.camion-line-font-icon:before {
+  content: "\F1D2" !important;
+}
+
+.world-line-font-icon:before {
+  content: "\F1D3" !important;
+}
+
+.world-font-icon:before {
+  content: "\F1D4" !important;
+}
+
+.logic-font-icon:before {
+  content: "\F1D5" !important;
+}
+
+.gramatic-font-icon:before {
+  content: "\F1D6" !important;
+}
+
+.solido2d-font-icon:before {
+  content: "\F1D7" !important;
+}
+
+.plano2d-font-icon:before {
+  content: "\F1D8" !important;
+}
+
+.map-font-icon:before {
+  content: "\F1D9" !important;
+}
+
+.connect-conf-font-icon:before {
+  content: "\F1DA" !important;
+}
+
+.no-connect-conf-font-icon:before {
+  content: "\F1DB" !important;
+}
+
+.down-dir-font-icon:before {
+  content: "\F1DC" !important;
+}
+
+.up-dir-font-icon:before {
+  content: "\F1DD" !important;
+}
+
+.droper-font-icon:before {
+  content: "\F1DE" !important;
+}
+
+.minus-font-icon:before {
+  content: "\F1DF" !important;
+}
+
+.filepdf-font-icon:before {
+  content: "\F1E0" !important;
+}
+
+.filedoc-font-icon:before {
+  content: "\F1E1" !important;
+}
+
+.fileimg-font-icon:before {
+  content: "\F1E2" !important;
+}
+
+.filelog-font-icon:before {
+  content: "\F1E3" !important;
+}
+
+.filemmp-font-icon:before {
+  content: "\F1E4" !important;
+}
+
+.fileaudio-font-icon:before {
+  content: "\F1E5" !important;
+}
+
+.fileppt-font-icon:before {
+  content: "\F1E6" !important;
+}
+
+.fileps-font-icon:before {
+  content: "\F1E7" !important;
+}
+
+.fileswf-font-icon:before {
+  content: "\F1E8" !important;
+}
+
+.filetxt-font-icon:before {
+  content: "\F1E9" !important;
+}
+
+.filevideo-font-icon:before {
+  content: "\F1EA" !important;
+}
+
+.filevsd-font-icon:before {
+  content: "\F1EB" !important;
+}
+
+.filexls-font-icon:before {
+  content: "\F1EC" !important;
+}
+
+.filexml-font-icon:before {
+  content: "\F1ED" !important;
+}
+
+.filezip-font-icon:before {
+  content: "\F1EE" !important;
+}
+
+.filenomime-font-icon:before {
+  content: "\F1EF" !important;
+}
+
+.filestl-font-icon:before {
+  content: "\F1F0" !important;
+}
+
+.download2-font-icon:before {
+  content: "\F1F1" !important;
+}
+
+.downloadlock-font-icon:before {
+  content: "\F1F2" !important;
+}
+
+.indicator-font-icon:before {
+  content: "\F1F3" !important;
+}
+
+.text-font-icon:before {
+  content: "\F1F4" !important;
+}
+
+.sticker-font-icon:before {
+  content: "\F1F5" !important;
+}
+
+.zoom-font-icon:before {
+  content: "\F1F6" !important;
+}
+
+.perspective5-font-icon:before {
+  content: "\F1F7" !important;
+}
+
+.perspective6-font-icon:before {
+  content: "\F1F8" !important;
+}
+
+.perspective7-font-icon:before {
+  content: "\F1F9" !important;
+}
+
+.perspective8-font-icon:before {
+  content: "\F1FA" !important;
+}
+
+.euro-font-icon:before {
+  content: "\F1FB" !important;
+}
+
+.dollar-font-icon:before {
+  content: "\F1FC" !important;
+}
+
+.libra-font-icon:before {
+  content: "\F1FD" !important;
+}
+
+.yen-font-icon:before {
+  content: "\F1FE" !important;
+}
+
+.money-font-icon:before {
+  content: "\F1FF" !important;
+}
+
+.moneybox-font-icon:before {
+  content: "\F200" !important;
+}
+
+.company-font-icon:before {
+  content: "\F201" !important;
+}
+
+.card-font-icon:before {
+  content: "\F202" !important;
+}
+
+.shopping-cart-font-icon:before {
+  content: "\F203" !important;
+}
+
+.user-ok-font-icon:before {
+  content: "\F204" !important;
+}
+
+.user-ok-line-font-icon:before {
+  content: "\F205" !important;
+}
+
+.euro-circle-font-icon:before {
+  content: "\F206" !important;
+}
+
+.dollar-circle-font-icon:before {
+  content: "\F207" !important;
+}
+
+.libra-circle-font-icon:before {
+  content: "\F208" !important;
+}
+
+.yen-circle-font-icon:before {
+  content: "\F209" !important;
+}
+
+.digital-signature-font-icon:before {
+  content: "\F20A" !important;
+}
+
+.amplify-font-icon:before {
+  content: "\F20B" !important;
+}
+
+.presence-control-font-icon:before {
+  content: "\F20C" !important;
+}
+
+.plant-control-font-icon:before {
+  content: "\F20D" !important;
+}
+
+.incidences-font-icon:before {
+  content: "\F20E" !important;
+}
+
+.reports-font-icon:before {
+  content: "\F20F" !important;
+}
+
+.file-work-font-icon:before {
+  content: "\F210" !important;
+}
+
+.exit-worker-font-icon:before {
+  content: "\F211" !important;
+}
+
+.entry-worker-font-icon:before {
+  content: "\F212" !important;
+}
+
+.exit-visit-font-icon:before {
+  content: "\F213" !important;
+}
+
+.entry-visit-font-icon:before {
+  content: "\F214" !important;
+}
+
+.exit-work-font-icon:before {
+  content: "\F215" !important;
+}
+
+.vertical-font-icon:before {
+  content: "\F216" !important;
+}
+
+.horizontal-font-icon:before {
+  content: "\F217" !important;
+}
+
+.layout01-font-icon:before {
+  content: "\F218" !important;
+}
+
+.layout02-font-icon:before {
+  content: "\F219" !important;
+}
+
+.layout03-font-icon:before {
+  content: "\F21A" !important;
+}
+
+.layout04-font-icon:before {
+  content: "\F21B" !important;
+}
+
+.redondez-font-icon:before {
+  content: "\F21C" !important;
+}
+
+.planicidad-font-icon:before {
+  content: "\F21D" !important;
+}
+
+.cilindricidad-font-icon:before {
+  content: "\F21E" !important;
+}
+
+.paralelismo-font-icon:before {
+  content: "\F21F" !important;
+}
+
+.perpendicularidad-font-icon:before {
+  content: "\F220" !important;
+}
+
+.inclinacion-font-icon:before {
+  content: "\F221" !important;
+}
+
+.concentricidad-font-icon:before {
+  content: "\F222" !important;
+}
+
+.simetria-font-icon:before {
+  content: "\F223" !important;
+}
+
+.circular-font-icon:before {
+  content: "\F224" !important;
+}
+
+.total-font-icon:before {
+  content: "\F225" !important;
+}
+
+.diametro-font-icon:before {
+  content: "\F226" !important;
+}
+
+.worker-font-icon:before {
+  content: "\F227" !important;
+}
+
+.worker-line-font-icon:before {
+  content: "\F228" !important;
+}
+
+.clase-font-icon:before {
+  content: "\F229" !important;
+}
+
+.clase-line-font-icon:before {
+  content: "\F22A" !important;
+}
+
+.instancia-font-icon:before {
+  content: "\F22B" !important;
+}
+
+.instancia-line-font-icon:before {
+  content: "\F22C" !important;
+}
+
+.propiedad-font-icon:before {
+  content: "\F22D" !important;
+}
+
+.propiedad-line-font-icon:before {
+  content: "\F22E" !important;
+}
+
+.boolean-font-icon:before {
+  content: "\F22F" !important;
+}
+
+.array-font-icon:before {
+  content: "\F230" !important;
+}
+
+.forma-linea-font-icon:before {
+  content: "\F231" !important;
+}
+
+.forma-superficie-font-icon:before {
+  content: "\F232" !important;
+}
+
+.posicion-font-icon:before {
+  content: "\F233" !important;
+}
+
+.pushpin-font-icon:before {
+  content: "\F234" !important;
+}
+
+.equal-font-icon:before {
+  content: "\F235" !important;
+}
+
+.m-font-icon:before {
+  content: "\F236" !important;
+}
+
+.c-font-icon:before {
+  content: "\F237" !important;
+}
+
+.plus-minus-font-icon:before {
+  content: "\F238" !important;
+}
+
+.smaller-equal-font-icon:before {
+  content: "\F239" !important;
+}
+
+.greater-equal-font-icon:before {
+  content: "\F23A" !important;
+}
+
+.smaller-font-icon:before {
+  content: "\F23B" !important;
+}
+
+.greater-font-icon:before {
+  content: "\F23C" !important;
+}
+
+.file-cabinet-font-icon:before {
+  content: "\F23D" !important;
+}
+
+.square-font-icon:before {
+  content: "\F23E" !important;
+}
+
+.acabado-superficial-font-icon:before {
+  content: "\F23F" !important;
+}
+
+.sap-font-icon:before {
+  content: "\F240" !important;
+}
+
+.baan-font-icon:before {
+  content: "\F241" !important;
+}
+
+.ln-font-icon:before {
+  content: "\F242" !important;
+}
+
+.robotic-arm-font-icon:before {
+  content: "\F243" !important;
+}
+
+.down-simple-arrow-font-icon:before {
+  content: "\F244" !important;
+}
+
+.up-simple-arrow-font-icon:before {
+  content: "\F245" !important;
+}
+
+.factory-font-icon:before {
+  content: "\F246" !important;
+}
+
+.letter-font-icon:before {
+  content: "\F247" !important;
+}
+
+.arrow-simple-left-font-icon:before,
+.back2-font-icon:before {
+  content: "\F248" !important;
+}
+
+.arrow-simple-right-font-icon:before {
+  content: "\F249" !important;
+}
+
+.arrow-simple-up-font-icon:before {
+  content: "\F24A" !important;
+}
+
+.arrow-simple-down-font-icon:before {
+  content: "\F24B" !important;
+}
+
+.print-font-icon:before {
+  content: "\F24C" !important;
+}
+
+.massive-email-font-icon:before {
+  content: "\F24D" !important;
+}
+
+.stamp-font-icon:before {
+  content: "\F24E" !important;
+}
+
+.stamp-ok-font-icon:before {
+  content: "\F24F" !important;
+}
+
+.bell-light-font-icon:before {
+  content: "\F250" !important;
+}
+
+.especial-ap-font-icon:before {
+  content: "\F251" !important;
+}
+
+.especial-cp-font-icon:before {
+  content: "\F252" !important;
+}
+
+.indicator-kg-font-icon:before {
+  content: "\F253" !important;
+}
+
+.user-speak-font-icon:before {
+  content: "\F254" !important;
+}
+
+.key-vip-font-icon:before {
+  content: "\F255" !important;
+}
+
+.key_1p1s-font-icon:before {
+  content: "\F256" !important;
+}
+
+.key_2p1s-font-icon:before {
+  content: "\F257" !important;
+}
+
+.key_2p2s-font-icon:before {
+  content: "\F258" !important;
+}
+
+.client-font-icon:before {
+  content: "\F259" !important;
+}
+
+.plafon-cs-font-icon:before {
+  content: "\F25A" !important;
+}
+
+.plafon-oval-cs-font-icon:before {
+  content: "\F25B" !important;
+}
+
+.tft28-font-icon:before {
+  content: "\F25C" !important;
+}
+
+.tft35-font-icon:before {
+  content: "\F25D" !important;
+}
+
+.tft56-font-icon:before {
+  content: "\F25E" !important;
+}
+
+.tftcliente-font-icon:before {
+  content: "\F25F" !important;
+}
+
+.tfttipo-font-icon:before {
+  content: "\F260" !important;
+}
+
+.especial-luminosos-font-icon:before {
+  content: "\F261" !important;
+}
+
+.pulsador_0-font-icon:before {
+  content: "\F262" !important;
+}
+
+.pulsador_1-font-icon:before {
+  content: "\F263" !important;
+}
+
+.pulsador-menos_1-font-icon:before {
+  content: "\F264" !important;
+}
+
+.pulsador_1A-font-icon:before {
+  content: "\F265" !important;
+}
+
+.pulsador_1B-font-icon:before {
+  content: "\F266" !important;
+}
+
+.pulsador_2-font-icon:before {
+  content: "\F267" !important;
+}
+
+.pulsador-menos_2-font-icon:before {
+  content: "\F268" !important;
+}
+
+.pulsador_2A-font-icon:before {
+  content: "\F269" !important;
+}
+
+.pulsador_2B-font-icon:before {
+  content: "\F26A" !important;
+}
+
+.pulsador_3-font-icon:before {
+  content: "\F26B" !important;
+}
+
+.pulsador-menos_3-font-icon:before {
+  content: "\F26C" !important;
+}
+
+.pulsador_3A-font-icon:before {
+  content: "\F26D" !important;
+}
+
+.pulsador_3B-font-icon:before {
+  content: "\F26E" !important;
+}
+
+.pulsador_4-font-icon:before {
+  content: "\F26F" !important;
+}
+
+.pulsador_5-font-icon:before {
+  content: "\F270" !important;
+}
+
+.pulsador_6-font-icon:before {
+  content: "\F271" !important;
+}
+
+.pulsador_7-font-icon:before {
+  content: "\F272" !important;
+}
+
+.pulsador_8-font-icon:before {
+  content: "\F273" !important;
+}
+
+.pulsador_9-font-icon:before {
+  content: "\F274" !important;
+}
+
+.pulsador_10-font-icon:before {
+  content: "\F275" !important;
+}
+
+.pulsador_11-font-icon:before {
+  content: "\F276" !important;
+}
+
+.pulsador_12-font-icon:before {
+  content: "\F277" !important;
+}
+
+.pulsador_13-font-icon:before {
+  content: "\F278" !important;
+}
+
+.pulsador_14-font-icon:before {
+  content: "\F279" !important;
+}
+
+.pulsador_15-font-icon:before {
+  content: "\F27A" !important;
+}
+
+.pulsador_16-font-icon:before {
+  content: "\F27B" !important;
+}
+
+.pulsador_17-font-icon:before {
+  content: "\F27C" !important;
+}
+
+.pulsador_18-font-icon:before {
+  content: "\F27D" !important;
+}
+
+.pulsador_19-font-icon:before {
+  content: "\F27E" !important;
+}
+
+.pulsador_20-font-icon:before {
+  content: "\F27F" !important;
+}
+
+.pulsador_21-font-icon:before {
+  content: "\F280" !important;
+}
+
+.pulsador_22-font-icon:before {
+  content: "\F281" !important;
+}
+
+.pulsador_23-font-icon:before {
+  content: "\F282" !important;
+}
+
+.pulsador_24-font-icon:before {
+  content: "\F283" !important;
+}
+
+.pulsador-A-font-icon:before {
+  content: "\F284" !important;
+}
+
+.pulsador-B-font-icon:before {
+  content: "\F285" !important;
+}
+
+.pulsador-C-font-icon:before {
+  content: "\F286" !important;
+}
+
+.pulsador-E-font-icon:before {
+  content: "\F287" !important;
+}
+
+.pulsador-F-font-icon:before {
+  content: "\F288" !important;
+}
+
+.pulsador-G-font-icon:before {
+  content: "\F289" !important;
+}
+
+.pulsador-G1-font-icon:before {
+  content: "\F28A" !important;
+}
+
+.pulsador-G2-font-icon:before {
+  content: "\F28B" !important;
+}
+
+.pulsador-G3-font-icon:before {
+  content: "\F28C" !important;
+}
+
+.pulsador-H-font-icon:before {
+  content: "\F28D" !important;
+}
+
+.pulsador-L-font-icon:before {
+  content: "\F28E" !important;
+}
+
+.pulsador-LB-font-icon:before {
+  content: "\F28F" !important;
+}
+
+.pulsador-LG-font-icon:before {
+  content: "\F290" !important;
+}
+
+.pulsador-M-font-icon:before {
+  content: "\F291" !important;
+}
+
+.pulsador-P-font-icon:before {
+  content: "\F292" !important;
+}
+
+.pulsador-PB-font-icon:before {
+  content: "\F293" !important;
+}
+
+.pulsador-PH-font-icon:before {
+  content: "\F294" !important;
+}
+
+.pulsador-PR-font-icon:before {
+  content: "\F295" !important;
+}
+
+.pulsador-R-font-icon:before {
+  content: "\F296" !important;
+}
+
+.pulsador-RC-font-icon:before {
+  content: "\F297" !important;
+}
+
+.pulsador-RI-font-icon:before {
+  content: "\F298" !important;
+}
+
+.pulsador-RJ-font-icon:before {
+  content: "\F299" !important;
+}
+
+.pulsador-RS-font-icon:before {
+  content: "\F29A" !important;
+}
+
+.pulsador-S-font-icon:before {
+  content: "\F29B" !important;
+}
+
+.pulsador-S1-font-icon:before {
+  content: "\F29C" !important;
+}
+
+.pulsador-S2-font-icon:before {
+  content: "\F29D" !important;
+}
+
+.pulsador-S3-font-icon:before {
+  content: "\F29E" !important;
+}
+
+.pulsador-SA-font-icon:before {
+  content: "\F29F" !important;
+}
+
+.pulsador-SS-font-icon:before {
+  content: "\F2A0" !important;
+}
+
+.pulsador-T-font-icon:before {
+  content: "\F2A1" !important;
+}
+
+.pulsador-U-font-icon:before {
+  content: "\F2A2" !important;
+}
+
+.pulsador-UG-font-icon:before {
+  content: "\F2A3" !important;
+}
+
+.pulsador-ESP-font-icon:before {
+  content: "\F2A4" !important;
+}
+
+.pulsador-Z-font-icon:before {
+  content: "\F2A5" !important;
+}
+
+.unlock-font-icon:before {
+  content: "\F2A6" !important;
+}
+
+.coser-celda-font-icon:before {
+  content: "\F2A7" !important;
+}
+
+.descoser-celda-font-icon:before {
+  content: "\F2A8" !important;
+}
+
+.cambio-mando-font-icon:before {
+  content: "\F2A9" !important;
+}
+
+.mover-derecha-font-icon:before {
+  content: "\F2AA" !important;
+}
+
+.mover-izquierda-font-icon:before {
+  content: "\F2AB" !important;
+}
+
+.seleccionar-celda-font-icon:before {
+  content: "\F2AC" !important;
+}
+
+.telemando-font-icon:before {
+  content: "\F2AD" !important;
+}
+
+.reduce-font-icon:before {
+  content: "\F2AE" !important;
+}
+
+.send-font-icon:before {
+  content: "\F2AF" !important;
+}
+
+.chrome-font-icon:before {
+  content: "\F2B0" !important;
+}
+
+.firefox-font-icon:before {
+  content: "\F2B1" !important;
+}
+
+.explorer-font-icon:before {
+  content: "\F2B2" !important;
+}
+
+.opera-font-icon:before {
+  content: "\F2B3" !important;
+}
+
+.trash-line-font-icon:before {
+  content: "\F2B4" !important;
+}
+
+.die-font-icon:before {
+  content: "\F2B5" !important;
+}
+
+.ok-double-font-icon:before {
+  content: "\F2B6" !important;
+}
+
+.ok-double-font-icon:after {
+  content: "\F2B6" !important;
+}
+
+.repcon-font-icon:before {
+  content: "\F2B7" !important;
+}
+
+.semantic-font-icon:before {
+  content: "\F2B8" !important;
+}
+
+.repcon-app-font-icon:before {
+  content: "\F2B9" !important;
+}
+
+.semantic-line-font-icon:before {
+  content: "\F2BA" !important;
+}
+
+.repcon-font-icon:before {
+  content: "\F2BB" !important;
+}
+
+.semantic-app-font-icon:before {
+  content: "\F2BC" !important;
+}
+
+.staber-font-icon:before {
+  content: "\F2BD" !important;
+}
+
+.panel_right-font-icon:before {
+  content: "\F2BE" !important;
+}
+
+.unlock-font-icon:before {
+  content: "\F2BF" !important;
+}
+
+.reduce-font-icon:before {
+  content: "\F2C0" !important;
+}
+
+.send-font-icon:before {
+  content: "\F2C1" !important;
+}
+
+.chrome-font-icon:before {
+  content: "\F2C2" !important;
+}
+
+.firefox-font-icon:before {
+  content: "\F2C3" !important;
+}
+
+.explorer-font-icon:before {
+  content: "\F2C4" !important;
+}
+
+.opera-font-icon:before {
+  content: "\F2C5" !important;
+}
+
+.instancia-square-font-icon:before {
+  content: "\F2C6" !important;
+}
+
+.builder-clase-no-propiedad-font-icon:before {
+  content: "\F2C7" !important;
+}
+
+.builder-clase-propiedad-font-icon:before {
+  content: "\F2C8" !important;
+}
+
+.arrow-left-double-font-icon:before {
+  content: "\F2C9" !important;
+}
+
+.arrow-right-double-font-icon:before {
+  content: "\F2CA" !important;
+}
+
+.contains-font-icon:before {
+  content: "\F2CB" !important;
+}
+
+.starts-with-font-icon:before {
+  content: "\F2CC" !important;
+}
+
+.empty-font-icon:before {
+  content: "\F2CD" !important;
+}
+
+.ends-with-font-icon:before {
+  content: "\F2CE" !important;
+}
+
+.not-contains-font-icon:before {
+  content: "\F2CF" !important;
+}
+
+.not-equal-font-icon:before {
+  content: "\F2D0" !important;
+}
+
+.not-null-font-icon:before {
+  content: "\F2D1" !important;
+}
+
+.filter-cancel-font-icon:before {
+  content: "\F2D2" !important;
+}
+
+.world2-font-icon:before,
+.lang-font-icon:before {
+  content: "\F2D3" !important;
+}
+
+.powered-font-icon:before {
+  content: "\F2D4" !important;
+}
+
+.right-circled-line-font-icon:before,
+.navigate-font-icon:before {
+  content: "\F2D5" !important;
+}
+
+.up-circled-line-font-icon:before {
+  content: "\F2D6" !important;
+}
+
+.right-circled-font-icon:before,
+.navigate2-font-icon:before {
+  content: "\F2D7" !important;
+}
+
+.up-circled-font-icon:before {
+  content: "\F2D8" !important;
+}
+
+.right-simple-arrow-font-icon:before {
+  content: "\F2D9" !important;
+}
+
+.left-simple-arrow-font-icon:before {
+  content: "\F2DA" !important;
+}
+
+.zoom-search-font-icon:before {
+  content: "\F2DB" !important;
+}
+
+.word-font-icon:before {
+  content: "\F2DC" !important;
+}
+
+.biolive-white-font-icon:before {
+  content: "\F2DD" !important;
+}
+
+.directProp-font-icon:before {
+  content: "\F2DE" !important;
+}
+
+.domain-font-icon:before {
+  content: "\F2DF" !important;
+}
+
+.dsca-font-icon:before {
+  content: "\F2E0" !important;
+}
+
+.inhcopy-font-icon:before {
+  content: "\F2E1" !important;
+}
+
+.integer-font-icon:before {
+  content: "\F2E2" !important;
+}
+
+.inverseProp-font-icon:before {
+  content: "\F2E3" !important;
+}
+
+.mmResource-font-icon:before {
+  content: "\F2E4" !important;
+}
+
+.noinh-font-icon:before {
+  content: "\F2E5" !important;
+}
+
+.inhnocopy-font-icon:before {
+  content: "\F2E6" !important;
+}
+
+.range-font-icon:before {
+  content: "\F2E7" !important;
+}
+
+.string-font-icon:before {
+  content: "\F2E8" !important;
+}
+
+.subclass-font-icon:before {
+  content: "\F2E9" !important;
+}
+
+.superclass-font-icon:before {
+  content: "\F2EA" !important;
+}
+
+.array-font-icon:before {
+  content: "\F2EB" !important;
+}
+
+.boolean-font-icon:before {
+  content: "\F2EC" !important;
+}
+
+.calendar-builder-font-icon:before {
+  content: "\F2ED" !important;
+}
+
+.class-font-icon:before {
+  content: "\F2EE" !important;
+}
+
+.class-line-font-icon:before {
+  content: "\F2EF" !important;
+}
+
+.instancia-font-icon:before {
+  content: "\F2F0" !important;
+}
+
+.instancia-line_2-font-icon:before {
+  content: "\F2F1" !important;
+}
+
+.float-font-icon:before {
+  content: "\F2F2" !important;
+}
+
+.propiedad-font-icon:before {
+  content: "\F2F3" !important;
+}
+
+.propiedad-line-font-icon:before {
+  content: "\F2F4" !important;
+}
+
+.staber_3d1-font-icon:before {
+  content: "\F2F5" !important;
+}
+
+.staber_3d2-font-icon:before {
+  content: "\F2F6" !important;
+}
+
+.assemblies-font-icon:before {
+  content: "\F2F7" !important;
+}
+
+.autocomplete-font-icon:before {
+  content: "\F2F8" !important;
+}
+
+.breadcrumb-font-icon:before {
+  content: "\F2F9" !important;
+}
+
+.button-font-icon:before {
+  content: "\F2FA" !important;
+}
+
+.date-font-icon:before {
+  content: "\F2FB" !important;
+}
+
+.canvas-font-icon:before {
+  content: "\F2FC" !important;
+}
+
+.checkbox-font-icon:before {
+  content: "\F2FD" !important;
+}
+
+.collapsible-font-icon:before {
+  content: "\F2FE" !important;
+}
+
+.color-picker-font-icon:before {
+  content: "\F2FF" !important;
+}
+
+.combobox-font-icon:before {
+  content: "\F300" !important;
+}
+
+.countdown-font-icon:before {
+  content: "\F301" !important;
+}
+
+.dialog-font-icon:before {
+  content: "\F302" !important;
+}
+
+.dinamictab-font-icon:before {
+  content: "\F303" !important;
+}
+
+.file-download-font-icon:before {
+  content: "\F304" !important;
+}
+
+.file-upload-font-icon:before {
+  content: "\F305" !important;
+}
+
+.gallery-font-icon:before {
+  content: "\F306" !important;
+}
+
+.grantt-font-icon:before {
+  content: "\F307" !important;
+}
+
+.graph-font-icon:before {
+  content: "\F308" !important;
+}
+
+.grid-font-icon:before {
+  content: "\F309" !important;
+}
+
+.header-font-icon:before {
+  content: "\F30A" !important;
+}
+
+.html-font-icon:before {
+  content: "\F30B" !important;
+}
+
+.html-editor-font-icon:before {
+  content: "\F30C" !important;
+}
+
+.image-font-icon:before {
+  content: "\F30D" !important;
+}
+
+.label-font-icon:before {
+  content: "\F30E" !important;
+}
+
+.list-font-icon:before {
+  content: "\F30F" !important;
+}
+
+.pagintoolbar-font-icon:before {
+  content: "\F310" !important;
+}
+
+.progressbar-font-icon:before {
+  content: "\F311" !important;
+}
+
+.ratio-font-icon:before {
+  content: "\F312" !important;
+}
+
+.scheduler-font-icon:before {
+  content: "\F313" !important;
+}
+
+.slider-font-icon:before {
+  content: "\F314" !important;
+}
+
+.tab-font-icon:before {
+  content: "\F315" !important;
+}
+
+.table-font-icon:before {
+  content: "\F316" !important;
+}
+
+.text-font-icon:before {
+  content: "\F317" !important;
+}
+
+.text-area-font-icon:before {
+  content: "\F318" !important;
+}
+
+.timelime-font-icon:before {
+  content: "\F319" !important;
+}
+
+.tree-font-icon:before {
+  content: "\F31A" !important;
+}
+
+.connect-font-icon:before {
+  content: "\F31B" !important;
+}
+
+.tool-tips-font-icon:before {
+  content: "\F31C" !important;
+}
+
+.type-here-font-icon:before {
+  content: "\F31D" !important;
+}
+
+.kadvancesearch-font-icon:before {
+  content: "\F31E" !important;
+}
+
+.kanvas-font-icon:before {
+  content: "\F31F" !important;
+}
+
+.kchart-font-icon:before {
+  content: "\F320" !important;
+}
+
+.kdetail-font-icon:before {
+  content: "\F321" !important;
+}
+
+.kform-font-icon:before {
+  content: "\F322" !important;
+}
+
+.kgallery-font-icon:before {
+  content: "\F323" !important;
+}
+
+.kgraph-font-icon:before {
+  content: "\F324" !important;
+}
+
+.kmenu-font-icon:before {
+  content: "\F325" !important;
+}
+
+.kmgt-font-icon:before {
+  content: "\F326" !important;
+}
+
+.kresult-font-icon:before {
+  content: "\F327" !important;
+}
+
+.ksearch-font-icon:before {
+  content: "\F328" !important;
+}
+
+.kstatusview-font-icon:before {
+  content: "\F329" !important;
+}
+
+.ktab-font-icon:before {
+  content: "\F32A" !important;
+}
+
+.ktallogue-font-icon:before {
+  content: "\F32B" !important;
+}
+
+.ktoolbar-font-icon:before {
+  content: "\F32C" !important;
+}
+
+.desktop-font-icon:before {
+  content: "\F32D" !important;
+}
+
+.laptop-font-icon:before {
+  content: "\F32E" !important;
+}
+
+.phone-font-icon:before {
+  content: "\F32F" !important;
+}
+
+.tablet-font-icon:before {
+  content: "\F330" !important;
+}
+
+.assests-font-icon:before {
+  content: "\F331" !important;
+}
+
+.components-font-icon:before {
+  content: "\F332" !important;
+}
+
+.process-font-icon:before {
+  content: "\F333" !important;
+}
+
+.screens-font-icon:before {
+  content: "\F334" !important;
+}
+
+.variables-font-icon:before {
+  content: "\F335" !important;
+}
+
+.current_class_rules-font-icon:before {
+  content: "\F336" !important;
+}
+
+.subclass_rules-font-icon:before {
+  content: "\F337" !important;
+}
+
+.superclass_rules-font-icon:before {
+  content: "\F338" !important;
+}
+
+.class_all_rules-font-icon:before {
+  content: "\F339" !important;
+}
+
+.savecheck_v1-font-icon:before {
+  content: "\F33A" !important;
+}
+
+.savecheck_v2-font-icon:before {
+  content: "\F33B" !important;
+}
+
+.graph-horizontal-bar-font-icon:before {
+  content: "\F33C" !important;
+}
+
+.graph-line-font-icon:before {
+  content: "\F33D" !important;
+}
+
+.graph-vertical-bar-font-icon:before {
+  content: "\F33E" !important;
+}
+
+.graph-donut-font-icon:before {
+  content: "\F33F" !important;
+}

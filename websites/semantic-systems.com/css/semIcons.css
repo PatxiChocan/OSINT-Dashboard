@@ -1,0 +1,395 @@
+@charset "UTF-8";
+@font-face {
+  font-family: "semIcons";
+  src: url("../fonts/semIcons.eot");
+  src: url("../fonts/semIcons.eot?#iefix") format("eot"), url("../fonts/semIcons.woff2") format("woff2"), url("../fonts/semIcons.woff") format("woff"), url("../fonts/semIcons.ttf") format("truetype"), url("../fonts/semIcons.svg#semIcons") format("svg");
+}
+[class*=font-sem]:before,
+[class*=font-sem]:after {
+  font-family: semIcons;
+  font-size: 1rem;
+}
+
+.correo-font-sem:before {
+  content: "\D101" !important;
+}
+
+.ia-font-sem:before {
+  content: "\D102" !important;
+}
+
+.identidad-font-sem:before {
+  content: "\D103" !important;
+}
+
+.informacion-font-sem:before {
+  content: "\D104" !important;
+}
+
+.internet-font-sem:before {
+  content: "\D105" !important;
+}
+
+.fichas-font-sem:before {
+  content: "\D106" !important;
+}
+
+.identidad_corporativa-font-sem:before {
+  content: "\D107" !important;
+}
+
+.multimedia-font-sem:before {
+  content: "\D108" !important;
+}
+
+.revista-font-sem:before {
+  content: "\D109" !important;
+}
+
+.altavoz-font-sem:before {
+  content: "\D10A" !important;
+}
+
+.microfono-font-sem:before {
+  content: "\D10B" !important;
+}
+
+.BuildeR-font-sem:before {
+  content: "\D10C" !important;
+}
+
+.geometria_3D-font-sem:before {
+  content: "\D10D" !important;
+}
+
+.motor_integracion_procesos-font-sem:before {
+  content: "\D10E" !important;
+}
+
+.visualizacion_datos_grafo-font-sem:before {
+  content: "\D10F" !important;
+}
+
+.administracion_comunicaciones-font-sem:before {
+  content: "\D110" !important;
+}
+
+.aplicaciones_criticas-font-sem:before {
+  content: "\D111" !important;
+}
+
+.cloud-font-sem:before {
+  content: "\D112" !important;
+}
+
+.sistemas_infraestructuras-font-sem:before {
+  content: "\D113" !important;
+}
+
+.analitica_avanzada-font-sem:before {
+  content: "\D114" !important;
+}
+
+.digitalizacion_operaciones_financieras-font-sem:before {
+  content: "\D115" !important;
+}
+
+.digitalizacion_procesos_comerciales-font-sem:before {
+  content: "\D116" !important;
+}
+
+.digitalizacion_procesos_gestion-font-sem:before {
+  content: "\D117" !important;
+}
+
+.industria4_0-font-sem:before {
+  content: "\D118" !important;
+}
+
+.servicios_gestionados_IT-font-sem:before {
+  content: "\D119" !important;
+}
+
+.configurador_producto-font-sem:before {
+  content: "\D11A" !important;
+}
+
+.generacion_pedidos-font-sem:before {
+  content: "\D11B" !important;
+}
+
+.proceso_facturas-font-sem:before {
+  content: "\D11C" !important;
+}
+
+.SII-font-sem:before {
+  content: "\D11D" !important;
+}
+
+.solucion_planta-font-sem:before {
+  content: "\D11E" !important;
+}
+
+.comillas-font-sem:before {
+  content: "\D11F" !important;
+}
+
+.ticketbai-font-sem:before {
+  content: "\D120" !important;
+}
+
+.soluciones_lan_sdlan_data_center-font-sem:before {
+  content: "\D121" !important;
+}
+
+.soluciones_wan-font-sem:before {
+  content: "\D122" !important;
+}
+
+.balanceador-carga-comunicaciones-font-sem:before {
+  content: "\D123" !important;
+}
+
+.segmentacion_redes-font-sem:before {
+  content: "\D124" !important;
+}
+
+.infraestructuras_red_seguridad_perimetral-font-sem:before {
+  content: "\D125" !important;
+}
+
+.sap_certified_sap_hana_operations-font-sem:before {
+  content: "\D126" !important;
+}
+
+.sap_certified_cloud_infrastructure_operations-font-sem:before {
+  content: "\D127" !important;
+}
+
+.sap_certified_hosting_operations-font-sem:before {
+  content: "\D128" !important;
+}
+
+.sap_partner_open_ecosystem-font-sem:before {
+  content: "\D129" !important;
+}
+
+.infor-gold-channel-partner-font-sem:before {
+  content: "\D12A" !important;
+}
+
+.soluciones_automatizacion_control_planta-font-sem:before {
+  content: "\D12B" !important;
+}
+
+.builder_logo-font-sem:before {
+  content: "\D12C" !important;
+}
+
+.repcon_ia_logo-font-sem:before {
+  content: "\D12D" !important;
+}
+
+.CompatibilidadconIA_icon-font-sem:before {
+  content: "\D12E" !important;
+}
+
+.ConsultasAvanzadas_icon-font-sem:before {
+  content: "\D12F" !important;
+}
+
+.Contextualizacion_icon-font-sem:before {
+  content: "\D130" !important;
+}
+
+.EscabilidadyFlexibilidad_icon-font-sem:before {
+  content: "\D131" !important;
+}
+
+.GestiondelConocimiento_icon-font-sem:before {
+  content: "\D132" !important;
+}
+
+.InferenciaAutomatica_icon-font-sem:before {
+  content: "\D133" !important;
+}
+
+.IntegraciondeDatosHeterogeneos_icon-font-sem:before {
+  content: "\D134" !important;
+}
+
+.Interoperabilidad_icon-font-sem:before {
+  content: "\D135" !important;
+}
+
+.MejoradeDecisiones_icon-font-sem:before {
+  content: "\D136" !important;
+}
+
+.ReutilizaciondeDatos_icon-font-sem:before {
+  content: "\D137" !important;
+}
+
+.Adaptabilidad_icon-font-sem:before {
+  content: "\D138" !important;
+}
+
+.AutomatizaciondeDecisiones_icon-font-sem:before {
+  content: "\D139" !important;
+}
+
+.Consistencia_icon-font-sem:before {
+  content: "\D13A" !important;
+}
+
+.Escalabilidad_icon-font-sem:before {
+  content: "\D13B" !important;
+}
+
+.AccesoaDatosDiversos_icon-font-sem:before {
+  content: "\D13C" !important;
+}
+
+.AnalisisComparativo_icon-font-sem:before {
+  content: "\D13D" !important;
+}
+
+.Escalabilidad_multidatasets_icon-font-sem:before {
+  content: "\D13E" !important;
+}
+
+.HistorificaciondeDatos_icon-font-sem:before {
+  content: "\D13F" !important;
+}
+
+.IntegraciondeDatosExternos_icon-font-sem:before {
+  content: "\D140" !important;
+}
+
+.PersonalizacionMejorada_icon-font-sem:before {
+  content: "\D141" !important;
+}
+
+.CumplimientodeNormativas_icon-font-sem:before {
+  content: "\D142" !important;
+}
+
+.GestiondePermisos_icon-font-sem:before {
+  content: "\D143" !important;
+}
+
+.HistorialdeVersiones_icon-font-sem:before {
+  content: "\D144" !important;
+}
+
+.ProtecciondeDatos_icon-font-sem:before {
+  content: "\D145" !important;
+}
+
+.ReducciondeErrores_icon-font-sem:before {
+  content: "\D146" !important;
+}
+
+.TrazabilidaddeCambios_icon-font-sem:before {
+  content: "\D147" !important;
+}
+
+.ConectividaddeDatos_icon-font-sem:before {
+  content: "\D148" !important;
+}
+
+.ConectividadentrePlataformas_icon-font-sem:before {
+  content: "\D149" !important;
+}
+
+.EscalabilidadOperativa_icon-font-sem:before {
+  content: "\D14A" !important;
+}
+
+.EstandarizaciondeDatos_icon-font-sem:before {
+  content: "\D14B" !important;
+}
+
+.ExportacionPersonalizable_icon-font-sem:before {
+  content: "\D14C" !important;
+}
+
+.ReducciondeSilosdeInformacion_icon-font-sem:before {
+  content: "\D14D" !important;
+}
+
+.VisibilidadenTiempoReal_icon-font-sem:before {
+  content: "\D14E" !important;
+}
+
+.AhorrodeTiempo_icon-font-sem:before {
+  content: "\D14F" !important;
+}
+
+.AumentodeIngresos_icon-font-sem:before {
+  content: "\D150" !important;
+}
+
+.ConociemientosdeVentas_icon-font-sem:before {
+  content: "\D151" !important;
+}
+
+.EficienciadeFabricacion_icon-font-sem:before {
+  content: "\D152" !important;
+}
+
+.MejoradeExperiencia_icon-font-sem:before {
+  content: "\D153" !important;
+}
+
+.Adaptabilidad_icon-font-sem:before {
+  content: "\D154" !important;
+}
+
+.IntegraciónSencilla_icon-font-sem:before {
+  content: "\D155" !important;
+}
+
+.ProteccióndeDatos_icon-font-sem:before {
+  content: "\D156" !important;
+}
+
+.ReduccióndeCostos_icon-font-sem:before {
+  content: "\D157" !important;
+}
+
+.LowCode_icon-font-sem:before {
+  content: "\D158" !important;
+}
+
+.TrabajoenEquipo_icon-font-sem:before {
+  content: "\D159" !important;
+}
+
+.TiempoReal_icon-font-sem:before {
+  content: "\D15A" !important;
+}
+
+.HistoricodeCambios_icon-font-sem:before {
+  content: "\D15B" !important;
+}
+
+.AutomatizacionAvanzada_icon-font-sem:before {
+  content: "\D15C" !important;
+}
+
+.OptimizacionRecursos_icon-font-sem:before {
+  content: "\D15D" !important;
+}
+
+.Descriptiva_icon-font-sem:before {
+  content: "\D15E" !important;
+}
+
+.Diagnostica_icon-font-sem:before {
+  content: "\D15F" !important;
+}
+
+.Predictiva_icon-font-sem:before {
+  content: "\D160" !important;
+}

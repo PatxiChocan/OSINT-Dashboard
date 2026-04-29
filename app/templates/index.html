@@ -25,9 +25,9 @@
         <span class="icon">⌂</span>
         <span>Inicio</span>
       </button>
-      <button class="nav-btn" onclick="show('plan',this)">
-        <span class="icon">📋</span>
-        <span>Plan de prueba</span>
+      <button class="nav-btn" onclick="show('scope',this)">
+        <span class="icon">📁</span>
+        <span>Alcance</span>
       </button>
       <button class="nav-btn" onclick="show('parallel',this)">
         <span class="icon">⚡</span>
@@ -53,9 +53,13 @@
         <span class="icon">☣</span>
         <span>IOCs</span>
       </button>
-      <button class="nav-btn" onclick="show('exposure',this)">
-        <span class="icon">🖥</span>
-        <span>Exposición</span>
+      <button class="nav-btn" onclick="show('shodan',this)">
+        <span class="icon">🔭</span>
+        <span>Shodan</span>
+      </button>
+      <button class="nav-btn" onclick="show('virustotal',this)">
+        <span class="icon">🦠</span>
+        <span>VirusTotal</span>
       </button>
       <button class="nav-btn" onclick="show('breaches',this)">
         <span class="icon">💧</span>
@@ -80,6 +84,14 @@
       <button class="nav-btn" onclick="show('katana',this)">
         <span class="icon">🕷</span>
         <span>Katana</span>
+      </button>
+      <button class="nav-btn" onclick="show('gitleaks',this)">
+        <span class="icon">🔑</span>
+        <span>Gitleaks</span>
+      </button>
+      <button class="nav-btn" onclick="show('wayback',this)">
+        <span class="icon">📼</span>
+        <span>Wayback</span>
       </button>
 
       <div class="sidebar-status sidebar-status-card">
@@ -106,6 +118,7 @@
 
         <div class="topbar-right">
           <span class="target-chip" id="targetChip"></span>
+          <span class="scope-topbar-indicator" id="scope-indicator" style="display:none"></span>
           <span id="clock" class="clock-label"></span>
         </div>
       </div>
@@ -143,12 +156,12 @@
               <div class="target-context-stats">
                 <div class="context-mini-card">
                   <span class="context-mini-k">Última acción</span>
-                  <span class="context-mini-v">Esperando ejecución</span>
+                  <span class="context-mini-v" id="home-last-action">Esperando ejecución</span>
                 </div>
 
                 <div class="context-mini-card">
                   <span class="context-mini-k">Herramientas</span>
-                  <span class="context-mini-v">3 módulos</span>
+                  <span class="context-mini-v"><span id="home-stat-tools">5</span> módulos</span>
                 </div>
 
                 <div class="context-mini-card">
@@ -159,16 +172,38 @@
             </div>
           </div>
 
+          <!-- Scope context card -->
+          <div class="scope-home-card" id="scope-home-card">
+            <div class="scope-home-empty" id="scope-home-empty">
+              <span class="scope-home-empty-icon">📁</span>
+              <span class="scope-home-empty-text">No hay alcance definido — define los dominios y rangos IP autorizados antes de analizar</span>
+              <button class="secondary-btn" onclick="show('scope',null)" style="margin-left:auto;white-space:nowrap">Definir alcance →</button>
+            </div>
+            <div class="scope-home-active" id="scope-home-active" style="display:none">
+              <div class="scope-home-info">
+                <div class="scope-home-eyebrow">Encargo activo</div>
+                <div class="scope-home-casename" id="scope-home-casename">—</div>
+                <div class="scope-home-client" id="scope-home-client"></div>
+              </div>
+              <div class="scope-home-chips" id="scope-home-chips"></div>
+              <div class="scope-home-actions">
+                <button class="secondary-btn" onclick="show('scope',null)">Editar →</button>
+                <button class="run-btn" onclick="generateExecutiveReport()">📄 Reporte PDF</button>
+                <button class="secondary-btn" onclick="generateSTIX()">🔗 STIX JSON</button>
+              </div>
+            </div>
+          </div>
+
           <div class="hero-box hero-box-compact">
             <div class="hero-box-left">
-              <div class="hero-box-title">Empieza por Discover</div>
+              <div class="hero-box-title">Recon externo guiado por alcance</div>
               <div class="hero-box-desc">
-                La mejor opción para demo y reconocimiento inicial: WHOIS, DNSRecon, WhatWeb, TLS, Nmap y otras comprobaciones rápidas desde un único punto de entrada.
+                Define el alcance del encargo, ejecuta herramientas contra los objetivos autorizados y genera reportes ejecutivos o STIX para MISP.
               </div>
 
               <div class="hero-actions">
                 <button class="run-btn" onclick="show('discover', null)">🚀 Ir a Discover</button>
-                <button class="secondary-btn" onclick="show('plan', null)">📋 Ver plan guiado</button>
+                <button class="secondary-btn" onclick="show('scope', null)">📁 Definir alcance</button>
               </div>
             </div>
 
@@ -176,15 +211,15 @@
               <div class="quick-steps quick-steps-compact">
                 <div class="quick-step">
                   <span class="quick-step-num">1</span>
-                  <span class="quick-step-text">Define el dominio o IP objetivo</span>
+                  <span class="quick-step-text">Define el alcance: dominios, IPs, tipo de análisis y expiración</span>
                 </div>
                 <div class="quick-step">
                   <span class="quick-step-num">2</span>
-                  <span class="quick-step-text">Abre Discover o el plan de prueba</span>
+                  <span class="quick-step-text">Ejecuta herramientas pasivas o activas según el alcance autorizado</span>
                 </div>
                 <div class="quick-step">
                   <span class="quick-step-num">3</span>
-                  <span class="quick-step-text">Ejecuta una herramienta y revisa findings + raw output</span>
+                  <span class="quick-step-text">Genera el reporte ejecutivo PDF o exporta STIX 2.1 para MISP / SIEM</span>
                 </div>
               </div>
             </div>
@@ -193,13 +228,13 @@
           <div class="stats-row stats-row-ops">
             <div class="stat-card stat-card-ops">
               <div class="stat-label stat-label-mono">TOOLS</div>
-              <div class="stat-val">3</div>
+              <div class="stat-val" id="home-stat-tools2">5</div>
               <div class="stat-sub">Módulos principales</div>
             </div>
 
             <div class="stat-card stat-card-ops">
               <div class="stat-label stat-label-mono">COMMANDS</div>
-              <div class="stat-val">40+</div>
+              <div class="stat-val" id="home-stat-cmds">30+</div>
               <div class="stat-sub">Subcomandos preparados</div>
             </div>
 
@@ -210,9 +245,9 @@
             </div>
 
             <div class="stat-card stat-card-ops">
-              <div class="stat-label stat-label-mono">WORKFLOW</div>
-              <div class="stat-val">📋</div>
-              <div class="stat-sub">Flujo guiado</div>
+              <div class="stat-label stat-label-mono">REPORTS</div>
+              <div class="stat-val">📄</div>
+              <div class="stat-sub">PDF + STIX 2.1</div>
             </div>
           </div>
 
@@ -339,11 +374,11 @@
               <div class="section-title">Flujos disponibles</div>
 
               <div class="home-grid">
-                <div class="home-card" onclick="show('plan',null)">
-                  <div class="home-card-icon">📋</div>
-                  <div class="home-card-name">Plan de prueba</div>
+                <div class="home-card" onclick="show('scope',null)">
+                  <div class="home-card-icon">📁</div>
+                  <div class="home-card-name">Alcance</div>
                   <div class="home-card-desc">
-                    Secuencia guiada de menor a mayor impacto para presentar el análisis paso a paso.
+                    Define dominios, rangos IP, tipo de análisis y expiración del encargo autorizado.
                   </div>
                 </div>
 
@@ -361,37 +396,8 @@
               <div class="section-title">Actividad reciente</div>
 
             <div class="activity-panel">
-              <div class="activity-panel-title">Eventos recientes</div>
-
-              <div class="activity-item">
-                <div class="activity-item-top">
-                  <span class="activity-tool">Discover</span>
-                  <span class="activity-time">Última ejecución</span>
-                </div>
-                <div class="activity-text">
-                  Reconocimiento inicial completado. Revisa findings estructurados y output raw.
-                </div>
-              </div>
-
-              <div class="activity-item">
-                <div class="activity-item-top">
-                  <span class="activity-tool">Plan de prueba</span>
-                  <span class="activity-time">Disponible</span>
-                </div>
-                <div class="activity-text">
-                  Flujo recomendado: passive → low contact → active moderate → noisy.
-                </div>
-              </div>
-
-              <div class="activity-item">
-                <div class="activity-item-top">
-                  <span class="activity-tool">Modo paralelo</span>
-                  <span class="activity-time">Ready</span>
-                </div>
-                <div class="activity-text">
-                  Preparado para ejecutar múltiples subherramientas con resumen unificado.
-                </div>
-              </div>
+              <div class="activity-panel-title">Ejecuciones de esta sesión</div>
+              <div id="home-activity-list"><p class="ui-message">Sin ejecuciones en esta sesión.</p></div>
             </div>
 
             <div class="section-title">Estado operativo</div>
@@ -420,15 +426,85 @@
           </div>
         </div>
 
-        <div class="panel" id="panel-plan">
+        <div class="panel" id="panel-scope">
           <div class="page-header">
-            <div class="page-title">📋 Plan de prueba</div>
-            <div class="page-desc">
-              Secuencia ordenada de menor a mayor impacto. Haz clic en cualquier paso para ir a la herramienta correspondiente con el comando preparado.
+            <div>
+              <div class="page-title">📁 Alcance del encargo</div>
+              <div class="page-desc">Define los límites autorizados del análisis. Se persiste en el navegador entre sesiones.</div>
             </div>
           </div>
 
-          <div class="plan-phases">
+          <!-- Scope form -->
+          <div class="scope-card">
+            <div class="scope-card-title">Datos del encargo</div>
+            <div class="scope-grid">
+              <div class="scope-field">
+                <label class="scope-lbl" for="scope-case">Nombre del caso</label>
+                <input class="scope-inp" id="scope-case" type="text" placeholder="Client X External Recon" autocomplete="off">
+              </div>
+              <div class="scope-field">
+                <label class="scope-lbl" for="scope-client">Cliente</label>
+                <input class="scope-inp" id="scope-client" type="text" placeholder="Client Corp S.L." autocomplete="off">
+              </div>
+              <div class="scope-field scope-full">
+                <label class="scope-lbl" for="scope-resp">Responsable</label>
+                <input class="scope-inp" id="scope-resp" type="text" placeholder="Manager / client / legal" autocomplete="off">
+              </div>
+              <div class="scope-field scope-full">
+                <label class="scope-lbl" for="scope-domains">Dominios aprobados</label>
+                <textarea class="scope-ta" id="scope-domains" rows="2" placeholder="client.com, client.net, api.client.com"></textarea>
+                <span class="scope-hint">Separados por comas — se usan para validar el objetivo activo</span>
+              </div>
+              <div class="scope-field scope-full">
+                <label class="scope-lbl" for="scope-ips">Rangos IP aprobados</label>
+                <textarea class="scope-ta" id="scope-ips" rows="2" placeholder="192.0.2.0/24, 10.0.0.0/8"></textarea>
+                <span class="scope-hint">CIDRs separados por comas</span>
+              </div>
+              <div class="scope-field">
+                <label class="scope-lbl">Tipo de análisis permitido</label>
+                <div class="scope-radios">
+                  <label class="scope-radio"><input type="radio" name="scope-scan" value="passive"> <span>Solo pasivo</span></label>
+                  <label class="scope-radio"><input type="radio" name="scope-scan" value="active" checked> <span>Activo permitido</span></label>
+                </div>
+              </div>
+              <div class="scope-field">
+                <label class="scope-lbl" for="scope-expiry">Fecha de expiración</label>
+                <input class="scope-inp" id="scope-expiry" type="date">
+              </div>
+            </div>
+            <div class="scope-actions">
+              <button class="run-btn" onclick="saveScope()">💾 Guardar alcance</button>
+              <button class="secondary-btn" onclick="clearScope()">🗑 Limpiar</button>
+            </div>
+            <div class="scope-saved-msg" id="scope-saved-msg" style="display:none">✅ Alcance guardado</div>
+          </div>
+
+          <!-- Active scope display -->
+          <div class="scope-active-card" id="scope-active-card" style="display:none">
+            <div class="scope-active-header">
+              <div class="scope-active-title" id="scope-active-title">—</div>
+              <div class="scope-active-badges" id="scope-active-badges"></div>
+            </div>
+            <div class="scope-active-body" id="scope-active-body"></div>
+          </div>
+
+          <!-- Report export -->
+          <div class="scope-reports-card">
+            <div class="scope-reports-title">📊 Exportar análisis completo</div>
+            <div class="scope-reports-desc">Genera reportes con todos los hallazgos recopilados en la sesión actual. Se incluyen datos de Shodan, VirusTotal y todas las herramientas ejecutadas.</div>
+            <div class="scope-reports-btns">
+              <button class="run-btn scope-report-btn" onclick="generateExecutiveReport()">
+                📄 Reporte ejecutivo PDF
+                <span class="btn-sub">Para el cliente · Formato profesional</span>
+              </button>
+              <button class="secondary-btn scope-report-btn" onclick="generateSTIX()">
+                🔗 STIX 2.1 JSON
+                <span class="btn-sub">Para MISP / SIEM · Formato estándar</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="display:none">
             <div class="plan-phase">
               <div class="phase-header">
                 <div class="phase-num" style="background:#1a7f4b">1</div>
@@ -895,60 +971,145 @@
           <div class="src-grid" id="src-grid"></div>
         </div>
 
-        <!-- ── Exposure Panel ────────────────────────────── -->
-        <div class="panel" id="panel-exposure">
+
+        <!-- ── Shodan Full Panel ────────────────────────── -->
+        <div class="panel" id="panel-shodan">
           <div class="page-header">
             <div>
-              <div class="page-title">🖥 Exposición — Servicios y puertos públicos</div>
-              <div class="page-desc">Hosts y servicios expuestos vía Shodan InternetDB (sin API key requerida).</div>
+              <div class="page-title">🔭 Shodan — Inteligencia de exposición</div>
+              <div class="page-desc">Servicios, banners, SSL, HTTP, CVEs y metadatos de red para cualquier IP o dominio.</div>
             </div>
           </div>
 
           <div class="exp-search-bar">
             <div class="news-search-wrap" style="flex:1">
               <span class="news-search-icon">🎯</span>
-              <input type="text" id="exp-target-input" placeholder="Dominio o IP (ej: example.com, 1.2.3.4)" spellcheck="false">
+              <input type="text" id="sh-target-input" placeholder="Dominio o IP (ej: example.com, 8.8.8.8)" spellcheck="false"
+                onkeydown="if(event.key==='Enter') searchShodan()">
             </div>
-            <button class="run-btn" id="exp-search-btn" onclick="searchExposure()">🔍 Analizar</button>
+            <button class="run-btn" id="sh-search-btn" onclick="searchShodan()">🔍 Consultar</button>
+            <button class="dl-btn" id="sh-export-btn" onclick="downloadShodan()" style="display:none">⬇ Exportar PDF</button>
           </div>
 
-          <div id="exp-loading" class="news-loading-state" style="display:none">
+          <div id="sh-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div><span>Consultando Shodan...</span>
+          </div>
+          <div id="sh-error" class="exp-error-msg" style="display:none"></div>
+          <div id="sh-source-notice" style="display:none;margin-bottom:12px"></div>
+
+          <div id="sh-summary" style="display:none">
+
+            <!-- Host overview -->
+            <div class="sh-host-card">
+              <div class="sh-host-row">
+                <div class="sh-host-field"><div class="sh-field-label">IP</div><div class="sh-field-val" id="sh-ip">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">Organización</div><div class="sh-field-val" id="sh-org">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">ISP</div><div class="sh-field-val" id="sh-isp">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">ASN</div><div class="sh-field-val" id="sh-asn">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">País / Ciudad</div><div class="sh-field-val" id="sh-loc">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">OS</div><div class="sh-field-val" id="sh-os">—</div></div>
+                <div class="sh-host-field"><div class="sh-field-label">Última actualización</div><div class="sh-field-val" id="sh-updated">—</div></div>
+              </div>
+              <div class="sh-tags-row" id="sh-tags"></div>
+              <div class="sh-hostnames-row" id="sh-hostnames"></div>
+            </div>
+
+            <!-- Stats -->
+            <div class="sh-stats-row">
+              <div class="exp-stat-card"><div class="exp-stat-label">Puertos abiertos</div><div class="exp-stat-val" id="sh-stat-ports">—</div></div>
+              <div class="exp-stat-card exp-stat-danger"><div class="exp-stat-label">CVEs</div><div class="exp-stat-val" id="sh-stat-vulns">—</div></div>
+              <div class="exp-stat-card"><div class="exp-stat-label">Servicios con SSL</div><div class="exp-stat-val" id="sh-stat-ssl">—</div></div>
+              <div class="exp-stat-card"><div class="exp-stat-label">Servicios HTTP</div><div class="exp-stat-val" id="sh-stat-http">—</div></div>
+            </div>
+
+            <!-- Services -->
+            <div class="sh-section-title">Servicios detectados</div>
+            <div id="sh-services-list"></div>
+
+            <!-- CVEs -->
+            <div id="sh-vulns-section" style="display:none">
+              <div class="sh-section-title sh-section-danger">⚠ CVEs detectados</div>
+              <div class="sh-vulns-list" id="sh-vulns-list"></div>
+            </div>
+          </div>
+
+          <div id="sh-empty" class="news-empty-state">
+            <div class="news-empty-icon">🔭</div>
+            <div class="news-empty-title">Sin datos</div>
+            <div class="news-empty-text">Introduce un dominio o IP y pulsa Consultar.</div>
+          </div>
+        </div>
+
+        <!-- ── VirusTotal Panel ──────────────────────────── -->
+        <div class="panel" id="panel-virustotal">
+          <div class="page-header">
+            <div>
+              <div class="page-title">🦠 VirusTotal — Reputación de indicadores</div>
+              <div class="page-desc">Analiza IPs, dominios, hashes de ficheros y URLs contra +70 motores antivirus.</div>
+            </div>
+          </div>
+
+          <div class="exp-search-bar">
+            <div class="news-search-wrap" style="flex:1">
+              <span class="news-search-icon">🎯</span>
+              <input type="text" id="vt-target-input"
+                placeholder="IP, dominio, hash MD5/SHA256 o URL (ej: 8.8.8.8, evil.com, https://...)"
+                spellcheck="false" onkeydown="if(event.key==='Enter') searchVT()">
+            </div>
+            <button class="run-btn" id="vt-search-btn" onclick="searchVT()">🔍 Analizar</button>
+            <button class="dl-btn" id="vt-export-btn" onclick="downloadVT()" style="display:none">⬇ Exportar PDF</button>
+          </div>
+
+          <div id="vt-loading" class="news-loading-state" style="display:none">
             <div class="news-spinner"></div>
-            <span>Consultando Shodan InternetDB...</span>
+            <span>Consultando VirusTotal...</span>
           </div>
 
-          <div id="exp-error" class="exp-error-msg" style="display:none"></div>
+          <div id="vt-error" class="exp-error-msg" style="display:none"></div>
+          <div id="vt-pending" class="vt-pending-msg" style="display:none"></div>
 
-          <div id="exp-summary" class="exp-summary-row" style="display:none">
-            <div class="exp-stat-card">
-              <div class="exp-stat-label">IPs encontradas</div>
-              <div class="exp-stat-val" id="exp-stat-ips">—</div>
+          <div id="vt-results" style="display:none">
+
+            <!-- Verdict hero -->
+            <div class="vt-verdict-row">
+              <div class="vt-verdict-badge" id="vt-verdict-badge">—</div>
+              <div class="vt-detection-ratio" id="vt-detection-ratio">—</div>
+              <div class="vt-meta-col">
+                <div class="vt-meta-row"><span class="vt-meta-label">Tipo</span><span id="vt-type">—</span></div>
+                <div class="vt-meta-row"><span class="vt-meta-label">Reputación</span><span id="vt-reputation">—</span></div>
+                <div class="vt-meta-row"><span class="vt-meta-label">Último análisis</span><span id="vt-date">—</span></div>
+              </div>
             </div>
-            <div class="exp-stat-card">
-              <div class="exp-stat-label">Puertos abiertos</div>
-              <div class="exp-stat-val" id="exp-stat-ports">—</div>
+
+            <!-- Stats bar -->
+            <div class="vt-stats-row">
+              <div class="vt-stat vt-stat-mal"><div class="vt-stat-num" id="vt-mal">0</div><div class="vt-stat-lbl">Malicioso</div></div>
+              <div class="vt-stat vt-stat-sus"><div class="vt-stat-num" id="vt-sus">0</div><div class="vt-stat-lbl">Sospechoso</div></div>
+              <div class="vt-stat vt-stat-ok"><div class="vt-stat-num" id="vt-ok">0</div><div class="vt-stat-lbl">Limpio</div></div>
+              <div class="vt-stat vt-stat-un"><div class="vt-stat-num" id="vt-un">0</div><div class="vt-stat-lbl">Sin datos</div></div>
             </div>
-            <div class="exp-stat-card exp-stat-danger">
-              <div class="exp-stat-label">CVEs detectados</div>
-              <div class="exp-stat-val" id="exp-stat-vulns">—</div>
+
+            <!-- Extra metadata -->
+            <div class="vt-extra-row" id="vt-extra-row"></div>
+
+            <!-- Tags -->
+            <div class="sh-tags-row" id="vt-tags"></div>
+
+            <!-- Flagging engines -->
+            <div id="vt-flagged-section" style="display:none">
+              <div class="sh-section-title sh-section-danger">⚠ Motores que lo detectan</div>
+              <div class="vt-engines-grid" id="vt-engines-grid"></div>
             </div>
-            <div class="exp-stat-card">
-              <div class="exp-stat-label">Tags</div>
-              <div class="exp-stat-tags" id="exp-stat-tags"></div>
+
+            <div id="vt-clean-msg" class="vt-clean-msg" style="display:none">
+              ✅ Ningún motor detectó amenazas en este indicador.
             </div>
           </div>
 
-          <div id="exp-vulns-row" class="exp-vulns-row" style="display:none">
-            <div class="exp-section-title">CVEs detectados</div>
-            <div class="exp-vuln-chips" id="exp-vuln-chips"></div>
-          </div>
-
-          <div id="exp-ip-grid" class="exp-ip-grid"></div>
-
-          <div id="exp-empty" class="news-empty-state" style="display:none">
-            <div class="news-empty-icon">🖥</div>
-            <div class="news-empty-title">Sin datos de exposición</div>
-            <div class="news-empty-text">Introduce un dominio o IP y pulsa Analizar.</div>
+          <div id="vt-empty" class="news-empty-state">
+            <div class="news-empty-icon">🦠</div>
+            <div class="news-empty-title">Sin datos</div>
+            <div class="news-empty-text">Introduce una IP, dominio, hash o URL y pulsa Analizar.</div>
           </div>
         </div>
 

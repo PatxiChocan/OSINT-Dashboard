@@ -61,10 +61,11 @@ BINARY_PATHS = {
 MAX_PROCESSES = 4
 PROCESS_SEMAPHORE = threading.Semaphore(MAX_PROCESSES)
 
-DEFAULT_COMMAND_TIMEOUT = 300
+DEFAULT_COMMAND_TIMEOUT = 120
 TOOL_TIMEOUTS = {
-    "amass": 900,
-    "katana": 900,
+    "amass": 600,
+    "katana": 300,
+    "wayback_machine_downloader": 120,
     "default": DEFAULT_COMMAND_TIMEOUT,
 }
 
@@ -156,6 +157,7 @@ def _detect_tool(parts):
         "amass": "amass",
         "dnsrecon": "dnsrecon",
         "nmap": "nmap",
+        "wayback_machine_downloader": "wayback_machine_downloader",
     }
 
     return aliases.get(tool)
@@ -557,12 +559,13 @@ def run_command(cmd: str, request_id: str):
             finished_streams = 0
             timed_out = False
 
-            # Heartbeat para mantener viva la conexión SSE cuando la herramienta no imprime nada
+            # last_activity se resetea con cada línea de output (idle timeout)
+            last_activity = time.time()
             last_heartbeat = time.time()
             heartbeat_interval = 15  # segundos
 
             while True:
-                if process.poll() is None and (time.time() - process_start) > effective_timeout:
+                if process.poll() is None and (time.time() - last_activity) > effective_timeout:
                     try:
                         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
                     except Exception:
@@ -571,7 +574,7 @@ def run_command(cmd: str, request_id: str):
 
                     yield {
                         "type": "error",
-                        "message": f"Timeout: el proceso tardó demasiado ({effective_timeout}s)",
+                        "message": f"Timeout: sin actividad durante {effective_timeout}s",
                         "request_id": request_id
                     }
 
@@ -595,6 +598,7 @@ def run_command(cmd: str, request_id: str):
                             break
                     else:
                         yield item
+                        last_activity = time.time()
                         last_heartbeat = time.time()
                 except queue.Empty:
                     if process.poll() is None and (time.time() - last_heartbeat) >= heartbeat_interval:

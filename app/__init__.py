@@ -13,6 +13,8 @@ def create_app():
     from .routes.breaches import breaches_bp
     from .routes.intelx import intelx_bp
     from .routes.harvest_breaches import harvest_bp
+    from .routes.shodan_full import shodan_full_bp
+    from .routes.virustotal import vt_bp
 
     app.register_blueprint(main)
     app.register_blueprint(runner)
@@ -24,5 +26,7 @@ def create_app():
     app.register_blueprint(breaches_bp)
     app.register_blueprint(intelx_bp)
     app.register_blueprint(harvest_bp)
+    app.register_blueprint(shodan_full_bp)
+    app.register_blueprint(vt_bp)
 
     return app

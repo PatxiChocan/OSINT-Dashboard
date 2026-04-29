@@ -56,15 +56,15 @@ SOURCES = [
     },
     # ── Filtraciones ─────────────────────────────────────────────────────────
     {
-        "id": "intelx",
-        "name": "Intelligence X",
+        "id": "haveibeenpwned",
+        "name": "HaveIBeenPwned",
         "category": "Breaches",
-        "description": "Búsqueda en pastes, dark web y filtraciones — intelx.io (API key requerida)",
-        "url": "https://2.intelx.io/hello",
+        "description": "Base de datos de brechas por email — usada por h8mail (sin auth para búsqueda pública)",
+        "url": "https://haveibeenpwned.com",
     },
     {
-        "id": "h8mail_leaklookup",
-        "name": "h8mail / Leak-Lookup",
+        "id": "leakcheck",
+        "name": "Leak-Lookup",
         "category": "Breaches",
         "description": "Brechas por email vía h8mail + Leak-Lookup public API (sin auth)",
         "url": "https://leak-lookup.com",
@@ -147,13 +147,6 @@ SOURCES = [
         "description": "Cybersecurity news and expert analysis",
         "url": "https://www.darkreading.com/rss.xml",
     },
-    {
-        "id": "cisa_alerts",
-        "name": "CISA Alerts",
-        "category": "News",
-        "description": "Official CISA cybersecurity advisories feed",
-        "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
-    },
 ]
 
 
@@ -168,8 +161,8 @@ def _check_source(source):
         r = requests.head(url, timeout=8, headers=HEADERS, allow_redirects=True)
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
-        if r.status_code == 405:
-            # HEAD not supported — try GET with stream to avoid downloading body
+        if r.status_code >= 400:
+            # HEAD blocked or not supported — confirm with GET
             start2 = time.monotonic()
             r2 = requests.get(url, timeout=8, headers=HEADERS, stream=True)
             r2.close()

@@ -20,7 +20,6 @@ FEEDS = [
     {"name": "BleepingComputer", "url": "https://www.bleepingcomputer.com/feed/", "region": "world"},
     {"name": "Krebs on Security", "url": "https://krebsonsecurity.com/feed/", "region": "world"},
     {"name": "Dark Reading", "url": "https://www.darkreading.com/rss.xml", "region": "world"},
-    {"name": "CISA Alerts", "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml", "region": "world"},
 ]
 
 CATEGORIES = [
