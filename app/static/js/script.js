@@ -98,9 +98,9 @@ const SUBTOOLS = {
     { name: 'Directorio /tmp/aletheia', func: 'Escanea ficheros descargados en sesión actual', alert: 'none', cmd: _t => `gitleaks detect --source /tmp/aletheia --no-git -v` }
   ],
   wayback: [
-    { name: 'Listar snapshots', func: 'Muestra todas las versiones archivadas del sitio (sin descargar)', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -p 1` },
-    { name: 'Snapshots desde 2020', func: 'Versiones archivadas a partir de enero 2020', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -f 20200101000000 -p 1` },
-    { name: 'Descargar sitio completo', func: 'Descarga la última versión archivada del sitio', alert: 'low', cmd: t => `wayback_machine_downloader https://${t} -d /tmp/aletheia -c 5` }
+    { name: 'Listar snapshots', func: 'Muestra todas las versiones archivadas del sitio (sin descargar)', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -p 1` },
+    { name: 'Snapshots desde 2020', func: 'Versiones archivadas a partir de enero 2020', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -f 20200101000000 -p 1` },
+    { name: 'Descargar sitio completo', func: 'Descarga la última versión archivada del sitio', alert: 'low', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -c 5` }
   ]
 };
 
@@ -2403,159 +2403,152 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
 
 /* ── STIX 2.1 JSON export ────────────────────────────────────────────────── */
 
-function generateSTIX() {
+// STIX 2.1 namespace for deterministic SCO UUIDv5 IDs
+const _STIX_NS = Uint8Array.from([
+  0x00,0xab,0xed,0xb4, 0xaa,0x42,0x46,0x6c,
+  0x9c,0x01,0xfe,0xd2, 0x33,0x15,0xa9,0xb7,
+]);
+
+function _uuid4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+async function _scoId(type, value) {
+  const nameBytes = new TextEncoder().encode(JSON.stringify({ value }));
+  const data = new Uint8Array(_STIX_NS.length + nameBytes.length);
+  data.set(_STIX_NS);
+  data.set(nameBytes, _STIX_NS.length);
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-1', data));
+  h[6] = (h[6] & 0x0f) | 0x50;
+  h[8] = (h[8] & 0x3f) | 0x80;
+  const x = Array.from(h.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${type}--${x.slice(0,8)}-${x.slice(8,12)}-${x.slice(12,16)}-${x.slice(16,20)}-${x.slice(20)}`;
+}
+
+async function generateSTIX() {
   const scope = getScope() || {};
   const now   = new Date().toISOString();
 
-  function uuid4() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-  }
+  // ── Phase 1: collect all unique SCO values ──
+  const seenIPs = new Set(), seenDomains = new Set(), seenEmails = new Set(), seenCves = new Set();
+  const allIPs = [], allDomains = [], allEmails = [];
 
-  const objects = [];
-  const reportRefs = [];
-
-  function addObj(obj) { objects.push(obj); reportRefs.push(obj.id); return obj.id; }
-
-  // Identity — client org
-  addObj({
-    type: 'identity', spec_version: '2.1', id: `identity--${uuid4()}`,
-    name: scope.client || scope.caseName || 'Unknown Client',
-    identity_class: 'organization', created: now, modified: now,
-  });
-
-  // Collect data sources
-  let shodanData = null, vtData = null;
-  try { shodanData = JSON.parse(sessionStorage.getItem('aletheia_shodan_data') || 'null'); } catch(_) {}
-  try { vtData     = JSON.parse(sessionStorage.getItem('aletheia_vt_data')     || 'null'); } catch(_) {}
-
-  // ── Shodan → network observables ──
-  if (shodanData?.ip) {
-    const ipId = addObj({
-      type: 'ipv4-addr', spec_version: '2.1', id: `ipv4-addr--${uuid4()}`,
-      value: shodanData.ip,
-    });
-
-    // Open port observations
-    const portRefs = [ipId];
-    (shodanData.services || []).forEach(svc => {
-      if (!svc.port) return;
-      const ntId = addObj({
-        type: 'network-traffic', spec_version: '2.1', id: `network-traffic--${uuid4()}`,
-        dst_ref: ipId, dst_port: svc.port,
-        protocols: [svc.transport || 'tcp'],
-        ...(svc.product ? { extensions: { 'tcp-ext': {} } } : {}),
-      });
-      portRefs.push(ntId);
-    });
-
-    addObj({
-      type: 'observed-data', spec_version: '2.1', id: `observed-data--${uuid4()}`,
-      created: now, modified: now,
-      first_observed: now, last_observed: now,
-      number_observed: 1, object_refs: portRefs,
-    });
-
-    // Hostnames
-    (shodanData.hostnames || []).forEach(hn => {
-      addObj({ type: 'domain-name', spec_version: '2.1', id: `domain-name--${uuid4()}`, value: hn });
-    });
-
-    // CVEs → vulnerability SDOs
-    (shodanData.vulns || []).forEach(cveId => {
-      addObj({
-        type: 'vulnerability', spec_version: '2.1', id: `vulnerability--${uuid4()}`,
-        name: cveId, created: now, modified: now,
-        external_references: [{ source_name: 'cve', external_id: cveId,
-          url: `https://nvd.nist.gov/vuln/detail/${cveId}` }],
-      });
-    });
-  }
-
-  // ── VirusTotal → indicator (if flagged) ──
-  if (vtData && (vtData.verdict === 'malicious' || vtData.verdict === 'suspicious')) {
-    const tgt = vtData._target || '';
-    let pattern = '';
-    if (vtData.type === 'ip')     pattern = `[ipv4-addr:value = '${tgt}']`;
-    else if (vtData.type === 'domain') pattern = `[domain-name:value = '${tgt}']`;
-    else if (vtData.type === 'hash')   pattern = `[file:hashes.'SHA-256' = '${tgt}']`;
-    else if (vtData.type === 'url')    pattern = `[url:value = '${tgt}']`;
-
-    if (pattern) {
-      addObj({
-        type: 'indicator', spec_version: '2.1', id: `indicator--${uuid4()}`,
-        name: `VT — ${tgt}`,
-        description: `VirusTotal verdict: ${vtData.verdict}. ${vtData.stats?.malicious||0} malicious / ${vtData.stats?.suspicious||0} suspicious out of ${vtData.total_engines||0} engines.`,
-        indicator_types: vtData.verdict === 'malicious' ? ['malicious-activity'] : ['anomalous-activity'],
-        pattern, pattern_type: 'stix', valid_from: now,
-        created: now, modified: now,
-        labels: ['threat-intelligence'],
-      });
-    }
-  }
-
-  // ── CLI tool outputs — extract IOCs via regex ──
-  const seenIPs = new Set(), seenDomains = new Set(), seenCves = new Set(), seenEmails = new Set();
   const ipRe        = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g;
   const cveRe       = /CVE-\d{4}-\d{4,7}/gi;
   const emailRe     = /[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi;
   const privateIpRe = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.)/;
 
-  // Helper: extract IOCs from a raw text string
-  function extractIOCs(rawText) {
-    (rawText.match(ipRe) || []).forEach(ip => {
-      if (!privateIpRe.test(ip) && !seenIPs.has(ip)) {
-        seenIPs.add(ip);
-        addObj({ type: 'ipv4-addr', spec_version: '2.1', id: `ipv4-addr--${uuid4()}`, value: ip });
-      }
+  function collectIP(ip)     { if (!privateIpRe.test(ip) && !seenIPs.has(ip))     { seenIPs.add(ip);         allIPs.push(ip); } }
+  function collectDomain(d)  { if (!seenDomains.has(d))                            { seenDomains.add(d);       allDomains.push(d); } }
+  function collectEmail(em)  { if (!seenEmails.has(em))                            { seenEmails.add(em);       allEmails.push(em); } }
+  function collectCve(id)    { if (!seenCves.has(id))                              { seenCves.add(id); } }
+
+  function collectFromText(rawText) {
+    (rawText.match(ipRe)    || []).forEach(ip  => collectIP(ip));
+    (rawText.match(emailRe) || []).forEach(em  => collectEmail(em.toLowerCase()));
+    (rawText.match(cveRe)   || []).forEach(cve => collectCve(cve.toUpperCase()));
+  }
+
+  let shodanData = null, vtData = null;
+  try { shodanData = JSON.parse(sessionStorage.getItem('aletheia_shodan_data') || 'null'); } catch(_) {}
+  try { vtData     = JSON.parse(sessionStorage.getItem('aletheia_vt_data')     || 'null'); } catch(_) {}
+
+  if (shodanData?.ip)                        collectIP(shodanData.ip);
+  (shodanData?.hostnames || []).forEach(hn => collectDomain(hn));
+  (shodanData?.vulns     || []).forEach(cv => collectCve(cv));
+
+  toolList.forEach(tool => {
+    try { const { rawText = '' } = JSON.parse(sessionStorage.getItem(_histKey(tool)) || '{}'); collectFromText(rawText); } catch(_) {}
+  });
+  try {
+    JSON.parse(sessionStorage.getItem('aletheia_parallel_runs') || '[]').forEach(r => collectFromText(r.rawText || ''));
+  } catch(_) {}
+
+  (scope.domains || []).forEach(d => collectDomain(d));
+
+  // ── Phase 2: generate deterministic UUIDv5 for all SCOs in parallel ──
+  const [ipIds, domainIds, emailIds] = await Promise.all([
+    Promise.all(allIPs.map(v     => _scoId('ipv4-addr',   v))),
+    Promise.all(allDomains.map(v => _scoId('domain-name', v))),
+    Promise.all(allEmails.map(v  => _scoId('email-addr',  v))),
+  ]);
+
+  const ipMap     = Object.fromEntries(allIPs.map((v, i)     => [v, ipIds[i]]));
+  const domainMap = Object.fromEntries(allDomains.map((v, i) => [v, domainIds[i]]));
+  const emailMap  = Object.fromEntries(allEmails.map((v, i)  => [v, emailIds[i]]));
+
+  // ── Phase 3: build STIX objects ──
+  const objects = [], reportRefs = [];
+  function addObj(obj) { objects.push(obj); reportRefs.push(obj.id); return obj.id; }
+
+  // Identity
+  addObj({
+    type: 'identity', spec_version: '2.1', id: `identity--${_uuid4()}`,
+    name: scope.client || scope.caseName || 'Unknown Client',
+    identity_class: 'organization', created: now, modified: now,
+  });
+
+  // SCO: ipv4-addr
+  allIPs.forEach(ip => addObj({ type: 'ipv4-addr', spec_version: '2.1', id: ipMap[ip], value: ip }));
+
+  // SCO: domain-name
+  allDomains.forEach(d => addObj({ type: 'domain-name', spec_version: '2.1', id: domainMap[d], value: d }));
+
+  // SCO: email-addr
+  allEmails.forEach(e => addObj({ type: 'email-addr', spec_version: '2.1', id: emailMap[e], value: e }));
+
+  // Shodan: network-traffic + observed-data
+  if (shodanData?.ip) {
+    const ipId = ipMap[shodanData.ip];
+    const portRefs = [ipId];
+    (shodanData.services || []).forEach(svc => {
+      if (!svc.port) return;
+      portRefs.push(addObj({
+        type: 'network-traffic', spec_version: '2.1', id: `network-traffic--${_uuid4()}`,
+        dst_ref: ipId, dst_port: svc.port, protocols: [svc.transport || 'tcp'],
+      }));
     });
-    (rawText.match(cveRe) || []).forEach(cve => {
-      const id = cve.toUpperCase();
-      if (!seenCves.has(id)) {
-        seenCves.add(id);
-        addObj({ type: 'vulnerability', spec_version: '2.1', id: `vulnerability--${uuid4()}`,
-          name: id, created: now, modified: now,
-          external_references: [{ source_name: 'cve', external_id: id, url: `https://nvd.nist.gov/vuln/detail/${id}` }] });
-      }
-    });
-    (rawText.match(emailRe) || []).forEach(em => {
-      const e = em.toLowerCase();
-      if (!seenEmails.has(e)) {
-        seenEmails.add(e);
-        addObj({ type: 'email-addr', spec_version: '2.1', id: `email-addr--${uuid4()}`, value: e });
-      }
+    addObj({
+      type: 'observed-data', spec_version: '2.1', id: `observed-data--${_uuid4()}`,
+      created: now, modified: now, first_observed: now, last_observed: now,
+      number_observed: 1, object_refs: portRefs,
     });
   }
 
-  // Individual tool history
-  toolList.forEach(tool => {
-    try {
-      const raw = sessionStorage.getItem(_histKey(tool));
-      if (!raw) return;
-      const { rawText = '' } = JSON.parse(raw);
-      extractIOCs(rawText);
-    } catch(_) {}
-  });
+  // CVEs → vulnerability SDOs
+  seenCves.forEach(cveId => addObj({
+    type: 'vulnerability', spec_version: '2.1', id: `vulnerability--${_uuid4()}`,
+    name: cveId, created: now, modified: now,
+    external_references: [{ source_name: 'cve', external_id: cveId,
+      url: `https://nvd.nist.gov/vuln/detail/${cveId}` }],
+  }));
 
-  // Parallel run history
-  try {
-    const parallelRuns = JSON.parse(sessionStorage.getItem('aletheia_parallel_runs') || '[]');
-    parallelRuns.forEach(r => extractIOCs(r.rawText || ''));
-  } catch(_) {}
-
-  // Scope domains as domain-name SCOs
-  (scope.domains || []).forEach(d => {
-    if (!seenDomains.has(d)) {
-      seenDomains.add(d);
-      addObj({ type: 'domain-name', spec_version: '2.1', id: `domain-name--${uuid4()}`, value: d });
+  // VirusTotal → indicator
+  if (vtData && (vtData.verdict === 'malicious' || vtData.verdict === 'suspicious')) {
+    const tgt = vtData._target || '';
+    let pattern = '';
+    if      (vtData.type === 'ip')     pattern = `[ipv4-addr:value = '${tgt}']`;
+    else if (vtData.type === 'domain') pattern = `[domain-name:value = '${tgt}']`;
+    else if (vtData.type === 'hash')   pattern = `[file:hashes.'SHA-256' = '${tgt}']`;
+    else if (vtData.type === 'url')    pattern = `[url:value = '${tgt}']`;
+    if (pattern) {
+      addObj({
+        type: 'indicator', spec_version: '2.1', id: `indicator--${_uuid4()}`,
+        name: `VT — ${tgt}`,
+        description: `VirusTotal verdict: ${vtData.verdict}. ${vtData.stats?.malicious||0} malicious / ${vtData.stats?.suspicious||0} suspicious out of ${vtData.total_engines||0} engines.`,
+        indicator_types: vtData.verdict === 'malicious' ? ['malicious-activity'] : ['anomalous-activity'],
+        pattern, pattern_type: 'stix', valid_from: now, created: now, modified: now,
+        labels: ['threat-intelligence'],
+      });
     }
-  });
+  }
 
-  // Report SDO (top-level)
+  // Report SDO — omit external_references if empty (STIX 2.1 prohibits empty arrays)
   const reportObj = {
-    type: 'report', spec_version: '2.1', id: `report--${uuid4()}`,
+    type: 'report', spec_version: '2.1', id: `report--${_uuid4()}`,
     name: scope.caseName || 'OSINT Engagement Report',
     description: [
       `Client: ${scope.client || '—'}`,
@@ -2568,26 +2561,210 @@ function generateSTIX() {
     published: now, created: now, modified: now,
     object_refs: reportRefs,
     labels: ['threat-report'],
-    external_references: [],
   };
 
   const bundle = {
     type: 'bundle',
-    id: `bundle--${uuid4()}`,
+    id: `bundle--${_uuid4()}`,
     spec_version: '2.1',
     objects: [reportObj, ...objects],
   };
 
-  const json = JSON.stringify(bundle, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `${(scope.caseName || 'aletheia').replace(/[^a-z0-9\-_]/gi, '_')}-stix21.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  _stixValidateAndDownload(bundle, scope.caseName);
+}
+
+function _stixValidateAndDownload(bundle, caseName) {
+  const filename = `${(caseName || 'aletheia').replace(/[^a-z0-9\-_]/gi, '_')}-stix21.json`;
+
+  // Show a validation modal immediately
+  let modal = document.getElementById('stix-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'stix-modal';
+    modal.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    modal.innerHTML = `
+      <div style="background:#1a1f2e;border:1px solid #2d3347;border-radius:12px;padding:28px 32px;min-width:420px;max-width:600px;width:90%;">
+        <div style="font-size:1rem;font-weight:600;color:#c9d1e8;margin-bottom:16px;display:flex;gap:10px;align-items:center;">
+          <span id="stix-modal-icon">⏳</span>
+          <span id="stix-modal-title">Validando bundle STIX 2.1…</span>
+        </div>
+        <div id="stix-modal-body" style="font-size:.85rem;color:#8b95b0;line-height:1.6;max-height:280px;overflow-y:auto;"></div>
+        <div id="stix-modal-actions" style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const icon    = document.getElementById('stix-modal-icon');
+  const title   = document.getElementById('stix-modal-title');
+  const body    = document.getElementById('stix-modal-body');
+  const actions = document.getElementById('stix-modal-actions');
+
+  icon.textContent    = '⏳';
+  title.textContent   = 'Validando bundle STIX 2.1…';
+  body.textContent    = '';
+  actions.innerHTML   = '';
+  modal.style.display = 'flex';
+
+  function closeModal() { modal.style.display = 'none'; }
+
+  function doDownload() {
+    const json = JSON.stringify(bundle, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    closeModal();
+  }
+
+  fetch('/api/validate-stix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bundle),
+  })
+  .then(r => r.json())
+  .then(res => {
+    const count = res.object_count ?? bundle.objects.length;
+
+    if (res.valid) {
+      icon.textContent  = '✅';
+      title.textContent = 'Bundle STIX 2.1 válido';
+
+      let html = `<div style="color:#4ade80;margin-bottom:8px;">El bundle cumple la especificación STIX 2.1.</div>`;
+      html += `<div style="color:#8b95b0;">Objetos incluidos: <strong style="color:#c9d1e8;">${count}</strong></div>`;
+
+      if (res.warnings.length) {
+        html += `<div style="margin-top:12px;color:#facc15;font-weight:600;">Advertencias (${res.warnings.length}):</div>`;
+        html += `<ul style="margin:6px 0 0 16px;color:#facc15;">` +
+          res.warnings.map(w => `<li>${w}</li>`).join('') + `</ul>`;
+      }
+      body.innerHTML = html;
+
+      const mispBtn = document.createElement('button');
+      mispBtn.className = 'secondary-btn';
+      mispBtn.textContent = '🔗 Push a MISP';
+      mispBtn.onclick = () => _pushToMISP(bundle, body, actions, mispBtn, closeModal);
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'run-btn';
+      dlBtn.textContent = '⬇ Descargar';
+      dlBtn.onclick = doDownload;
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'secondary-btn';
+      cancelBtn.textContent = 'Cerrar';
+      cancelBtn.onclick = closeModal;
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(mispBtn);
+      actions.appendChild(dlBtn);
+
+    } else {
+      icon.textContent  = '❌';
+      title.textContent = 'Bundle inválido — errores STIX 2.1';
+
+      let html = `<div style="color:#f87171;margin-bottom:10px;">El bundle no supera la validación. Corrígelo antes de exportar.</div>`;
+      html += `<ul style="margin:0 0 0 16px;color:#f87171;">` +
+        res.errors.map(e => `<li style="margin-bottom:4px;">${e}</li>`).join('') + `</ul>`;
+
+      if (res.warnings.length) {
+        html += `<div style="margin-top:12px;color:#facc15;font-weight:600;">Advertencias:</div>`;
+        html += `<ul style="margin:6px 0 0 16px;color:#facc15;">` +
+          res.warnings.map(w => `<li>${w}</li>`).join('') + `</ul>`;
+      }
+      body.innerHTML = html;
+
+      const forceBtn = document.createElement('button');
+      forceBtn.className = 'secondary-btn';
+      forceBtn.textContent = '⬇ Descargar igualmente';
+      forceBtn.onclick = doDownload;
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'run-btn';
+      cancelBtn.textContent = 'Cerrar';
+      cancelBtn.onclick = closeModal;
+
+      actions.appendChild(forceBtn);
+      actions.appendChild(cancelBtn);
+    }
+  })
+  .catch(() => {
+    icon.textContent  = '⚠️';
+    title.textContent = 'No se pudo contactar el validador';
+    body.innerHTML    = `<div style="color:#facc15;">El backend no respondió. ¿Quieres descargar el bundle sin validar?</div>`;
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'run-btn';
+    dlBtn.textContent = '⬇ Descargar sin validar';
+    dlBtn.onclick = doDownload;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'secondary-btn';
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.onclick = closeModal;
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(dlBtn);
+  });
+}
+
+/* ── Push STIX bundle a MISP ─────────────────────────────────────────────── */
+
+function _pushToMISP(bundle, body, actions, mispBtn, closeModal) {
+  mispBtn.disabled = true;
+  mispBtn.textContent = '⏳ Enviando…';
+
+  fetch('/api/misp/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bundle),
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.ok) {
+      let html = body.innerHTML;
+      html += `<div style="margin-top:14px;padding:12px;background:#0f2a1a;border:1px solid #4ade80;border-radius:8px;">`;
+      html += `<div style="color:#4ade80;font-weight:600;margin-bottom:6px;">✅ Bundle enviado a MISP</div>`;
+      if (res.events && res.events.length) {
+        html += `<div style="color:#8b95b0;font-size:.82rem;">Eventos creados:</div>`;
+        html += res.events.map(e =>
+          `<a href="${e.url}" target="_blank" rel="noopener"
+             style="display:block;color:#60a5fa;font-size:.82rem;margin-top:4px;">
+             Evento #${e.id} → ${e.url}
+           </a>`
+        ).join('');
+      } else {
+        html += `<div style="color:#8b95b0;font-size:.82rem;">Importado correctamente (sin IDs devueltos por MISP).</div>`;
+      }
+      html += `</div>`;
+      body.innerHTML = html;
+      mispBtn.textContent = '✅ Enviado';
+    } else {
+      let html = body.innerHTML;
+      html += `<div style="margin-top:14px;padding:12px;background:#2a0f0f;border:1px solid #f87171;border-radius:8px;">`;
+      html += `<div style="color:#f87171;font-weight:600;margin-bottom:4px;">❌ Error al enviar a MISP</div>`;
+      html += `<div style="color:#f87171;font-size:.82rem;">${res.error || 'Error desconocido'}</div>`;
+      html += `</div>`;
+      body.innerHTML = html;
+      mispBtn.disabled = false;
+      mispBtn.textContent = '🔗 Reintentar';
+    }
+  })
+  .catch(() => {
+    let html = body.innerHTML;
+    html += `<div style="margin-top:14px;color:#facc15;font-size:.82rem;">No se pudo contactar el backend — ¿está Flask arriba?</div>`;
+    body.innerHTML = html;
+    mispBtn.disabled = false;
+    mispBtn.textContent = '🔗 Reintentar';
+  });
 }
 
 /* ── Home — actividad reciente ────────────────────────────────────────────── */

@@ -76,7 +76,9 @@ ACTIVE_PROCESSES = {}
 ACTIVE_LOCK = threading.Lock()
 
 TMP_DIR = "/tmp/aletheia"
+DOWNLOADS_DIR = "/home/kali/aletheia-downloads"
 os.makedirs(TMP_DIR, exist_ok=True)
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 
 def is_valid_command(cmd: str) -> tuple[bool, str]:
@@ -175,9 +177,12 @@ def _get_command_timeout(parts):
 
 
 def _is_safe_output_path(path: str) -> bool:
-    """Verifica que un path de output apunte solo a TMP_DIR."""
     try:
-        return os.path.realpath(path).startswith(os.path.realpath(TMP_DIR) + os.sep)
+        real = os.path.realpath(path)
+        return (
+            real.startswith(os.path.realpath(TMP_DIR) + os.sep) or
+            real.startswith(os.path.realpath(DOWNLOADS_DIR) + os.sep)
+        )
     except Exception:
         return False
 
@@ -187,7 +192,7 @@ def _validate_output_flags(parts: list) -> tuple[bool, str]:
     Bloquea flags de escritura que apunten fuera de TMP_DIR
     para evitar sobrescritura de archivos arbitrarios.
     """
-    OUTPUT_FLAGS = {"-oN", "-oJ", "-oX", "-oG", "-oA", "-oS", "-f", "-j"}
+    OUTPUT_FLAGS = {"-oN", "-oJ", "-oX", "-oG", "-oA", "-oS", "-f", "-j", "-d"}
     for i, part in enumerate(parts):
         if part in OUTPUT_FLAGS and i + 1 < len(parts):
             target_path = parts[i + 1]
