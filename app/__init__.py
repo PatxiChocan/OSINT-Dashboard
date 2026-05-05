@@ -1,4 +1,15 @@
 from flask import Flask
+import os
+import urllib3
+import requests
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+_orig_request = requests.Session.request
+def _patched_request(self, method, url, **kwargs):
+    kwargs.setdefault('verify', False)
+    return _orig_request(self, method, url, **kwargs)
+requests.Session.request = _patched_request
 
 def create_app():
     app = Flask(__name__)

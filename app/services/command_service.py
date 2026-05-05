@@ -48,11 +48,6 @@ ALLOWED_BINARIES = {
     "finalrecon",
     # Infraestructura / APIs
     "shodan",
-    # Metadatos
-    "metagoofil",
-    "exiftool",
-    # Secretos
-    "trufflehog",
 }
 
 BINARY_PATHS = {
@@ -90,11 +85,6 @@ BINARY_PATHS = {
     "finalrecon":"/home/kali/Aletheia-Dashboard/venv/bin/finalrecon",
     # Infraestructura
     "shodan":   "/home/kali/Aletheia-Dashboard/venv/bin/shodan",
-    # Metadatos
-    "metagoofil":"/usr/bin/metagoofil",
-    "exiftool": "/usr/bin/exiftool",
-    # Secretos
-    "trufflehog":"/usr/bin/trufflehog",
 }
 
 MAX_PROCESSES = 4
@@ -107,7 +97,6 @@ TOOL_TIMEOUTS = {
     "wayback_machine_downloader": 120,
     "photon": 300,
     "finalrecon": 300,
-    "metagoofil": 180,
     "default": DEFAULT_COMMAND_TIMEOUT,
 }
 

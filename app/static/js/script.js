@@ -60,8 +60,6 @@ const TOOL_COLORS = {
   subfinder:  { bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' },
   webrecon:   { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' },
   shodancli:  { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' },
-  metadatos:  { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
-  secretos:   { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' }
 };
 
 const SUBTOOLS = {
@@ -86,9 +84,7 @@ const SUBTOOLS = {
     { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -whois -d ${t}` },
     { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t}` },
     { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t}` },
-    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t}` },
-    { name: 'track', func: 'Nuevos subdominios vs escaneos anteriores', alert: 'none', cmd: t => `amass track -d ${t}` },
-    { name: 'db', func: 'Consulta base de datos local', alert: 'none', cmd: t => `amass db -d ${t}` }
+    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t}` }
   ],
   katana: [
     { name: 'Estático', func: 'Rastrea HTML sin JS', alert: 'low', cmd: t => `katana -u https://${t} -rl 20 -silent` },
@@ -141,22 +137,9 @@ const SUBTOOLS = {
     { name: 'Search org', func: 'Activos públicos de la organización en Shodan', alert: 'none', cmd: t => `shodan search --fields ip_str,port,org "org:${t}"` },
     { name: 'Count activos', func: 'Número total de activos indexados sin gastar créditos', alert: 'none', inputType: 'domain', cmd: t => `shodan count "hostname:${t}"` }
   ],
-  metadatos: [
-    { name: 'ExifTool — fichero', func: 'Extrae todos los metadatos de un fichero descargado en /tmp/aletheia/', alert: 'none', cmd: t => `exiftool /tmp/aletheia/${t}` },
-    { name: 'ExifTool — recursivo', func: 'Metadatos de todos los ficheros en /tmp/aletheia/', alert: 'none', cmd: _t => `exiftool /tmp/aletheia/` },
-    { name: 'Metagoofil — PDFs', func: 'Descarga y extrae metadatos de PDFs públicos del dominio', alert: 'low', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t pdf -l 10 -o /tmp/aletheia/metagoofil_${t}` },
-    { name: 'Metagoofil — Office', func: 'Descarga y extrae metadatos de docs Word/Excel del dominio', alert: 'low', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t doc,docx,xls,xlsx -l 10 -o /tmp/aletheia/metagoofil_${t}` },
-    { name: 'Metagoofil — todo', func: 'PDFs, Office e imágenes — análisis completo de metadatos', alert: 'med', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t pdf,doc,docx,xls,xlsx -l 20 -o /tmp/aletheia/metagoofil_${t}` }
-  ],
-  secretos: [
-    { name: 'TruffleHog — git local', func: 'Escanea historial git del directorio actual buscando secretos', alert: 'none', cmd: _t => `trufflehog git file://. --only-verified` },
-    { name: 'TruffleHog — filesystem', func: 'Escanea /tmp/aletheia/ buscando claves y tokens', alert: 'none', cmd: _t => `trufflehog filesystem /tmp/aletheia/ --only-verified` },
-    { name: 'TruffleHog — sin verificar', func: 'Muestra todos los secretos potenciales (más ruido)', alert: 'none', cmd: _t => `trufflehog filesystem /tmp/aletheia/` },
-    { name: 'TruffleHog — repo GitHub', func: 'Escanea un repositorio remoto (escribe la URL en el comando)', alert: 'med', inputType: 'domain', cmd: t => `trufflehog github --repo https://github.com/${t} --only-verified` }
-  ]
 };
 
-const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli', 'metadatos', 'secretos'];
+const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli'];
 
 const toolMeta = {
   discover: {
@@ -204,16 +187,6 @@ const toolMeta = {
     desc: 'Consultas directas a Shodan desde terminal: hosts, dominios, búsquedas y conteos.',
     tags: '<span class="tag tag-mit">MIT</span>'
   },
-  metadatos: {
-    title: '🗂 Metadatos',
-    desc: 'Extracción de metadatos de ficheros y documentos públicos (EXIF, PDF, Office).',
-    tags: '<span class="tag tag-mit">MIT</span>'
-  },
-  secretos: {
-    title: '🔐 Secretos',
-    desc: 'Detecta claves de API, tokens y credenciales filtradas en código y ficheros.',
-    tags: '<span class="tag tag-mit">MIT</span>'
-  }
 };
 
 function $(id) {
@@ -746,12 +719,31 @@ function parseOutput(tool, lines) {
 
   // ── Amass ────────────────────────────────────────────────────────────────
   if (tool === 'amass') {
-    const subdomains = [...new Set(
-      lines.map(l => l.trim()).filter(l => l && /\./.test(l) && !l.includes('/') && !/^\[|^Error|^The |usage|subcommand/i.test(l))
-    )];
-    if (subdomains.length) groups.push({ title: `Subdominios (${subdomains.length})`, icon: '🌐', type: 'host', items: subdomains });
-    const ips = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
-    if (ips.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: ips });
+    const domRe = /^[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,}$/;
+    const fqdns = new Set();
+    const ips   = new Set();
+    const asns  = new Set();
+    const nets  = new Set();
+
+    lines.forEach(l => {
+      // Graph format: extract all typed tokens — "value (TYPE)"
+      for (const m of l.matchAll(/([^\s(]+)\s+\(FQDN\)/g))
+        if (domRe.test(m[1])) fqdns.add(m[1]);
+      for (const m of l.matchAll(/([\d.]+)\s+\(IPAddress\)/g))
+        ips.add(m[1]);
+      for (const m of l.matchAll(/(\d+)\s+\(ASN\)/g))
+        asns.add(`AS${m[1]}`);
+      for (const m of l.matchAll(/([^\s(]+\/\d+)\s+\(Netblock\)/g))
+        nets.add(m[1]);
+      // Plain subdomain lines (enum output without graph)
+      const tok = l.trim().split(/\s/)[0];
+      if (tok && domRe.test(tok)) fqdns.add(tok);
+    });
+
+    if (fqdns.size) groups.push({ title: `Hosts / Dominios (${fqdns.size})`, icon: '🌐', type: 'host', items: [...fqdns] });
+    if (ips.size)   groups.push({ title: `IPs (${ips.size})`, icon: '📡', type: 'ip', items: [...ips] });
+    if (asns.size)  groups.push({ title: `ASNs (${asns.size})`, icon: '🏢', type: 'generic', items: [...asns] });
+    if (nets.size)  groups.push({ title: `Netblocks (${nets.size})`, icon: '🔗', type: 'generic', items: [...nets] });
     if (groups.length) return groups;
   }
 
