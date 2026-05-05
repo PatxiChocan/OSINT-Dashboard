@@ -51,11 +51,17 @@ const selectedSubtool = {};
 const _structuredCache = {}; // stores structured JSON until 'done' arrives
 
 const TOOL_COLORS = {
-  discover:  { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
-  amass:     { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-  katana:    { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
-  gitleaks:  { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-  wayback:   { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' }
+  discover:   { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+  amass:      { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  katana:     { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
+  gitleaks:   { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+  wayback:    { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  identidad:  { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
+  subfinder:  { bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' },
+  webrecon:   { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' },
+  shodancli:  { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' },
+  metadatos:  { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
+  secretos:   { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' }
 };
 
 const SUBTOOLS = {
@@ -101,10 +107,56 @@ const SUBTOOLS = {
     { name: 'Listar snapshots', func: 'Muestra todas las versiones archivadas del sitio (sin descargar)', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -p 1` },
     { name: 'Snapshots desde 2020', func: 'Versiones archivadas a partir de enero 2020', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -f 20200101000000 -p 1` },
     { name: 'Descargar sitio completo', func: 'Descarga la última versión archivada del sitio', alert: 'low', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -c 5` }
+  ],
+  identidad: [
+    { name: 'Sherlock', func: 'Busca el alias en +300 redes sociales', alert: 'none', cmd: t => `sherlock ${t} --print-found --local --no-txt` },
+    { name: 'Sherlock (timeout 15s)', func: 'Búsqueda rápida con tiempo límite por sitio', alert: 'none', cmd: t => `sherlock ${t} --print-found --local --no-txt --timeout 15` },
+    { name: 'Maigret', func: 'Búsqueda profunda en +3000 sitios', alert: 'none', cmd: t => `maigret ${t}` },
+    { name: 'Maigret (reporte HTML)', func: 'Genera informe HTML con el perfil completo', alert: 'none', cmd: t => `maigret ${t} --html /tmp/aletheia/maigret_${t.replace(/[\/:.]/g, '_')}.html` },
+    { name: 'Holehe (email)', func: 'Solo emails — qué servicios tienen esa cuenta asociada', alert: 'none', inputType: 'email', cmd: t => `holehe ${t}` },
+    { name: 'Blackbird (username)', func: 'Busca el alias en +500 sitios, devuelve JSON', alert: 'none', cmd: t => `blackbird -u ${t}` },
+    { name: 'Blackbird (email)', func: 'Solo emails — busca cuentas asociadas en +500 sitios', alert: 'none', inputType: 'email', cmd: t => `blackbird -e ${t}` },
+    { name: 'usufy (OSRFramework)', func: 'Verifica el alias en cientos de plataformas con OSRFramework', alert: 'none', cmd: t => `usufy -n ${t}` },
+    { name: 'searchfy (OSRFramework)', func: 'Busca el término en buscadores y redes sociales', alert: 'none', cmd: t => `searchfy -q "${t}"` }
+  ],
+  subfinder: [
+    { name: 'Pasivo básico', func: 'Descubrimiento de subdominios solo con fuentes OSINT', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -silent` },
+    { name: 'Todas las fuentes', func: 'Usa todas las fuentes disponibles incluyendo APIs', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent` },
+    { name: 'Recursivo', func: 'Enumera subdominios de subdominios (más profundo)', alert: 'low', inputType: 'domain', cmd: t => `subfinder -d ${t} -recursive -silent` },
+    { name: 'Con timeout extendido', func: 'Búsqueda con 60s de timeout por fuente', alert: 'low', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent -timeout 60` },
+    { name: 'Exportar a fichero', func: 'Guarda resultados en /tmp/aletheia/subfinder_dominio.txt', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent -o /tmp/aletheia/subfinder_${t}.txt` }
+  ],
+  webrecon: [
+    { name: 'Photon — rastreo básico', func: 'Extrae URLs, emails y archivos de un sitio web', alert: 'low', inputType: 'domain', cmd: t => `photon -u https://${t} -t 5 -o /tmp/aletheia/photon_${t.replace(/[\/:.]/g,'_')}` },
+    { name: 'Photon — profundo', func: 'Rastreo profundo (nivel 3) extrayendo claves y secretos', alert: 'med', inputType: 'domain', cmd: t => `photon -u https://${t} -l 3 -t 10 -o /tmp/aletheia/photon_${t.replace(/[\/:.]/g,'_')} --keys` },
+    { name: 'Photon — solo URLs internas', func: 'Extrae únicamente rutas internas del dominio objetivo', alert: 'low', inputType: 'domain', cmd: t => `photon -u https://${t} -t 5 --only-urls -o /tmp/aletheia/photon_${t.replace(/[\/:.]/g,'_')}` },
+    { name: 'FinalRecon — completo', func: 'Cabeceras, SSL, WHOIS, DNS y subdominios en un solo paso', alert: 'low', inputType: 'domain', cmd: t => `finalrecon --url https://${t} --full` },
+    { name: 'FinalRecon — cabeceras + SSL', func: 'Analiza cabeceras HTTP y certificado TLS', alert: 'none', inputType: 'domain', cmd: t => `finalrecon --url https://${t} --headers --sslinfo` },
+    { name: 'FinalRecon — DNS + subdominios', func: 'Registros DNS y enumeración pasiva de subdominios', alert: 'none', inputType: 'domain', cmd: t => `finalrecon --url https://${t} --dns --sub` }
+  ],
+  shodancli: [
+    { name: 'Host info', func: 'Puertos, servicios y vulnerabilidades conocidas de una IP', alert: 'none', inputType: 'ip', cmd: t => `shodan host ${t}` },
+    { name: 'Domain info', func: 'IPs, subdominios y historial asociados al dominio', alert: 'none', inputType: 'domain', cmd: t => `shodan domain ${t}` },
+    { name: 'Search hostname', func: 'Busca todos los activos del dominio en el índice de Shodan', alert: 'none', inputType: 'domain', cmd: t => `shodan search --fields ip_str,port,org,hostnames "hostname:${t}"` },
+    { name: 'Search org', func: 'Activos públicos de la organización en Shodan', alert: 'none', cmd: t => `shodan search --fields ip_str,port,org "org:${t}"` },
+    { name: 'Count activos', func: 'Número total de activos indexados sin gastar créditos', alert: 'none', inputType: 'domain', cmd: t => `shodan count "hostname:${t}"` }
+  ],
+  metadatos: [
+    { name: 'ExifTool — fichero', func: 'Extrae todos los metadatos de un fichero descargado en /tmp/aletheia/', alert: 'none', cmd: t => `exiftool /tmp/aletheia/${t}` },
+    { name: 'ExifTool — recursivo', func: 'Metadatos de todos los ficheros en /tmp/aletheia/', alert: 'none', cmd: _t => `exiftool /tmp/aletheia/` },
+    { name: 'Metagoofil — PDFs', func: 'Descarga y extrae metadatos de PDFs públicos del dominio', alert: 'low', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t pdf -l 10 -o /tmp/aletheia/metagoofil_${t}` },
+    { name: 'Metagoofil — Office', func: 'Descarga y extrae metadatos de docs Word/Excel del dominio', alert: 'low', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t doc,docx,xls,xlsx -l 10 -o /tmp/aletheia/metagoofil_${t}` },
+    { name: 'Metagoofil — todo', func: 'PDFs, Office e imágenes — análisis completo de metadatos', alert: 'med', inputType: 'domain', cmd: t => `metagoofil -d ${t} -t pdf,doc,docx,xls,xlsx -l 20 -o /tmp/aletheia/metagoofil_${t}` }
+  ],
+  secretos: [
+    { name: 'TruffleHog — git local', func: 'Escanea historial git del directorio actual buscando secretos', alert: 'none', cmd: _t => `trufflehog git file://. --only-verified` },
+    { name: 'TruffleHog — filesystem', func: 'Escanea /tmp/aletheia/ buscando claves y tokens', alert: 'none', cmd: _t => `trufflehog filesystem /tmp/aletheia/ --only-verified` },
+    { name: 'TruffleHog — sin verificar', func: 'Muestra todos los secretos potenciales (más ruido)', alert: 'none', cmd: _t => `trufflehog filesystem /tmp/aletheia/` },
+    { name: 'TruffleHog — repo GitHub', func: 'Escanea un repositorio remoto (escribe la URL en el comando)', alert: 'med', inputType: 'domain', cmd: t => `trufflehog github --repo https://github.com/${t} --only-verified` }
   ]
 };
 
-const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback'];
+const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli', 'metadatos', 'secretos'];
 
 const toolMeta = {
   discover: {
@@ -130,6 +182,36 @@ const toolMeta = {
   wayback: {
     title: '📼 Wayback Machine',
     desc: 'Accede a versiones archivadas de sitios web a través de Internet Archive.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  identidad: {
+    title: '👤 Identidad',
+    desc: 'Huella digital de personas: búsqueda de alias y emails en redes sociales y servicios.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  subfinder: {
+    title: '🔎 Subfinder',
+    desc: 'Descubrimiento rápido de subdominios con múltiples fuentes OSINT pasivas.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  webrecon: {
+    title: '🕸 Web Recon',
+    desc: 'Crawling y reconocimiento web: extracción de URLs, emails, claves y análisis de cabeceras.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  shodancli: {
+    title: '📡 Shodan CLI',
+    desc: 'Consultas directas a Shodan desde terminal: hosts, dominios, búsquedas y conteos.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  metadatos: {
+    title: '🗂 Metadatos',
+    desc: 'Extracción de metadatos de ficheros y documentos públicos (EXIF, PDF, Office).',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  secretos: {
+    title: '🔐 Secretos',
+    desc: 'Detecta claves de API, tokens y credenciales filtradas en código y ficheros.',
     tags: '<span class="tag tag-mit">MIT</span>'
   }
 };
@@ -609,7 +691,7 @@ function parseOutput(tool, lines) {
     whatwebData.titles.length ||
     whatwebData.servers.length;
 
-  if (looksLikeWhatWeb) {
+  if (looksLikeWhatWeb && tool === 'discover') {
     if (whatwebData.urls.length) groups.push({ title: 'URLs analizadas', icon: '🔗', type: 'url', items: whatwebData.urls });
     if (whatwebData.ips.length) groups.push({ title: 'IPs detectadas', icon: '📡', type: 'ip', items: whatwebData.ips });
     if (whatwebData.titles.length) groups.push({ title: 'Títulos', icon: '📰', type: 'generic', items: whatwebData.titles });
@@ -665,7 +747,7 @@ function parseOutput(tool, lines) {
   // ── Amass ────────────────────────────────────────────────────────────────
   if (tool === 'amass') {
     const subdomains = [...new Set(
-      lines.map(l => l.trim()).filter(l => l && /\./.test(l) && !/^\[|^Error/i.test(l))
+      lines.map(l => l.trim()).filter(l => l && /\./.test(l) && !l.includes('/') && !/^\[|^Error|^The |usage|subcommand/i.test(l))
     )];
     if (subdomains.length) groups.push({ title: `Subdominios (${subdomains.length})`, icon: '🌐', type: 'host', items: subdomains });
     const ips = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
@@ -683,6 +765,48 @@ function parseOutput(tool, lines) {
     if (jsUrls.length)  groups.push({ title: `Archivos JS (${jsUrls.length})`, icon: '📜', type: 'url', items: jsUrls });
     if (other.length)   groups.push({ title: `Rutas / URLs (${other.length})`, icon: '🔗', type: 'url', items: other });
     return groups;
+  }
+
+  // ── Sherlock ──────────────────────────────────────────────────────────────
+  const isSherlock = tool === 'identidad' && lines.some(l => /Checking username .+ on:/i.test(l) || /Search completed with \d+ results/i.test(l));
+  if (isSherlock) {
+    const found = lines
+      .map(l => l.match(/^\[.{0,2}\+.{0,2}\]\s+(.+?):\s+(https?:\/\/\S+)/i))
+      .filter(Boolean)
+      .map(m => `${m[1].trim()}: ${m[2].trim()}`);
+    const totalMatch = joined.match(/Search completed with (\d+) results/i);
+    const total = totalMatch ? parseInt(totalMatch[1]) : found.length;
+    if (found.length) {
+      groups.push({ title: `Perfiles encontrados (${total})`, icon: '👤', type: 'url', items: found });
+    }
+    if (groups.length) return groups;
+  }
+
+  // ── Blackbird ─────────────────────────────────────────────────────────────
+  const isBlackbird = tool === 'identidad' && lines.some(l => /Enumerating accounts with username|by Lucas Antoniaci|Blackbird v\d/i.test(l) || /✔️.*\[/.test(l));
+  if (isBlackbird) {
+    const sitesFound = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!/✔️/.test(l)) continue;
+      // Same line: ✔️  [Site] https://...
+      const sameM = l.match(/\[([^\]]+)\]\s+(https?:\/\/\S+)/);
+      if (sameM) { sitesFound.push(`${sameM[1]}: ${sameM[2]}`); continue; }
+      // Multi-line: ✔️  [Site]\nhttps://...
+      const siteM = l.match(/\[([^\]]+)\]/);
+      const nextLine = (lines[i + 1] || '').trim();
+      if (siteM && nextLine.startsWith('http')) {
+        sitesFound.push(`${siteM[1]}: ${nextLine}`);
+      } else if (siteM) {
+        sitesFound.push(siteM[1]);
+      }
+    }
+    const totalMatch = joined.match(/Check completed in ([\d.]+) seconds/i);
+    const total = totalMatch ? ` en ${totalMatch[1]}s` : '';
+    if (sitesFound.length) {
+      groups.push({ title: `Perfiles encontrados (${sitesFound.length})${total}`, icon: '🐦', type: 'url', items: sitesFound });
+    }
+    if (groups.length) return groups;
   }
 
   // ── Generic fallback ─────────────────────────────────────────────────────
@@ -1144,8 +1268,43 @@ function launchParallel() {
   const checked = [...document.querySelectorAll('#parallel-subtool-grid .pg-checkbox:checked')];
   if (!checked.length) return;
 
+  // Build target list: all scope domains + IPs, or fallback to current target
+  const scope = getScope();
+  const scopeTargets = [
+    ...(scope?.domains  || []),
+    ...(scope?.ipRanges || []),
+  ].filter(Boolean);
+  const targets = scopeTargets.length ? scopeTargets : (target ? [target] : []);
+
+  if (!targets.length) {
+    const parallelOut = $('parallel-out');
+    if (parallelOut) parallelOut.innerHTML =
+      `<div style="color:var(--red);padding:20px;font-size:.85rem">⚠ Define el alcance o establece un objetivo antes de lanzar.</div>`;
+    return;
+  }
+
+  // Target type helpers
+  const _isIPRange = t => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d+)?$/.test(t);
+  const _isEmail   = t => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+  const _isDomain  = t => !_isIPRange(t) && !_isEmail(t);
+
+  // Each checkbox × each compatible target = one job
+  const jobs = [];
+  checked.forEach(checkbox => {
+    const tool = checkbox.dataset.tool;
+    const idx  = parseInt(checkbox.dataset.idx);
+    const subtool = (SUBTOOLS[tool] || [])[idx];
+    const inputType = subtool?.inputType || 'any';
+
+    targets.forEach(tgt => {
+      if (inputType === 'domain' && !_isDomain(tgt)) return;
+      if (inputType === 'email'  && !_isEmail(tgt))  return;
+      jobs.push({ checkbox, tgt });
+    });
+  });
+
   Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
-  _parallelTotal = checked.length;
+  _parallelTotal = jobs.length;
   _parallelDone  = 0;
 
   // Clear previous parallel run history for this session
@@ -1164,12 +1323,13 @@ function launchParallel() {
 
   _startParallelTimer();
 
-  checked.forEach(checkbox => {
+  jobs.forEach(({ checkbox, tgt }) => {
     const tool = checkbox.dataset.tool;
     const idx  = parseInt(checkbox.dataset.idx, 10);
-    const key  = _parallelKey(tool, idx);
+    // Use tgt+tool+idx as unique key when multiple targets
+    const key  = targets.length > 1 ? `${tgt}__${tool}__${idx}` : _parallelKey(tool, idx);
     const subtool = SUBTOOLS[tool][idx];
-    const cmd  = subtool.cmd(target || 'OBJETIVO');
+    const cmd  = subtool.cmd(tgt);
     const color = TOOL_COLORS[tool];
 
     if (cmd.includes('OBJETIVO')) {
@@ -1181,7 +1341,7 @@ function launchParallel() {
     _parallelState[key] = {
       tool,
       idx,
-      name: subtool.name,
+      name: targets.length > 1 ? `${subtool.name} [${tgt}]` : subtool.name,
       cmd,
       startTime: Date.now(),
       done: false,
@@ -1403,19 +1563,20 @@ function renderScopeStatus() {
 
     const bodyEl = $('scope-active-body');
     if (bodyEl) {
-      // Domains as clickable target buttons
-      const domainChips = (scope.domains || []).map(d =>
-        `<span class="scope-domain-chip" onclick="setTargetFromScope('${escHtml(d)}')" title="Establecer como objetivo activo">
-          ${escHtml(d)} <span class="scope-chip-arrow">→</span>
-        </span>`
-      ).join('');
+      // Domains and IPs as clickable target chips
+      const _chip = v =>
+        `<span class="scope-domain-chip" onclick="setTargetFromScope('${escHtml(v)}')" title="Establecer como objetivo activo">
+          ${escHtml(v)} <span class="scope-chip-arrow">→</span>
+        </span>`;
+      const domainChips = (scope.domains  || []).map(_chip).join('');
+      const ipChips     = (scope.ipRanges || []).map(_chip).join('');
 
       const fields = [
-        ['Cliente',      escHtml(scope.client || '—'), false],
-        ['Responsable',  escHtml(scope.responsable || '—'), false],
+        ['Cliente',            escHtml(scope.client || '—'), false],
+        ['Responsable',        escHtml(scope.responsable || '—'), false],
         ['Dominios aprobados', domainChips || '—', true],
-        ['Rangos IP',    escHtml((scope.ipRanges || []).join(', ') || '—'), false],
-        ['Expiración',   escHtml(scope.expiry || '—'), false],
+        ['Rangos IP',          ipChips     || '—', true],
+        ['Expiración',         escHtml(scope.expiry || '—'), false],
       ];
       bodyEl.innerHTML = fields.map(([k, v, raw]) => `
         <div class="scope-active-field">
@@ -1451,13 +1612,34 @@ function renderScopeStatus() {
     }
   }
 
-  // Topbar scope indicator (updated when target changes too)
+  // Parallel panel scope chips (domains + IPs)
+  const pChipsWrap = $('parallel-scope-chips');
+  const pChipsList = $('parallel-scope-list');
+  if (pChipsWrap && pChipsList) {
+    const hasDomains = scope?.domains?.length > 0;
+    const hasIPs     = scope?.ipRanges?.length > 0;
+    if (scope && (hasDomains || hasIPs)) {
+      pChipsList.innerHTML =
+        (scope.domains  || []).map(v =>
+          `<span class="parallel-scope-chip parallel-scope-dom" onclick="setTargetFromScope('${escHtml(v)}')" title="Usar como objetivo">${escHtml(v)}</span>`
+        ).join('') +
+        (scope.ipRanges || []).map(v =>
+          `<span class="parallel-scope-chip parallel-scope-ip" onclick="setTargetFromScope('${escHtml(v)}')" title="Usar como objetivo">${escHtml(v)}</span>`
+        ).join('');
+      pChipsWrap.style.display = 'flex';
+    } else {
+      pChipsWrap.style.display = 'none';
+    }
+  }
+
+  // Scope indicator (updated when target changes too)
   _updateScopeIndicator();
 }
 
 function setTargetFromScope(domain) {
   const inp = document.getElementById('targetInput');
-  if (inp) { inp.value = domain; updateTarget(domain); }
+  if (inp) inp.value = domain;
+  updateTarget(domain);
 }
 
 function _updateScopeIndicator() {
@@ -1612,6 +1794,61 @@ function runPlanStep(cmdTemplate, tool) {
     }
   );
 }
+
+// ── Parallel scan profiles ────────────────────────────────────────────────────
+
+const PARALLEL_PROFILES = [
+  { id: 'recon',    name: 'Recon dominio',   icon: '🌐', tools: ['theHarvester', 'DNSRecon', 'WHOIS', 'intel', 'enum -passive'] },
+  { id: 'web',      name: 'Análisis web',     icon: '🕸', tools: ['WhatWeb', 'WafW00f', 'Nikto', 'Estático', 'Con JS (-jc)']   },
+  { id: 'osint',    name: 'OSINT pasivo',      icon: '📡', tools: ['theHarvester', 'WHOIS', 'WhatWeb', 'enum -passive']          },
+  { id: 'puertos',  name: 'Puertos',           icon: '🔌', tools: ['Nmap top1000', 'Nmap + versiones', 'Traceroute']             },
+  { id: 'tls',      name: 'TLS / SSL',         icon: '🔒', tools: ['sslscan', 'sslyze']                                          },
+  { id: 'infra',    name: 'Infraestructura',   icon: '🖧', tools: ['Nmap top1000', 'Nmap + versiones', 'Nmap + NSE', 'sslscan', 'sslyze', 'Traceroute'] },
+  { id: 'pasivo',   name: 'Completo pasivo',   icon: '⚡', tools: ['theHarvester', 'DNSRecon', 'WHOIS', 'WhatWeb', 'sslscan', 'enum -passive', 'intel', 'Listar snapshots'] },
+  { id: 'full',     name: 'Análisis completo', icon: '🎯', tools: null },
+];
+
+function _buildParallelProfilesBar() {
+  const list = $('parallel-profiles-list');
+  if (!list) return;
+  list.innerHTML = PARALLEL_PROFILES.map(p =>
+    `<button class="pp-btn" data-id="${p.id}" onclick="applyParallelProfile('${p.id}')" title="${escHtml(p.tools ? p.tools.join(' · ') : 'Todas las herramientas')}">
+      ${p.icon} ${escHtml(p.name)}
+    </button>`
+  ).join('');
+}
+
+function applyParallelProfile(id) {
+  const profile = PARALLEL_PROFILES.find(p => p.id === id);
+  if (!profile) return;
+
+  document.querySelectorAll('#parallel-subtool-grid .pg-checkbox').forEach(cb => {
+    cb.checked = false;
+    cb.closest('.pg-card')?.classList.remove('pg-selected');
+  });
+
+  if (profile.tools === null) {
+    document.querySelectorAll('#parallel-subtool-grid .pg-checkbox').forEach(cb => {
+      cb.checked = true;
+      cb.closest('.pg-card')?.classList.add('pg-selected');
+    });
+  } else {
+    document.querySelectorAll('#parallel-subtool-grid .pg-card').forEach(card => {
+      const name = card.querySelector('.pg-card-name')?.textContent?.trim();
+      if (profile.tools.includes(name)) {
+        const cb = card.querySelector('.pg-checkbox');
+        if (cb) { cb.checked = true; card.classList.add('pg-selected'); }
+      }
+    });
+  }
+
+  updateParallelCount();
+
+  document.querySelectorAll('.pp-btn').forEach(btn => {
+    btn.classList.toggle('pp-btn-active', btn.dataset.id === id);
+  });
+}
+
 
 function streamCmd(cmd, requestId, onData, onError) {
   const controller = new AbortController();
@@ -2732,17 +2969,24 @@ function _pushToMISP(bundle, body, actions, mispBtn, closeModal) {
     if (res.ok) {
       let html = body.innerHTML;
       html += `<div style="margin-top:14px;padding:12px;background:#0f2a1a;border:1px solid #4ade80;border-radius:8px;">`;
-      html += `<div style="color:#4ade80;font-weight:600;margin-bottom:6px;">✅ Bundle enviado a MISP</div>`;
+      html += `<div style="color:#4ade80;font-weight:600;margin-bottom:6px;">✅ Evento creado en MISP</div>`;
+      if (res.attr_count !== undefined) {
+        html += `<div style="color:#8b95b0;font-size:.82rem;margin-bottom:4px;">${res.attr_count} atributos importados</div>`;
+      }
+      if (res.tags && res.tags.length) {
+        html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">` +
+          res.tags.map(t => `<span style="background:#1e3a5f;color:#60a5fa;border-radius:4px;padding:2px 8px;font-size:.78rem;">${t}</span>`).join('') +
+          `</div>`;
+      }
       if (res.events && res.events.length) {
-        html += `<div style="color:#8b95b0;font-size:.82rem;">Eventos creados:</div>`;
         html += res.events.map(e =>
           `<a href="${e.url}" target="_blank" rel="noopener"
-             style="display:block;color:#60a5fa;font-size:.82rem;margin-top:4px;">
+             style="display:block;color:#60a5fa;font-size:.82rem;margin-top:4px;word-break:break-all;">
              Evento #${e.id} → ${e.url}
            </a>`
         ).join('');
       } else {
-        html += `<div style="color:#8b95b0;font-size:.82rem;">Importado correctamente (sin IDs devueltos por MISP).</div>`;
+        html += `<div style="color:#8b95b0;font-size:.82rem;">Creado correctamente (sin ID devuelto).</div>`;
       }
       html += `</div>`;
       body.innerHTML = html;
@@ -2808,8 +3052,11 @@ function updateHomeActivity() {
 buildToolPanels();
 updateHomeActivity();
 buildParallelGrid();
+_buildParallelProfilesBar();
 updateParallelCount();
 renderScopeStatus();
+const _homeDash = { loaded: false };
+loadHomeDashboard();
 
 /* ═══════════════════════════════════════════════
    CYBERNEWS MODULE
@@ -2941,6 +3188,7 @@ function onNewsCat(val) {
 const _origShow = show;
 window.show = function (panel, btn) {
   _origShow(panel, btn);
+  if (panel === 'home' && !_homeDash.loaded) loadHomeDashboard();
   if (panel === 'overview' && !_overview.loaded) loadOverview();
   if (panel === 'news' && !_news.loaded) loadNews();
   if (panel === 'cves' && !_cves.loaded) loadCVEs();
@@ -3088,6 +3336,98 @@ async function loadOverview() {
   } finally {
     if (loading) loading.style.display = 'none';
     if (btn) btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   HOME DASHBOARD
+═══════════════════════════════════════════════ */
+
+async function loadHomeDashboard() {
+  if (_homeDash.loaded) return;
+  const hnLoading = $('home-news-loading');
+  const hovLoading = $('home-ov-loading');
+  if (hnLoading) hnLoading.style.display = 'flex';
+  if (hovLoading) hovLoading.style.display = 'flex';
+
+  try {
+    const [newsRes, ovRes] = await Promise.all([
+      fetch('/api/news'),
+      fetch('/api/overview'),
+    ]);
+    const newsData = await newsRes.json();
+    const ovData = await ovRes.json();
+
+    const articles = (newsData.news || []).slice(0, 3);
+    const mini = $('home-news-mini');
+    if (mini) {
+      mini.innerHTML = articles.map(n => {
+        const date = fmtNewsDate ? fmtNewsDate(n.date) : '';
+        const catLabel = (CAT_LABELS && CAT_LABELS[n.category]) || n.category || 'General';
+        const desc = n.description ? n.description.substring(0, 160) : '';
+        return `<a class="news-card" href="${escHtml(n.link || '#')}" target="_blank" rel="noopener noreferrer">
+          <div class="news-card-meta">
+            <span class="news-region-dot news-region-${n.region}"></span>
+            <span class="news-card-source">${escHtml(n.source || '')}</span>
+            <span class="news-card-date">${date}</span>
+          </div>
+          <div class="news-card-title">${escHtml(n.title || '')}</div>
+          ${desc ? `<div class="news-card-desc">${escHtml(desc)}</div>` : ''}
+          <span class="news-cat-badge news-cat-${n.category}">${escHtml(catLabel)}</span>
+        </a>`;
+      }).join('') || '<div style="color:var(--text3);font-size:.82rem;padding:8px 0">Sin noticias disponibles</div>';
+    }
+
+    const d = ovData;
+    const risk = d.risk || {};
+    const kev  = d.kev  || {};
+    const iocs = d.iocs || {};
+    const news = d.news || {};
+
+    const kevList = $('home-kev-list');
+    if (kevList) {
+      kevList.innerHTML = (d.recent_kev || []).map(c => `
+        <div class="ov-kev-item">
+          <span class="ov-kev-id">${escHtml(c.id)}</span>
+          <span class="ov-kev-product">${escHtml([c.vendor, c.product].filter(Boolean).join(' · '))}</span>
+          ${c.ransomware ? '<span class="ov-kev-ransom">⚠ Ransom</span>' : ''}
+          <span class="ov-kev-date">${escHtml(c.date || '')}</span>
+        </div>`).join('') || '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>';
+    }
+
+    const iocList = $('home-ioc-list');
+    if (iocList) {
+      iocList.innerHTML = (d.recent_iocs || []).map(i => `
+        <div class="ov-ioc-item">
+          <span class="ioc-type-badge ioc-type-${i.indicator?.includes('http') ? 'url' : 'ip'}">${i.indicator?.includes('http') ? 'URL' : 'IP'}</span>
+          <span class="ov-ioc-indicator">${escHtml(i.indicator || '—')}</span>
+          <span class="ov-ioc-threat">${escHtml(i.threat || '')}</span>
+        </div>`).join('') || '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>';
+    }
+
+    const tables = $('home-ov-tables');
+    if (tables) tables.style.display = 'grid';
+
+    const kpiRow = $('home-kpi-row');
+    if (kpiRow) {
+      _setEl('hkv-risk', risk.score ?? '—');
+      _setEl('hkv-risk-level', risk.level ?? '—');
+      _setEl('hkv-kev', (kev.total ?? '—').toLocaleString?.() ?? kev.total);
+      _setEl('hkv-kev-sub', `${kev.new_7d ?? 0} nuevos esta semana`);
+      _setEl('hkv-ioc', (iocs.total ?? '—').toLocaleString?.() ?? iocs.total);
+      _setEl('hkv-ransom', kev.ransomware_count ?? '—');
+      _setEl('hkv-news', news.count ?? '—');
+      const riskCard = $('home-kpi-risk-card');
+      if (riskCard) riskCard.className = `home-kpi-card home-kpi-risk ov-risk-${risk.level || 'BAJO'}`;
+      kpiRow.style.display = 'grid';
+    }
+
+    _homeDash.loaded = true;
+  } catch(e) {
+    console.error('loadHomeDashboard error:', e);
+  } finally {
+    if (hnLoading) hnLoading.style.display = 'none';
+    if (hovLoading) hovLoading.style.display = 'none';
   }
 }
 
@@ -3962,4 +4302,92 @@ function _renderH8mailResult(r) {
       </div>
       ${pwned ? `<div class="br-source-list">${sourceChips}</div>` : ''}
     </div>`;
+}
+
+// ── Urlscan.io ────────────────────────────────────────────────────────────────
+
+async function urlscanSearch() {
+  const inp = $('us-input');
+  const q = inp ? inp.value.trim() : '';
+  if (!q) { showToast('Introduce un dominio o URL', 'error'); return; }
+
+  $('us-status').style.display = 'flex';
+  $('us-results').style.display = 'none';
+  $('us-empty').style.display = 'none';
+
+  try {
+    const res = await fetch(`/api/urlscan/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    $('us-status').style.display = 'none';
+
+    if (data.error) { showToast(data.error, 'error'); return; }
+
+    const grid = $('us-results');
+    if (!data.results || data.results.length === 0) {
+      $('us-empty').style.display = 'flex';
+      return;
+    }
+
+    grid.innerHTML = data.results.map(r => {
+      const date = r.date ? new Date(r.date).toLocaleDateString('es-ES') : '—';
+      const malBadge = r.malicious
+        ? `<span class="us-badge us-malicious">⚠ Malicioso</span>`
+        : `<span class="us-badge us-clean">✓ Limpio</span>`;
+      const tags = (r.tags || []).map(t => `<span class="us-tag">${escHtml(t)}</span>`).join('');
+      return `
+        <div class="us-card">
+          <a class="us-screenshot-wrap" href="${escHtml(r.result_url)}" target="_blank" rel="noopener">
+            <img class="us-screenshot" src="${escHtml(r.screenshot)}" alt="screenshot" loading="lazy" onerror="this.style.display='none'">
+          </a>
+          <div class="us-card-body">
+            <div class="us-card-top">
+              <span class="us-domain">${escHtml(r.domain || r.url)}</span>
+              ${malBadge}
+            </div>
+            <div class="us-meta">
+              <span>🌍 ${escHtml(r.country || '—')}</span>
+              <span>📡 ${escHtml(r.ip || '—')}</span>
+              <span>🏢 ${escHtml(r.asnname || r.asn || '—')}</span>
+              <span>🖥 ${escHtml(r.server || '—')}</span>
+              <span>📅 ${date}</span>
+            </div>
+            ${tags ? `<div class="us-tags">${tags}</div>` : ''}
+            <a class="us-link" href="${escHtml(r.result_url)}" target="_blank" rel="noopener">Ver reporte completo →</a>
+          </div>
+        </div>`;
+    }).join('');
+
+    grid.style.display = 'grid';
+  } catch (err) {
+    $('us-status').style.display = 'none';
+    showToast('Error al consultar urlscan.io', 'error');
+  }
+}
+
+async function urlscanSubmit() {
+  const inp = $('us-input');
+  const url = inp ? inp.value.trim() : '';
+  if (!url) { showToast('Introduce un dominio o URL', 'error'); return; }
+
+  const btn = $('us-scan-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+  try {
+    const res = await fetch('/api/urlscan/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast(`Escaneo enviado. Resultado en: ${data.result_url}`, 'success', 6000);
+      window.open(data.result_url, '_blank');
+    }
+  } catch (err) {
+    showToast('Error al enviar el escaneo', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '+ Nuevo escaneo'; }
+  }
 }

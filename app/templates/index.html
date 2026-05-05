@@ -37,10 +37,6 @@
       <div class="nav-divider"></div>
 
       <div class="sidebar-section">Inteligencia</div>
-      <button class="nav-btn" onclick="show('overview',this)">
-        <span class="icon">📊</span>
-        <span>Overview</span>
-      </button>
       <button class="nav-btn" onclick="show('news',this)">
         <span class="icon">📰</span>
         <span>CyberNews</span>
@@ -53,6 +49,14 @@
         <span class="icon">☣</span>
         <span>IOCs</span>
       </button>
+      <button class="nav-btn" onclick="show('sources',this)">
+        <span class="icon">📡</span>
+        <span>Fuentes</span>
+      </button>
+
+      <div class="nav-divider"></div>
+
+      <div class="sidebar-section">Herramientas</div>
       <button class="nav-btn" onclick="show('shodan',this)">
         <span class="icon">🔭</span>
         <span>Shodan</span>
@@ -65,33 +69,29 @@
         <span class="icon">💧</span>
         <span>Filtraciones</span>
       </button>
-      <button class="nav-btn" onclick="show('sources',this)">
-        <span class="icon">📡</span>
-        <span>Fuentes</span>
+      <button class="nav-btn" onclick="show('urlscan',this)">
+        <span class="icon">🔬</span>
+        <span>Urlscan.io</span>
       </button>
 
       <div class="nav-divider"></div>
 
-      <div class="sidebar-section">Herramientas</div>
-      <button class="nav-btn" onclick="show('discover',this)">
-        <span class="icon">🔍</span>
-        <span>Discover</span>
+      <div class="sidebar-section">Análisis CLI</div>
+      <button class="nav-btn" onclick="show('shodancli',this)">
+        <span class="icon">📡</span>
+        <span>Shodan CLI</span>
       </button>
-      <button class="nav-btn" onclick="show('amass',this)">
-        <span class="icon">🌐</span>
-        <span>Amass</span>
+      <button class="nav-btn" onclick="show('webrecon',this)">
+        <span class="icon">🕸</span>
+        <span>Web Recon</span>
       </button>
-      <button class="nav-btn" onclick="show('katana',this)">
-        <span class="icon">🕷</span>
-        <span>Katana</span>
+      <button class="nav-btn" onclick="show('metadatos',this)">
+        <span class="icon">🗂</span>
+        <span>Metadatos</span>
       </button>
-      <button class="nav-btn" onclick="show('gitleaks',this)">
-        <span class="icon">🔑</span>
-        <span>Gitleaks</span>
-      </button>
-      <button class="nav-btn" onclick="show('wayback',this)">
-        <span class="icon">📼</span>
-        <span>Wayback</span>
+      <button class="nav-btn" onclick="show('secretos',this)">
+        <span class="icon">🔐</span>
+        <span>Secretos</span>
       </button>
 
       <div class="sidebar-status sidebar-status-card">
@@ -105,74 +105,10 @@
     </nav>
 
     <div class="main">
-      <div class="topbar">
-        <div class="topbar-left">
-          <span class="topbar-label">🎯 Objetivo</span>
-          <input
-            class="target-input"
-            id="targetInput"
-            placeholder="ej: example.com"
-            oninput="updateTarget(this.value)"
-          >
-        </div>
-
-        <div class="topbar-right">
-          <span class="target-chip" id="targetChip"></span>
-          <span class="scope-topbar-indicator" id="scope-indicator" style="display:none"></span>
-          <span id="clock" class="clock-label"></span>
-        </div>
-      </div>
-
       <div class="content">
         <div class="panel active" id="panel-home">
-          <div class="page-header page-header-home">
-            <div>
-              <div class="page-title">Análisis OSINT guiado</div>
-              <div class="page-desc">
-                Introduce un dominio y ejecuta reconocimiento pasivo, enumeración y crawling desde una única interfaz.
-              </div>
-            </div>
-          </div>
 
-          <div class="target-context">
-            <div class="target-context-header">
-              <div>
-                <div class="target-context-eyebrow">Contexto activo</div>
-                <div class="target-context-title">Objetivo actual</div>
-              </div>
-
-              <div class="context-status-badge">
-                <span class="context-dot"></span>
-                <span id="homeTargetStatus">READY</span>
-              </div>
-            </div>
-
-            <div class="target-context-body">
-              <div class="target-context-domain">
-                <span class="target-context-label">Dominio / IP</span>
-                <div class="target-context-value" id="homeTargetValue">Sin objetivo definido</div>
-              </div>
-
-              <div class="target-context-stats">
-                <div class="context-mini-card">
-                  <span class="context-mini-k">Última acción</span>
-                  <span class="context-mini-v" id="home-last-action">Esperando ejecución</span>
-                </div>
-
-                <div class="context-mini-card">
-                  <span class="context-mini-k">Herramientas</span>
-                  <span class="context-mini-v"><span id="home-stat-tools">5</span> módulos</span>
-                </div>
-
-                <div class="context-mini-card">
-                  <span class="context-mini-k">Estado motor</span>
-                  <span class="context-mini-v ok">Nominal</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Scope context card -->
+          <!-- Scope context bar -->
           <div class="scope-home-card" id="scope-home-card">
             <div class="scope-home-empty" id="scope-home-empty">
               <span class="scope-home-empty-icon">📁</span>
@@ -194,238 +130,71 @@
             </div>
           </div>
 
-          <div class="hero-box hero-box-compact">
-            <div class="hero-box-left">
-              <div class="hero-box-title">Recon externo guiado por alcance</div>
-              <div class="hero-box-desc">
-                Define el alcance del encargo, ejecuta herramientas contra los objetivos autorizados y genera reportes ejecutivos o STIX para MISP.
-              </div>
+          <!-- CyberNews mini -->
+          <div class="home-feed-header">
+            <span class="home-feed-title">CyberNews</span>
+            <button class="home-feed-link" onclick="show('news',null)">Ver noticias &#x2192;</button>
+          </div>
+          <div id="home-news-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div><span>Cargando noticias...</span>
+          </div>
+          <div id="home-news-mini" class="home-news-mini-grid"></div>
 
-              <div class="hero-actions">
-                <button class="run-btn" onclick="show('discover', null)">🚀 Ir a Discover</button>
-                <button class="secondary-btn" onclick="show('scope', null)">📁 Definir alcance</button>
+          <!-- Overview mini -->
+          <div class="home-feed-header home-feed-header-mt">
+            <span class="home-feed-title">Overview</span>
+            <button class="home-feed-link" onclick="show('overview',null)">Ver completo &#x2192;</button>
+          </div>
+          <div id="home-ov-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div><span>Cargando inteligencia de amenazas...</span>
+          </div>
+          <div class="home-ov-tables" id="home-ov-tables" style="display:none">
+            <div class="home-ov-card">
+              <div class="home-ov-card-header">
+                <span class="home-ov-card-title">Últimas adiciones — CISA KEV</span>
+                <button class="ov-goto-btn" onclick="show('cves',null)">Ver CVEs &#x2192;</button>
               </div>
+              <div id="home-kev-list" class="ov-kev-list"></div>
             </div>
-
-            <div class="hero-box-right">
-              <div class="quick-steps quick-steps-compact">
-                <div class="quick-step">
-                  <span class="quick-step-num">1</span>
-                  <span class="quick-step-text">Define el alcance: dominios, IPs, tipo de análisis y expiración</span>
-                </div>
-                <div class="quick-step">
-                  <span class="quick-step-num">2</span>
-                  <span class="quick-step-text">Ejecuta herramientas pasivas o activas según el alcance autorizado</span>
-                </div>
-                <div class="quick-step">
-                  <span class="quick-step-num">3</span>
-                  <span class="quick-step-text">Genera el reporte ejecutivo PDF o exporta STIX 2.1 para MISP / SIEM</span>
-                </div>
+            <div class="home-ov-card">
+              <div class="home-ov-card-header">
+                <span class="home-ov-card-title">IOCs recientes</span>
+                <button class="ov-goto-btn" onclick="show('iocs',null)">Ver IOCs &#x2192;</button>
               </div>
+              <div id="home-ioc-list" class="ov-ioc-list"></div>
             </div>
           </div>
 
-          <div class="stats-row stats-row-ops">
-            <div class="stat-card stat-card-ops">
-              <div class="stat-label stat-label-mono">TOOLS</div>
-              <div class="stat-val" id="home-stat-tools2">5</div>
-              <div class="stat-sub">Módulos principales</div>
+          <!-- KPI stats -->
+          <div class="home-kpi-row" id="home-kpi-row" style="display:none">
+            <div class="home-kpi-card home-kpi-risk" id="home-kpi-risk-card">
+              <div class="home-kpi-label">SCORE DE RIESGO</div>
+              <div class="home-kpi-val" id="hkv-risk">—</div>
+              <div class="home-kpi-sub" id="hkv-risk-level">—</div>
             </div>
-
-            <div class="stat-card stat-card-ops">
-              <div class="stat-label stat-label-mono">COMMANDS</div>
-              <div class="stat-val" id="home-stat-cmds">30+</div>
-              <div class="stat-sub">Subcomandos preparados</div>
+            <div class="home-kpi-card">
+              <div class="home-kpi-label">CISA KEV TOTAL</div>
+              <div class="home-kpi-val" id="hkv-kev">—</div>
+              <div class="home-kpi-sub" id="hkv-kev-sub">—</div>
             </div>
-
-            <div class="stat-card stat-card-ops">
-              <div class="stat-label stat-label-mono">PARALLEL</div>
-              <div class="stat-val">⚡</div>
-              <div class="stat-sub">Ejecución concurrente</div>
+            <div class="home-kpi-card">
+              <div class="home-kpi-label">IOCs ACTIVOS</div>
+              <div class="home-kpi-val" id="hkv-ioc">—</div>
+              <div class="home-kpi-sub">URLs · IPs C2 · Hashes</div>
             </div>
-
-            <div class="stat-card stat-card-ops">
-              <div class="stat-label stat-label-mono">REPORTS</div>
-              <div class="stat-val">📄</div>
-              <div class="stat-sub">PDF + STIX 2.1</div>
+            <div class="home-kpi-card">
+              <div class="home-kpi-label">CVEs RANSOMWARE</div>
+              <div class="home-kpi-val" id="hkv-ransom">—</div>
+              <div class="home-kpi-sub">en CISA KEV</div>
             </div>
-          </div>
-
-          <div class="home-main-grid">
-            <div class="home-main-left">
-              <div class="section-title">Inicio rápido</div>
-
-              <div class="tool-overview-grid">
-                <div class="tool-overview-card tool-overview-primary" onclick="show('discover',null)">
-                  <div class="tool-overview-head">
-                    <div class="tool-overview-head-left">
-                      <div class="tool-overview-icon">🔍</div>
-                      <div>
-                        <div class="tool-overview-name">Discover</div>
-                        <div class="tool-overview-subtitle">Recon inicial visible</div>
-                      </div>
-                    </div>
-                    <span class="tag tag-primary">Recomendado</span>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Descripción</div>
-                    <div class="tool-overview-desc">
-                      Reconocimiento inicial del objetivo con salida rápida y visible.
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Cobertura</div>
-                    <div class="tool-overview-meta">
-                      <span class="tool-meta-chip">WHOIS</span>
-                      <span class="tool-meta-chip">DNS</span>
-                      <span class="tool-meta-chip">WhatWeb</span>
-                      <span class="tool-meta-chip">TLS</span>
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-footer">
-                    <div>
-                      <div class="tool-section-title">Salida esperada</div>
-                      <span class="tool-overview-out">Dominio, IPs, stack, puertos</span>
-                    </div>
-                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('discover',null)">Abrir</button>
-                  </div>
-                </div>
-
-                <div class="tool-overview-card" onclick="show('amass',null)">
-                  <div class="tool-overview-head">
-                    <div class="tool-overview-head-left">
-                      <div class="tool-overview-icon">🌐</div>
-                      <div>
-                        <div class="tool-overview-name">Amass</div>
-                        <div class="tool-overview-subtitle">Superficie externa</div>
-                      </div>
-                    </div>
-                    <span class="tag tag-apache">Apache 2.0</span>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Descripción</div>
-                    <div class="tool-overview-desc">
-                      Expansión de superficie externa mediante enumeración pasiva y activa.
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Cobertura</div>
-                    <div class="tool-overview-meta">
-                      <span class="tool-meta-chip">Subdominios</span>
-                      <span class="tool-meta-chip">IPs</span>
-                      <span class="tool-meta-chip">Passive</span>
-                      <span class="tool-meta-chip">Active</span>
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-footer">
-                    <div>
-                      <div class="tool-section-title">Salida esperada</div>
-                      <span class="tool-overview-out">Subdominios y resolución</span>
-                    </div>
-                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('amass',null)">Abrir</button>
-                  </div>
-                </div>
-
-                <div class="tool-overview-card" onclick="show('katana',null)">
-                  <div class="tool-overview-head">
-                    <div class="tool-overview-head-left">
-                      <div class="tool-overview-icon">🕷</div>
-                      <div>
-                        <div class="tool-overview-name">Katana</div>
-                        <div class="tool-overview-subtitle">Crawling y endpoints</div>
-                      </div>
-                    </div>
-                    <span class="tag tag-mit">MIT</span>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Descripción</div>
-                    <div class="tool-overview-desc">
-                      Crawling web para descubrir rutas, JS y endpoints expuestos.
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-section">
-                    <div class="tool-section-title">Cobertura</div>
-                    <div class="tool-overview-meta">
-                      <span class="tool-meta-chip">Routes</span>
-                      <span class="tool-meta-chip">JS</span>
-                      <span class="tool-meta-chip">API</span>
-                      <span class="tool-meta-chip">Headless</span>
-                    </div>
-                  </div>
-
-                  <div class="tool-overview-footer">
-                    <div>
-                      <div class="tool-section-title">Salida esperada</div>
-                      <span class="tool-overview-out">Endpoints y recursos</span>
-                    </div>
-                    <button class="tool-overview-btn" onclick="event.stopPropagation(); show('katana',null)">Abrir</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="section-title">Flujos disponibles</div>
-
-              <div class="home-grid">
-                <div class="home-card" onclick="show('scope',null)">
-                  <div class="home-card-icon">📁</div>
-                  <div class="home-card-name">Alcance</div>
-                  <div class="home-card-desc">
-                    Define dominios, rangos IP, tipo de análisis y expiración del encargo autorizado.
-                  </div>
-                </div>
-
-                <div class="home-card" onclick="show('parallel',null)">
-                  <div class="home-card-icon">⚡</div>
-                  <div class="home-card-name">Modo paralelo</div>
-                  <div class="home-card-desc">
-                    Lanza varias subherramientas a la vez y revisa resultados unificados.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="home-main-right">
-              <div class="section-title">Actividad reciente</div>
-
-            <div class="activity-panel">
-              <div class="activity-panel-title">Ejecuciones de esta sesión</div>
-              <div id="home-activity-list"><p class="ui-message">Sin ejecuciones en esta sesión.</p></div>
-            </div>
-
-            <div class="section-title">Estado operativo</div>
-
-            <div class="ops-panel">
-              <div class="ops-panel-title">Estado del sistema</div>
-
-              <div class="ops-row">
-                <span class="ops-key">Motor</span>
-                <span class="ops-value ok">Nominal</span>
-              </div>
-              <div class="ops-row">
-                <span class="ops-key">Streaming</span>
-                <span class="ops-value ok">Disponible</span>
-              </div>
-              <div class="ops-row">
-                <span class="ops-key">Parseo</span>
-                <span class="ops-value ok">Activo</span>
-              </div>
-              <div class="ops-row">
-                <span class="ops-key">Modo paralelo</span>
-                <span class="ops-value">Listo</span>
-              </div>
-            </div>
+            <div class="home-kpi-card">
+              <div class="home-kpi-label">NOTICIAS HOY</div>
+              <div class="home-kpi-val" id="hkv-news">—</div>
+              <div class="home-kpi-sub">fuentes activas</div>
             </div>
           </div>
+
         </div>
-
         <div class="panel" id="panel-scope">
           <div class="page-header">
             <div>
@@ -669,6 +438,22 @@
             <div class="page-desc">
               Selecciona varias subherramientas para ejecutarlas a la vez y visualizar el output unificado abajo.
             </div>
+          </div>
+
+          <!-- Hidden target input (used by JS) -->
+          <input id="targetInput" style="display:none" oninput="updateTarget(this.value)" autocomplete="off">
+
+          <!-- Scope targets -->
+          <div class="parallel-scope-chips" id="parallel-scope-chips" style="display:none">
+            <span class="parallel-scope-label">Alcance:</span>
+            <div class="parallel-scope-list" id="parallel-scope-list"></div>
+          </div>
+
+          <!-- Quick scan profiles -->
+          <div class="parallel-profiles-bar">
+            <span class="parallel-profiles-label">Perfil rápido:</span>
+            <div class="parallel-profiles-list" id="parallel-profiles-list"></div>
+            <button class="parallel-profiles-clear" onclick="clearParallel()">✕ Limpiar</button>
           </div>
 
           <div id="parallel-subtool-grid" class="parallel-subtool-grid"></div>
@@ -1247,32 +1032,41 @@
           </div>
         </div>
 
+        <!-- Urlscan.io panel -->
+        <div class="panel" id="panel-urlscan">
+          <div class="page-header">
+            <div class="page-title">🔬 Urlscan.io <span class="tag tag-mit">Free API</span></div>
+            <div class="page-desc">Analiza webs sin visitarlas: tecnologías, IPs, capturas de pantalla y veredictos de seguridad.</div>
+          </div>
+
+          <div class="sh-search-card">
+            <div class="sh-search-row">
+              <input class="sh-host-field" id="us-input" type="text" placeholder="dominio.com o URL completa" autocomplete="off" onkeydown="if(event.key==='Enter')urlscanSearch()">
+              <button class="run-btn" onclick="urlscanSearch()">🔍 Buscar</button>
+              <button class="secondary-btn" id="us-scan-btn" onclick="urlscanSubmit()" title="Requiere URLSCAN_API_KEY en .env">+ Nuevo escaneo</button>
+            </div>
+            <div class="sh-hint">Busca escaneos existentes del dominio en la base de datos pública. El botón &quot;Nuevo escaneo&quot; requiere API key.</div>
+          </div>
+
+          <div id="us-status" style="display:none" class="news-loading-state">
+            <div class="news-spinner"></div><span>Consultando urlscan.io...</span>
+          </div>
+
+          <div id="us-results" class="us-results-grid" style="display:none"></div>
+
+          <div id="us-empty" class="news-empty-state" style="display:none">
+            <div class="news-empty-icon">🔬</div>
+            <div class="news-empty-title">Sin resultados</div>
+            <div class="news-empty-text">No se encontraron escaneos públicos para este dominio.</div>
+          </div>
+        </div>
+
+
       </div>
     </div>
   </div>
 
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-  <script>
-    (function () {
-      const targetInput = document.getElementById('targetInput');
-      const homeTargetValue = document.getElementById('homeTargetValue');
-      const homeTargetStatus = document.getElementById('homeTargetStatus');
 
-      function syncHomeTarget() {
-        const value = targetInput && targetInput.value ? targetInput.value.trim() : '';
-        if (homeTargetValue) {
-          homeTargetValue.textContent = value || 'Sin objetivo definido';
-        }
-        if (homeTargetStatus) {
-          homeTargetStatus.textContent = value ? 'READY' : 'WAITING TARGET';
-        }
-      }
-
-      if (targetInput) {
-        targetInput.addEventListener('input', syncHomeTarget);
-        syncHomeTarget();
-      }
-    })();
-  </script>
 </body>
 </html>

@@ -33,6 +33,26 @@ ALLOWED_BINARIES = {
     "smbclient",
     "ike-scan",
     "timeout",
+    # Identidad
+    "sherlock",
+    "maigret",
+    "holehe",
+    "blackbird",
+    "usufy",
+    "searchfy",
+    # Reconocimiento de subdominios
+    "subfinder",
+    "dnsx",
+    # Web recon
+    "photon",
+    "finalrecon",
+    # Infraestructura / APIs
+    "shodan",
+    # Metadatos
+    "metagoofil",
+    "exiftool",
+    # Secretos
+    "trufflehog",
 }
 
 BINARY_PATHS = {
@@ -56,6 +76,25 @@ BINARY_PATHS = {
     "theHarvester": "/usr/bin/theHarvester",
     "gitleaks": "/home/kali/.local/bin/gitleaks",
     "wayback_machine_downloader": "/home/kali/.local/bin/wayback_machine_downloader",
+    "sherlock": "/home/kali/Aletheia-Dashboard/venv/bin/sherlock",
+    "maigret": "/home/kali/Aletheia-Dashboard/venv/bin/maigret",
+    "holehe": "/home/kali/Aletheia-Dashboard/venv/bin/holehe",
+    "blackbird": "/home/kali/Aletheia-Dashboard/venv/bin/blackbird",
+    "subfinder": "/usr/bin/subfinder",
+    "dnsx": "/home/kali/go/bin/dnsx",
+    # Identidad
+    "usufy":    "/home/kali/Aletheia-Dashboard/venv/bin/usufy",
+    "searchfy": "/home/kali/Aletheia-Dashboard/venv/bin/searchfy",
+    # Web recon
+    "photon":    "/home/kali/Aletheia-Dashboard/venv/bin/photon",
+    "finalrecon":"/home/kali/Aletheia-Dashboard/venv/bin/finalrecon",
+    # Infraestructura
+    "shodan":   "/home/kali/Aletheia-Dashboard/venv/bin/shodan",
+    # Metadatos
+    "metagoofil":"/usr/bin/metagoofil",
+    "exiftool": "/usr/bin/exiftool",
+    # Secretos
+    "trufflehog":"/usr/bin/trufflehog",
 }
 
 MAX_PROCESSES = 4
@@ -66,6 +105,9 @@ TOOL_TIMEOUTS = {
     "amass": 600,
     "katana": 300,
     "wayback_machine_downloader": 120,
+    "photon": 300,
+    "finalrecon": 300,
+    "metagoofil": 180,
     "default": DEFAULT_COMMAND_TIMEOUT,
 }
 
@@ -192,7 +234,7 @@ def _validate_output_flags(parts: list) -> tuple[bool, str]:
     Bloquea flags de escritura que apunten fuera de TMP_DIR
     para evitar sobrescritura de archivos arbitrarios.
     """
-    OUTPUT_FLAGS = {"-oN", "-oJ", "-oX", "-oG", "-oA", "-oS", "-f", "-j", "-d"}
+    OUTPUT_FLAGS = {"-oN", "-oJ", "-oX", "-oG", "-oA", "-oS", "-f", "-j", "-o"}
     for i, part in enumerate(parts):
         if part in OUTPUT_FLAGS and i + 1 < len(parts):
             target_path = parts[i + 1]

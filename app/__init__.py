@@ -17,6 +17,7 @@ def create_app():
     from .routes.virustotal import vt_bp
     from .routes.stix_validate import stix_validate_bp
     from .routes.misp import misp_bp
+    from .routes.urlscan import urlscan_bp
 
     app.register_blueprint(main)
     app.register_blueprint(runner)
@@ -32,5 +33,6 @@ def create_app():
     app.register_blueprint(vt_bp)
     app.register_blueprint(stix_validate_bp)
     app.register_blueprint(misp_bp)
+    app.register_blueprint(urlscan_bp)
 
     return app
