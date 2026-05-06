@@ -29,6 +29,7 @@ def create_app():
     from .routes.stix_validate import stix_validate_bp
     from .routes.misp import misp_bp
     from .routes.urlscan import urlscan_bp
+    from .routes.nmap_discover import nmap_discover_bp
 
     app.register_blueprint(main)
     app.register_blueprint(runner)
@@ -45,5 +46,6 @@ def create_app():
     app.register_blueprint(stix_validate_bp)
     app.register_blueprint(misp_bp)
     app.register_blueprint(urlscan_bp)
+    app.register_blueprint(nmap_discover_bp)
 
     return app

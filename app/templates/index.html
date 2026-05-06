@@ -209,6 +209,11 @@
                 <label class="scope-lbl" for="scope-ips">Rangos IP aprobados</label>
                 <textarea class="scope-ta" id="scope-ips" rows="2" placeholder="192.0.2.0/24, 10.0.0.0/8"></textarea>
                 <span class="scope-hint">CIDRs separados por comas</span>
+                <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                  <button class="secondary-btn" id="discover-hosts-btn" onclick="discoverHosts()">🔍 Descubrir hosts activos</button>
+                  <button class="cancel-parallel-btn" id="discover-stop-btn" onclick="stopDiscover()" style="display:none;background:var(--red);color:#fff;border-color:var(--red)">⏹ Detener</button>
+                </div>
+                <div id="discover-hosts-result" style="display:none;margin-top:10px"></div>
               </div>
               <div class="scope-field">
                 <label class="scope-lbl">Tipo de análisis permitido</label>

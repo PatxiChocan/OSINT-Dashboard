@@ -1499,6 +1499,146 @@ function saveScope() {
   if (msg) { msg.style.display = 'block'; setTimeout(() => { msg.style.display = 'none'; }, 2500); }
 }
 
+let _discoverScanId  = null;
+let _discoverPollTimer = null;
+
+async function discoverHosts() {
+  const ipsEl    = $('scope-ips');
+  const btn      = $('discover-hosts-btn');
+  const stopBtn  = $('discover-stop-btn');
+  const resultEl = $('discover-hosts-result');
+
+  const ranges = (ipsEl?.value || '').split(',').map(r => r.trim()).filter(Boolean);
+  if (!ranges.length) {
+    resultEl.innerHTML = `<span style="color:var(--red);font-size:.82rem">⚠ Añade al menos un rango CIDR antes de escanear</span>`;
+    resultEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Escaneando...';
+  stopBtn.style.display = 'inline-flex';
+  resultEl.innerHTML = '';
+  resultEl.style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/nmap/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ranges })
+    });
+    const data = await resp.json();
+    if (data.error) {
+      _discoverFinish();
+      resultEl.innerHTML = `<span style="color:var(--red);font-size:.82rem">⚠ ${data.error}</span>`;
+      return;
+    }
+    _discoverScanId = data.scan_id;
+    _discoverPoll();
+  } catch(e) {
+    _discoverFinish();
+    resultEl.innerHTML = `<span style="color:var(--red);font-size:.82rem">⚠ Error de conexión con el servidor</span>`;
+  }
+}
+
+function _discoverPoll() {
+  if (!_discoverScanId) return;
+  _discoverPollTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(`/api/nmap/status/${_discoverScanId}`);
+      const data = await resp.json();
+      const resultEl = $('discover-hosts-result');
+
+      if (data.status === 'running') {
+        if (resultEl) {
+          const count = data.hosts?.length || 0;
+          resultEl.innerHTML = `<span style="color:var(--text3);font-size:.82rem">⏳ Escaneando… ${count > 0 ? `${count} hosts encontrados hasta ahora` : ''}</span>`;
+        }
+        _discoverPoll();
+      } else {
+        _discoverFinish();
+        if (data.status === 'error') {
+          resultEl.innerHTML = `<span style="color:var(--red);font-size:.82rem">⚠ ${data.error}</span>`;
+        } else if (data.status === 'stopped') {
+          _discoverShowResults(data.hosts, true);
+        } else {
+          _discoverShowResults(data.hosts, false);
+        }
+      }
+    } catch(e) {
+      _discoverFinish();
+      const resultEl = $('discover-hosts-result');
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red);font-size:.82rem">⚠ Error de conexión</span>`;
+    }
+  }, 2000);
+}
+
+function _discoverShowResults(hosts, stopped) {
+  const resultEl = $('discover-hosts-result');
+  if (!resultEl) return;
+  if (!hosts?.length) {
+    resultEl.innerHTML = `<span style="color:var(--text3);font-size:.82rem">${stopped ? 'Detenido — sin hosts encontrados' : 'Sin hosts activos en el rango'}</span>`;
+    return;
+  }
+  const chips = hosts.map(ip =>
+    `<span class="parallel-scope-chip parallel-scope-ip" style="cursor:default">${ip}</span>`
+  ).join('');
+  const label = stopped ? `${hosts.length} hosts encontrados (detenido)` : `${hosts.length} hosts activos encontrados`;
+  resultEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span style="font-size:.78rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${label}</span>
+      <button class="clr-btn" onclick="clearDiscoverResults()" title="Limpiar resultados">✕ Limpiar</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">${chips}</div>
+    <button class="secondary-btn" onclick="addDiscoveredToScope(${JSON.stringify(hosts).replace(/"/g,'&quot;')})" style="font-size:.78rem">
+      + Añadir todos al alcance
+    </button>`;
+}
+
+function _discoverFinish() {
+  const btn     = $('discover-hosts-btn');
+  const stopBtn = $('discover-stop-btn');
+  if (btn)     { btn.disabled = false; btn.textContent = '🔍 Descubrir hosts activos'; }
+  if (stopBtn)   stopBtn.style.display = 'none';
+  clearTimeout(_discoverPollTimer);
+  _discoverScanId = null;
+}
+
+async function stopDiscover() {
+  if (!_discoverScanId) return;
+  const id = _discoverScanId;
+  clearTimeout(_discoverPollTimer);
+  try {
+    await fetch(`/api/nmap/stop/${id}`, { method: 'POST' });
+    // Poll once more to get partial results
+    const resp = await fetch(`/api/nmap/status/${id}`);
+    const data = await resp.json();
+    _discoverFinish();
+    _discoverShowResults(data.hosts, true);
+  } catch(e) {
+    _discoverFinish();
+  }
+}
+
+function clearDiscoverResults() {
+  const resultEl = $('discover-hosts-result');
+  if (resultEl) { resultEl.innerHTML = ''; resultEl.style.display = 'none'; }
+}
+
+function addDiscoveredToScope(hosts) {
+  const ipsEl = $('scope-ips');
+  if (!ipsEl) return;
+  const existing = ipsEl.value.split(',').map(r => r.trim()).filter(Boolean);
+  const toAdd = hosts.filter(h => !existing.includes(h));
+  ipsEl.value = [...existing, ...toAdd].join(', ');
+  saveScope();
+  const resultEl = $('discover-hosts-result');
+  if (resultEl) {
+    const addBtn = resultEl.querySelector('button');
+    if (addBtn) { addBtn.textContent = `✅ ${toAdd.length} IPs añadidas al alcance`; addBtn.disabled = true; }
+  }
+}
+
 function clearScope() {
   localStorage.removeItem(SCOPE_KEY);
   ['scope-case','scope-client','scope-resp','scope-domains','scope-ips','scope-expiry'].forEach(id => {
@@ -2152,36 +2292,48 @@ function downloadOut(tool) {
 <meta charset="UTF-8">
 <title>${title} — ${tgt}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; padding: 24px 32px; }
-  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: #0a1628; }
-  .subtitle { font-size: 10px; color: #666; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
-  .subtitle span { margin-right: 16px; }
-  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #444; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; margin: 18px 0 10px; }
-  /* parsed output */
-  .parsed-section table { width: 100%; border-collapse: collapse; font-size: 10px; }
-  .parsed-section td, .parsed-section th { border: 1px solid #ddd; padding: 4px 7px; }
-  .parsed-section th { background: #f4f4f4; font-weight: 600; }
-  .parsed-section .tag, .parsed-section [class*="badge"], .parsed-section [class*="chip"] { display: inline-block; padding: 1px 5px; border-radius: 3px; background: #eee; font-size: 9px; margin: 1px; }
-  .parsed-section .ui-message { color: #888; font-style: italic; }
-  /* raw output */
-  pre { white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', monospace; font-size: 9.5px; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 4px; padding: 12px; line-height: 1.5; }
-  @media print { body { padding: 12px 16px; } }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#1C0500;background:#F9F5F4}
+  .cover{background:#1C0500;color:#fff;padding:44px 48px 36px;position:relative;overflow:hidden}
+  .cover-accent{position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,#BD1D00,#E84020)}
+  .cover-brand{font-size:9px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#9A6055;margin-bottom:20px}
+  .cover-badge{display:inline-block;background:#BD1D00;color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:999px;margin-bottom:14px}
+  .cover-title{font-size:22px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:4px}
+  .cover-meta{display:flex;gap:24px;font-size:9.5px;color:#9A6055;margin-top:16px;padding-top:16px;border-top:1px solid rgba(189,29,0,.25)}
+  .cover-meta b{color:#F3EEEC}
+  .rpt-body{padding:32px 44px;background:#F9F5F4;min-height:100vh}
+  .section-hdr{position:relative;padding-left:14px;margin:28px 0 14px;font-size:0.58rem;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#9A6055;display:flex;align-items:center;gap:10px}
+  .section-hdr::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:13px;background:linear-gradient(180deg,#BD1D00,#E84020);border-radius:2px}
+  .section-hdr-label{font-size:10.5px;font-weight:800;color:#1C0500;letter-spacing:0}
+  .card{background:#fff;border:1px solid rgba(189,29,0,.09);border-radius:14px;padding:20px 22px;margin-bottom:12px;box-shadow:0 6px 18px rgba(189,29,0,.06)}
+  .parsed-section table{width:100%;border-collapse:collapse;font-size:10px;border-radius:8px;overflow:hidden}
+  .parsed-section td,.parsed-section th{border:1px solid rgba(189,29,0,.10);padding:6px 10px}
+  .parsed-section th{background:#FBF2F0;font-weight:700;color:#3D1510;font-size:9px;text-transform:uppercase;letter-spacing:.04em}
+  .parsed-section tr:nth-child(even) td{background:#FBF2F0}
+  .parsed-section .ui-message{color:#9A6055;font-style:italic}
+  .raw-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#F3EEEC;background:#3D1510;padding:7px 14px;border-radius:8px 8px 0 0;margin-top:0}
+  pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;font-size:8.5px;background:#130400;color:#f0e8e5;border-radius:0 0 8px 8px;padding:14px;line-height:1.7;margin-top:0}
+  @media print{body{background:#F9F5F4}}
 </style>
 </head>
 <body>
-  <h1>${title}</h1>
-  <div class="subtitle">
-    <span><b>Objetivo:</b> ${tgt}</span>
-    <span><b>Fecha:</b> ${date}</span>
-    <span><b>Tool:</b> ${tool}</span>
+  <div class="cover">
+    <div class="cover-accent"></div>
+    <div class="cover-brand">Aletheia OSINT Platform</div>
+    <div class="cover-badge">${tool}</div>
+    <div class="cover-title">${title}</div>
+    <div class="cover-meta">
+      <span><b>Objetivo</b> ${tgt}</span>
+      <span><b>Fecha</b> ${date}</span>
+    </div>
   </div>
-
-  <div class="section-title">Resumen</div>
-  <div class="parsed-section">${parsedHtml}</div>
-
-  <div class="section-title">Output completo</div>
-  <pre>${rawTxt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+  <div class="rpt-body">
+    <div class="section-hdr"><span class="section-hdr-label">Resumen</span></div>
+    <div class="card"><div class="parsed-section">${parsedHtml}</div></div>
+    <div class="section-hdr"><span class="section-hdr-label">Output técnico completo</span></div>
+    <div class="raw-label">Terminal</div>
+    <pre>${rawTxt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+  </div>
 </body>
 </html>`;
 
@@ -2325,7 +2477,7 @@ function generateExecutiveReport() {
   toolEntries.forEach(e => {
     const title = toolMeta[e.tool]?.title || e.tool;
     toolSections += `
-      <div class="rpt-section">
+      <div class="card rpt-section">
         <div class="rpt-section-hdr">
           <span class="rpt-section-num">4.${sIdx++}</span>
           <span class="rpt-section-title">${esc(stripEmoji(title))}</span>
@@ -2337,7 +2489,7 @@ function generateExecutiveReport() {
 
   parallelRuns.forEach(r => {
     toolSections += `
-      <div class="rpt-section">
+      <div class="card rpt-section">
         <div class="rpt-section-hdr">
           <span class="rpt-section-num">4.${sIdx++}</span>
           <span class="rpt-section-title">${esc(stripEmoji(r.toolTitle || r.tool))} — ${esc(r.subtoolName)}</span>
@@ -2354,40 +2506,40 @@ function generateExecutiveReport() {
     }).join('');
     const cveChips = cves.length ? cves.map(id => `<span class="rpt-cve">${esc(id)}</span>`).join(' ') : '<em class="dim">Ninguno detectado</em>';
     toolSections += `
-      <div class="rpt-section">
+      <div class="card rpt-section">
         <div class="rpt-section-hdr">
           <span class="rpt-section-num">4.${sIdx++}</span>
           <span class="rpt-section-title">Shodan — Exposición de red</span>
           <span class="rpt-section-meta">IP: ${esc(shodanData.ip)} · ${esc(shodanData.org||'—')} · ${esc(shodanData.country||'—')}</span>
         </div>
         ${svcRows ? `<table class="fi-table"><thead><tr><th>Puerto</th><th>Proto</th><th>Servicio / Producto</th><th>Banner</th></tr></thead><tbody>${svcRows}</tbody></table>` : '<p class="dim">Sin servicios expuestos.</p>'}
-        <div style="margin-top:12px"><div class="fi-group-hdr">CVEs detectados</div><div style="margin-top:6px">${cveChips}</div></div>
+        <div style="margin-top:12px"><div class="fi-group-hdr" style="border-radius:6px 6px 0 0">CVEs detectados</div><div style="padding:8px 12px;background:#FBF2F0;border:1px solid rgba(189,29,0,.10);border-top:none;border-radius:0 0 6px 6px">${cveChips}</div></div>
       </div>`;
   }
 
   if (vtData) {
-    const vColor = vtData.verdict === 'malicious' ? '#c62828' : vtData.verdict === 'suspicious' ? '#e65100' : '#2e7d32';
-    const vBg    = vtData.verdict === 'malicious' ? '#fff0f0' : vtData.verdict === 'suspicious' ? '#fff8f0' : '#f0fff4';
+    const vColor = vtData.verdict === 'malicious' ? '#DC2626' : vtData.verdict === 'suspicious' ? '#D97706' : '#16A34A';
+    const vBg    = vtData.verdict === 'malicious' ? '#fff5f5' : vtData.verdict === 'suspicious' ? '#fffaf3' : '#f5fff8';
     const stats  = vtData.stats || {};
     const flagged = (vtData.flagged || []).slice(0, 20);
     toolSections += `
-      <div class="rpt-section">
+      <div class="card rpt-section">
         <div class="rpt-section-hdr">
           <span class="rpt-section-num">4.${sIdx++}</span>
           <span class="rpt-section-title">VirusTotal — Reputación</span>
           <span class="rpt-section-meta">${esc(vtData._target||'—')} · ${esc(vtData.type)}</span>
         </div>
-        <div style="background:${vBg};border:1.5px solid ${vColor};border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:20px;margin-bottom:12px">
-          <div style="font-size:20px;font-weight:800;color:${vColor};letter-spacing:.04em">${esc((vtData.verdict||'').toUpperCase())}</div>
-          <div style="font-size:10px;color:#333">
+        <div style="background:${vBg};border:1px solid ${vColor};border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:20px;margin-bottom:12px">
+          <div style="font-size:22px;font-weight:800;color:${vColor};letter-spacing:.04em">${esc((vtData.verdict||'').toUpperCase())}</div>
+          <div style="font-size:10px;color:#3D1510">
             <b>${stats.malicious||0}</b> motores maliciosos ·
             <b>${stats.suspicious||0}</b> sospechosos ·
             <b>${stats.harmless||0}</b> limpios
-            <span style="color:#888"> de ${vtData.total_engines||0} motores totales</span>
+            <span style="color:#9A6055"> de ${vtData.total_engines||0} motores totales</span>
           </div>
         </div>
-        ${flagged.length ? `<table class="fi-table"><thead><tr><th>Motor antivirus</th><th>Resultado</th></tr></thead><tbody>${
-          flagged.map(f => `<tr><td>${esc(f.engine)}</td><td style="color:${f.category==='malicious'?'#c62828':'#e65100'};font-weight:600">${esc(f.result||f.category)}</td></tr>`).join('')
+        ${flagged.length ? `<table class="fi-table" style="border-radius:8px;overflow:hidden"><thead><tr><th>Motor antivirus</th><th>Resultado</th></tr></thead><tbody>${
+          flagged.map(f => `<tr><td>${esc(f.engine)}</td><td style="color:${f.category==='malicious'?'#DC2626':'#D97706'};font-weight:600">${esc(f.result||f.category)}</td></tr>`).join('')
         }</tbody></table>` : ''}
       </div>`;
   }
@@ -2417,84 +2569,135 @@ function generateExecutiveReport() {
 <meta charset="UTF-8">
 <title>Informe OSINT — ${esc(scope.caseName || 'Análisis')}</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#1a1a2e;background:#fff}
-a{color:#1565c0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#1C0500;background:#F9F5F4}
+a{color:#BD1D00}
 
-/* ── Cover ── */
-.cover{background:#0a1628;color:#fff;min-height:100vh;padding:64px 56px;page-break-after:always;display:flex;flex-direction:column;justify-content:space-between}
-.cover-top{}
-.cover-logo{font-size:10px;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:#5c8adb;margin-bottom:56px}
-.cover-badge{display:inline-block;background:#c62828;color:#fff;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:2px;margin-bottom:20px}
-.cover-title{font-size:32px;font-weight:800;line-height:1.2;margin-bottom:10px;color:#fff}
-.cover-client{font-size:16px;color:#7aadff;margin-bottom:0}
-.cover-bottom{border-top:1px solid #1e3a5f;padding-top:24px}
-.cover-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 32px;font-size:10px;color:#8ea8cc}
-.cover-meta-item b{display:block;color:#fff;font-size:11px;margin-bottom:3px}
-.cover-meta-item{}
+/* Cover */
+.cover{
+  background:#1C0500;color:#fff;
+  min-height:100vh;padding:64px 52px;
+  page-break-after:always;
+  display:flex;flex-direction:column;justify-content:space-between;
+  position:relative;overflow:hidden;
+}
+.cover-accent{
+  position:absolute;left:0;top:0;bottom:0;width:5px;
+  background:linear-gradient(180deg,#BD1D00,#E84020);
+}
+.cover-brand{font-size:9px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#9A6055;margin-bottom:52px}
+.cover-badge{
+  display:inline-block;background:#BD1D00;color:#fff;
+  font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 10px;border-radius:999px;margin-bottom:18px
+}
+.cover-title{font-size:30px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:8px}
+.cover-client{font-size:14px;color:#C07060}
+.cover-bottom{border-top:1px solid rgba(189,29,0,.25);padding-top:22px}
+.cover-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 28px;font-size:9.5px;color:#9A6055}
+.cover-meta-item b{display:block;color:#F3EEEC;font-size:10.5px;margin-bottom:2px}
 
-/* ── Body layout ── */
-.rpt-body{padding:36px 52px}
-.rpt-h1{font-size:16px;font-weight:800;color:#0a1628;margin:36px 0 14px;padding-bottom:8px;border-bottom:3px solid #0a1628;display:flex;align-items:center;gap:10px}
-.rpt-h1 .h1-num{font-size:10px;font-weight:700;background:#0a1628;color:#fff;padding:2px 8px;border-radius:3px;letter-spacing:.06em}
+/* Body */
+.rpt-body{padding:36px 48px;background:#F9F5F4;min-height:100vh}
 
-/* ── Summary cards ── */
-.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.sum-card{border:1px solid #dde3f0;border-radius:8px;padding:16px 12px;text-align:center}
-.sum-card.red{border-color:#ffcdd2;background:#fff5f5}
-.sum-card.amber{border-color:#ffe0b2;background:#fffaf5}
-.sum-card.green{border-color:#c8e6c9;background:#f5fff6}
-.sum-num{font-size:28px;font-weight:800;color:#0a1628;line-height:1}
-.sum-num.red{color:#c62828}
-.sum-num.amber{color:#e65100}
-.sum-num.green{color:#2e7d32}
-.sum-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-top:6px}
+/* Section title — matches .section-title from web */
+.rpt-h1{
+  position:relative;padding-left:16px;
+  margin:36px 0 18px;
+  font-size:0.6rem;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#9A6055;
+  display:flex;align-items:center;gap:12px;
+}
+.rpt-h1::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:4px;height:14px;
+  background:linear-gradient(180deg,#BD1D00,#E84020);border-radius:2px;
+}
+.rpt-h1 .h1-num{
+  font-size:9px;font-weight:700;
+  background:linear-gradient(135deg,#BD1D00,#8B1400);
+  color:#fff;padding:2px 9px;border-radius:999px;letter-spacing:.04em;
+}
+.rpt-h1 .h1-label{font-size:11px;font-weight:800;color:#1C0500;letter-spacing:0}
 
-/* ── Scope table ── */
-.scope-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:0}
-.scope-table td{padding:7px 12px;border:1px solid #dde3f0}
-.scope-table .sk{font-weight:700;color:#444;background:#f5f7fb;width:180px;text-transform:uppercase;font-size:9px;letter-spacing:.05em}
+/* Card — matches .stat-card / .home-card from web */
+.card{
+  background:#fff;border:1px solid rgba(189,29,0,.09);
+  border-radius:14px;padding:20px 22px;margin-bottom:14px;
+  box-shadow:0 8px 24px rgba(189,29,0,.06);
+}
 
-/* ── Section header ── */
-.rpt-section{margin-bottom:32px;padding-bottom:28px;border-bottom:1px solid #eaecf2}
-.rpt-section-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
-.rpt-section-num{font-size:9px;font-weight:700;background:#0a1628;color:#fff;padding:2px 8px;border-radius:3px;letter-spacing:.04em;white-space:nowrap}
-.rpt-section-title{font-size:13px;font-weight:700;color:#0a1628}
-.rpt-section-meta{font-size:9px;color:#999;margin-left:auto;text-align:right}
+/* Summary cards */
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.sum-card{
+  background:#fff;border:1px solid rgba(189,29,0,.10);
+  border-radius:12px;padding:16px 10px;text-align:center;
+  box-shadow:0 4px 14px rgba(189,29,0,.05);
+}
+.sum-card.red{border-color:rgba(220,38,38,.3);background:#fff5f5}
+.sum-card.amber{border-color:rgba(217,119,6,.3);background:#fffaf3}
+.sum-card.green{border-color:rgba(22,163,74,.25);background:#f5fff8}
+.sum-num{font-size:26px;font-weight:800;color:#1C0500;line-height:1}
+.sum-num.red{color:#DC2626}
+.sum-num.amber{color:#D97706}
+.sum-num.green{color:#16A34A}
+.sum-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#9A6055;margin-top:7px}
 
-/* ── Aggregated tables ── */
-.agg-table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:4px}
-.agg-table th{background:#0a1628;color:#fff;padding:6px 10px;text-align:left;font-size:9px;letter-spacing:.05em;font-weight:600}
-.agg-table td{padding:5px 10px;border-bottom:1px solid #eaecf2;vertical-align:top}
-.agg-table tr:nth-child(even) td{background:#f8f9fc}
-.src-cell{color:#888;font-size:9px}
+/* Scope table */
+.scope-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.scope-table td{padding:8px 13px;border:1px solid rgba(189,29,0,.12)}
+.scope-table .sk{font-weight:700;color:#3D1510;background:#FBF2F0;width:180px;text-transform:uppercase;font-size:9px;letter-spacing:.05em}
 
-/* ── Finding groups ── */
-.fi-group{margin-bottom:14px}
-.fi-group-hdr{font-size:10px;font-weight:700;color:#0a1628;background:#eef1f8;padding:5px 10px;border-radius:4px 4px 0 0;border:1px solid #dde3f0;border-bottom:none}
-.fi-table{width:100%;border-collapse:collapse;font-size:10px;border:1px solid #dde3f0;border-radius:0 0 4px 4px;overflow:hidden}
-.fi-table th{background:#f0f3fa;color:#333;padding:5px 10px;text-align:left;font-size:9px;letter-spacing:.04em;font-weight:700;border-bottom:1px solid #dde3f0}
-.fi-table td{padding:5px 10px;border-bottom:1px solid #eaecf2;vertical-align:top}
+/* Section block */
+.rpt-section{margin-bottom:14px}
+.rpt-section-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.rpt-section-num{
+  font-size:9px;font-weight:700;
+  background:linear-gradient(135deg,#BD1D00,#8B1400);
+  color:#fff;padding:2px 9px;border-radius:999px;letter-spacing:.04em;white-space:nowrap;
+}
+.rpt-section-title{font-size:12px;font-weight:700;color:#1C0500}
+.rpt-section-meta{font-size:9px;color:#9A6055;margin-left:auto;text-align:right}
+
+/* Aggregated tables */
+.agg-table{width:100%;border-collapse:collapse;font-size:10px;border-radius:10px;overflow:hidden}
+.agg-table th{background:#3D1510;color:#F3EEEC;padding:7px 12px;text-align:left;font-size:9px;letter-spacing:.05em;font-weight:700}
+.agg-table td{padding:6px 12px;border-bottom:1px solid rgba(189,29,0,.07);vertical-align:top;background:#fff}
+.agg-table tr:nth-child(even) td{background:#FBF2F0}
+.src-cell{color:#9A6055;font-size:9px}
+
+/* Finding groups */
+.fi-group{margin-bottom:10px;border-radius:10px;overflow:hidden;border:1px solid rgba(189,29,0,.10)}
+.fi-group-hdr{font-size:9.5px;font-weight:700;color:#3D1510;background:#FBF2F0;padding:6px 12px;border-bottom:1px solid rgba(189,29,0,.10)}
+.fi-table{width:100%;border-collapse:collapse;font-size:10px}
+.fi-table th{background:#F3EEEC;color:#3D1510;padding:5px 12px;text-align:left;font-size:9px;letter-spacing:.04em;font-weight:700;border-bottom:1px solid rgba(189,29,0,.08)}
+.fi-table td{padding:5px 12px;border-bottom:1px solid rgba(189,29,0,.05);vertical-align:top;background:#fff}
 .fi-table tr:last-child td{border-bottom:none}
-.fi-table tr:nth-child(even) td{background:#f8f9fc}
-.fi-key{font-weight:600;color:#444;background:#f5f7fb!important;width:160px;white-space:nowrap;font-size:9.5px}
+.fi-table tr:nth-child(even) td{background:#FBF2F0}
+.fi-key{font-weight:600;color:#3D1510;background:#F3EEEC!important;width:160px;white-space:nowrap;font-size:9.5px}
 .fi-list td{font-family:'Courier New',monospace;font-size:9.5px}
-.banner-cell{font-family:'Courier New',monospace;font-size:8.5px;color:#555;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner-cell{font-family:'Courier New',monospace;font-size:8.5px;color:#9A6055;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* ── CVE chips ── */
-.rpt-cve{display:inline-block;background:#fff0f0;border:1px solid #ffcdd2;color:#c62828;border-radius:3px;padding:2px 7px;font-family:monospace;font-size:9px;margin:2px}
+/* CVE chips */
+.rpt-cve{
+  display:inline-block;background:rgba(220,38,38,.08);
+  border:1px solid rgba(220,38,38,.22);color:#DC2626;
+  border-radius:999px;padding:2px 9px;
+  font-family:monospace;font-size:9px;font-weight:700;margin:2px;
+}
 
-/* ── Appendix ── */
-.rpt-appendix-note{font-size:9.5px;color:#888;font-style:italic;margin-bottom:20px;padding:8px 12px;background:#fffde7;border-left:3px solid #f9a825;border-radius:2px}
-.rpt-appendix-tool{margin-bottom:24px}
-.rpt-appendix-title{font-size:10px;font-weight:700;background:#1e3a5f;color:#fff;padding:6px 12px;border-radius:4px 4px 0 0}
-pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;font-size:8px;background:#f8f9fc;border:1px solid #dde3f0;border-top:none;border-radius:0 0 4px 4px;padding:12px;line-height:1.6;color:#222}
+/* Appendix */
+.rpt-appendix-note{font-size:9.5px;color:#9A6055;font-style:italic;margin-bottom:18px;padding:10px 14px;background:#FBF2F0;border-left:4px solid #BD1D00;border-radius:0 8px 8px 0}
+.rpt-appendix-tool{margin-bottom:22px}
+.rpt-appendix-title{font-size:9.5px;font-weight:700;background:#3D1510;color:#F3EEEC;padding:7px 14px;border-radius:8px 8px 0 0}
+pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;font-size:8px;background:#130400;color:#f0e8e5;border-radius:0 0 8px 8px;padding:14px;line-height:1.7}
 
-.dim{color:#aaa;font-style:italic;font-size:10px}
+.body-text{font-size:10.5px;color:#3D1510;line-height:1.8;margin-bottom:10px}
+.dim{color:#9A6055;font-style:italic;font-size:10px}
+
 @media print{
-  body{padding:0}
+  body{background:#F9F5F4}
   .cover{page-break-after:always;min-height:100vh}
-  .rpt-section{page-break-inside:avoid}
+  .card,.rpt-section{page-break-inside:avoid}
   pre{max-height:none}
 }
 </style>
@@ -2503,8 +2706,9 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
 
 <!-- COVER -->
 <div class="cover">
-  <div class="cover-top">
-    <div class="cover-logo">Aletheia OSINT Platform</div>
+  <div class="cover-accent"></div>
+  <div>
+    <div class="cover-brand">Aletheia OSINT Platform</div>
     <div class="cover-badge">CONFIDENCIAL</div>
     <div class="cover-title">${esc(scope.caseName || 'Informe de reconocimiento externo')}</div>
     <div class="cover-client">${esc(scope.client || 'Cliente no especificado')}</div>
@@ -2525,26 +2729,28 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
 <div class="rpt-body">
 
   <!-- 01 SCOPE -->
-  <div class="rpt-h1"><span class="h1-num">01</span> Alcance del encargo</div>
-  <table class="scope-table">
-    <tr><td class="sk">Expediente</td><td>${esc(scope.caseName||'—')}</td></tr>
-    <tr><td class="sk">Cliente</td><td>${esc(scope.client||'—')}</td></tr>
-    <tr><td class="sk">Responsable</td><td>${esc(scope.responsable||'—')}</td></tr>
-    <tr><td class="sk">Dominios aprobados</td><td>${esc((scope.domains||[]).join(', ')||'—')}</td></tr>
-    <tr><td class="sk">Rangos IP aprobados</td><td>${esc((scope.ipRanges||[]).join(', ')||'—')}</td></tr>
-    <tr><td class="sk">Modalidad</td><td>${scope.scanType === 'passive' ? 'Análisis pasivo (sin interacción directa)' : 'Análisis activo (interacción directa permitida)'}</td></tr>
-    <tr><td class="sk">Expiración</td><td>${esc(scope.expiry||'—')}</td></tr>
-    <tr><td class="sk">Fecha del análisis</td><td>${dateISO}</td></tr>
-  </table>
+  <div class="rpt-h1"><span class="h1-num">01</span><span class="h1-label">Alcance del encargo</span></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="scope-table">
+      <tr><td class="sk">Expediente</td><td>${esc(scope.caseName||'—')}</td></tr>
+      <tr><td class="sk">Cliente</td><td>${esc(scope.client||'—')}</td></tr>
+      <tr><td class="sk">Responsable</td><td>${esc(scope.responsable||'—')}</td></tr>
+      <tr><td class="sk">Dominios aprobados</td><td>${esc((scope.domains||[]).join(', ')||'—')}</td></tr>
+      <tr><td class="sk">Rangos IP aprobados</td><td>${esc((scope.ipRanges||[]).join(', ')||'—')}</td></tr>
+      <tr><td class="sk">Modalidad</td><td>${scope.scanType === 'passive' ? 'Análisis pasivo (sin interacción directa)' : 'Análisis activo (interacción directa permitida)'}</td></tr>
+      <tr><td class="sk">Expiración</td><td>${esc(scope.expiry||'—')}</td></tr>
+      <tr><td class="sk">Fecha del análisis</td><td>${dateISO}</td></tr>
+    </table>
+  </div>
 
   <!-- 02 EXECUTIVE SUMMARY -->
-  <div class="rpt-h1"><span class="h1-num">02</span> Resumen ejecutivo</div>
+  <div class="rpt-h1"><span class="h1-num">02</span><span class="h1-label">Resumen ejecutivo</span></div>
   <div class="sum-grid">
     <div class="sum-card">
       <div class="sum-num">${toolsRun}</div>
       <div class="sum-lbl">Herramientas ejecutadas</div>
     </div>
-    <div class="sum-card ${uniqHosts.length ? '' : ''}">
+    <div class="sum-card">
       <div class="sum-num">${uniqHosts.length}</div>
       <div class="sum-lbl">Subdominios / hosts</div>
     </div>
@@ -2557,20 +2763,22 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
       <div class="sum-lbl">Veredicto VirusTotal</div>
     </div>
   </div>
-  <p style="font-size:10.5px;color:#444;line-height:1.7;margin-bottom:8px">
-    En el marco del encargo <b>${esc(scope.caseName||'—')}</b> para <b>${esc(scope.client||'—')}</b>,
-    se han ejecutado <b>${toolsRun}</b> módulos de reconocimiento sobre los activos aprobados.
-    El análisis ha identificado <b>${uniqHosts.length}</b> subdominios o hosts,
-    <b>${uniqIPs.length}</b> direcciones IP y
-    <b>${uniqEmails.length}</b> correos electrónicos.
-    ${cves.length ? `Se han detectado <b style="color:#c62828">${cves.length} vulnerabilidades CVE</b> activas en el perímetro expuesto.` : 'No se han detectado CVEs activos mediante Shodan.'}
-    ${vtVerdict === 'malicious' ? `VirusTotal califica el objetivo como <b style="color:#c62828">MALICIOSO</b>.` : vtVerdict === 'suspicious' ? `VirusTotal califica el objetivo como <b style="color:#e65100">SOSPECHOSO</b>.` : ''}
-  </p>
+  <div class="card">
+    <p class="body-text">
+      En el marco del encargo <b>${esc(scope.caseName||'—')}</b> para <b>${esc(scope.client||'—')}</b>,
+      se han ejecutado <b>${toolsRun}</b> módulos de reconocimiento sobre los activos aprobados.
+      El análisis ha identificado <b>${uniqHosts.length}</b> subdominios o hosts,
+      <b>${uniqIPs.length}</b> direcciones IP y
+      <b>${uniqEmails.length}</b> correos electrónicos.
+      ${cves.length ? `Se han detectado <b style="color:#DC2626">${cves.length} vulnerabilidades CVE</b> activas en el perímetro expuesto.` : 'No se han detectado CVEs activos mediante Shodan.'}
+      ${vtVerdict === 'malicious' ? `VirusTotal califica el objetivo como <b style="color:#DC2626">MALICIOSO</b>.` : vtVerdict === 'suspicious' ? `VirusTotal califica el objetivo como <b style="color:#D97706">SOSPECHOSO</b>.` : ''}
+    </p>
+  </div>
 
   <!-- 03 CONSOLIDATED INTELLIGENCE -->
-  <div class="rpt-h1"><span class="h1-num">03</span> Inteligencia consolidada</div>
+  <div class="rpt-h1"><span class="h1-num">03</span><span class="h1-label">Inteligencia consolidada</span></div>
 
-  <div class="rpt-section">
+  <div class="card">
     <div class="rpt-section-hdr">
       <span class="rpt-section-num">3.1</span>
       <span class="rpt-section-title">Subdominios y hosts descubiertos</span>
@@ -2579,7 +2787,7 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
     ${aggTable(uniqHosts, ['Subdominio / Host', 'IP asociada', 'Fuente'])}
   </div>
 
-  <div class="rpt-section">
+  <div class="card">
     <div class="rpt-section-hdr">
       <span class="rpt-section-num">3.2</span>
       <span class="rpt-section-title">Direcciones IP identificadas</span>
@@ -2588,7 +2796,7 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
     ${aggTable(uniqIPs, ['Dirección IP', 'Fuente'])}
   </div>
 
-  <div class="rpt-section">
+  <div class="card">
     <div class="rpt-section-hdr">
       <span class="rpt-section-num">3.3</span>
       <span class="rpt-section-title">Correos electrónicos hallados</span>
@@ -2598,27 +2806,27 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
   </div>
 
   ${cves.length ? `
-  <div class="rpt-section">
+  <div class="card">
     <div class="rpt-section-hdr">
       <span class="rpt-section-num">3.4</span>
       <span class="rpt-section-title">Vulnerabilidades CVE (Shodan)</span>
-      <span class="rpt-section-meta">${cves.length} detectadas en IP ${esc(shodanData?.ip||'—')}</span>
+      <span class="rpt-section-meta">${cves.length} en IP ${esc(shodanData?.ip||'—')}</span>
     </div>
-    <p style="font-size:10px;color:#555;margin-bottom:10px">Las siguientes vulnerabilidades han sido correlacionadas por Shodan con los servicios expuestos en el perímetro. Se recomienda verificar su aplicabilidad y priorizar su remediación.</p>
+    <p class="body-text" style="margin-bottom:12px">Vulnerabilidades correlacionadas por Shodan con los servicios expuestos. Verificar aplicabilidad y priorizar remediación.</p>
     <div>${cves.map(id => `<span class="rpt-cve">${esc(id)}</span>`).join(' ')}</div>
   </div>` : ''}
 
   <!-- 04 PER-TOOL FINDINGS -->
-  <div class="rpt-h1"><span class="h1-num">04</span> Hallazgos por herramienta</div>
-  ${toolSections || '<p class="dim">No se han ejecutado herramientas en esta sesión.</p>'}
+  <div class="rpt-h1"><span class="h1-num">04</span><span class="h1-label">Hallazgos por herramienta</span></div>
+  ${toolSections || '<div class="card"><p class="dim">No se han ejecutado herramientas en esta sesión.</p></div>'}
 
   <!-- APPENDIX -->
   ${appendix ? `
-  <div class="rpt-h1"><span class="h1-num">A</span> Apéndice — Output técnico completo</div>
-  <div class="rpt-appendix-note">Esta sección contiene el output en bruto de cada herramienta. Está destinada a uso técnico de referencia, no a la lectura ejecutiva.</div>
+  <div class="rpt-h1"><span class="h1-num">A</span><span class="h1-label">Apéndice — Output técnico completo</span></div>
+  <div class="rpt-appendix-note">Esta sección contiene el output en bruto de cada herramienta. Destinada a uso técnico, no a la lectura ejecutiva.</div>
   ${appendix}` : ''}
 
-</div><!-- /rpt-body -->
+</div>
 </body>
 </html>`;
 
