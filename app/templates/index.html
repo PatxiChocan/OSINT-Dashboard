@@ -574,7 +574,7 @@
             <button class="run-btn" id="cves-refresh-btn" onclick="loadCVEs()">⟳ Actualizar</button>
           </div>
 
-          <div class="threat-toolbar">
+          <div class="news-toolbar">
             <div class="news-search-wrap">
               <span class="news-search-icon">🔍</span>
               <input type="text" id="cves-search" placeholder="Buscar CVE, producto, vendor..." oninput="onCVESearch(this.value)">
@@ -626,7 +626,7 @@
             <button class="run-btn" id="iocs-refresh-btn" onclick="loadIOCs()">⟳ Actualizar</button>
           </div>
 
-          <div class="threat-toolbar">
+          <div class="news-toolbar">
             <div class="news-search-wrap">
               <span class="news-search-icon">🔍</span>
               <input type="text" id="iocs-search" placeholder="Buscar IOC, amenaza, tag..." oninput="onIOCSearch(this.value)">
@@ -745,9 +745,10 @@
               <div class="page-title">🔭 Shodan — Inteligencia de exposición</div>
               <div class="page-desc">Servicios, banners, SSL, HTTP, CVEs y metadatos de red para cualquier IP o dominio.</div>
             </div>
+            <button class="dl-btn" id="sh-export-btn-hdr" onclick="downloadShodan()" style="display:none">⬇ Exportar PDF</button>
           </div>
 
-          <div class="exp-search-bar">
+          <div class="news-toolbar">
             <div class="news-search-wrap" style="flex:1">
               <span class="news-search-icon">🎯</span>
               <input type="text" id="sh-target-input" placeholder="Dominio o IP (ej: example.com, 8.8.8.8)" spellcheck="false"
@@ -813,9 +814,10 @@
               <div class="page-title">🦠 VirusTotal — Reputación de indicadores</div>
               <div class="page-desc">Analiza IPs, dominios, hashes de ficheros y URLs contra +70 motores antivirus.</div>
             </div>
+            <button class="dl-btn" id="vt-export-btn-hdr" onclick="downloadVT()" style="display:none">⬇ Exportar PDF</button>
           </div>
 
-          <div class="exp-search-bar">
+          <div class="news-toolbar">
             <div class="news-search-wrap" style="flex:1">
               <span class="news-search-icon">🎯</span>
               <input type="text" id="vt-target-input"
@@ -888,6 +890,7 @@
             </div>
           </div>
 
+
           <div class="br-section-tabs">
             <button class="out-tab active" id="br-tab-domain" onclick="switchBreachTab('domain',this)">🌐 Dominio</button>
             <button class="out-tab" id="br-tab-h8mail" onclick="switchBreachTab('h8mail',this)">📧 Email</button>
@@ -895,7 +898,7 @@
 
           <!-- Dominio tab: theHarvester + h8mail -->
           <div id="br-pane-domain" class="br-tab-pane">
-            <div class="exp-search-bar">
+            <div class="news-toolbar">
               <div class="news-search-wrap" style="flex:1">
                 <span class="news-search-icon">🎯</span>
                 <input type="text" id="harvest-target-input"
@@ -931,7 +934,7 @@
 
           <!-- h8mail tab -->
           <div id="br-pane-h8mail" class="br-tab-pane" style="display:none">
-            <div class="exp-search-bar">
+            <div class="news-toolbar">
               <div class="news-search-wrap" style="flex:1">
                 <span class="news-search-icon">🎯</span>
                 <input type="text" id="breaches-target-input"
@@ -1020,13 +1023,14 @@
             <div class="page-desc">Analiza webs sin visitarlas: tecnologías, IPs, capturas de pantalla y veredictos de seguridad.</div>
           </div>
 
-          <div class="sh-search-card">
-            <div class="sh-search-row">
-              <input class="sh-host-field" id="us-input" type="text" placeholder="dominio.com o URL completa" autocomplete="off" onkeydown="if(event.key==='Enter')urlscanSearch()">
-              <button class="run-btn" onclick="urlscanSearch()">🔍 Buscar</button>
-              <button class="secondary-btn" id="us-scan-btn" onclick="urlscanSubmit()" title="Requiere URLSCAN_API_KEY en .env">+ Nuevo escaneo</button>
+          <div class="news-toolbar">
+            <div class="news-search-wrap" style="flex:1">
+              <span class="news-search-icon">🔍</span>
+              <input type="text" id="us-input" placeholder="dominio.com o URL completa" autocomplete="off" spellcheck="false"
+                onkeydown="if(event.key==='Enter')urlscanSearch()">
             </div>
-            <div class="sh-hint">Busca escaneos existentes del dominio en la base de datos pública. El botón &quot;Nuevo escaneo&quot; requiere API key.</div>
+            <button class="run-btn" onclick="urlscanSearch()">🔍 Buscar</button>
+            <button class="secondary-btn" id="us-scan-btn" onclick="urlscanSubmit()" title="Requiere URLSCAN_API_KEY en .env">+ Nuevo escaneo</button>
           </div>
 
           <div id="us-status" style="display:none" class="news-loading-state">

@@ -401,7 +401,15 @@ textarea {
 /* Generic */
 
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 22px;
+}
+.page-header > div:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .page-header-home {
@@ -2698,7 +2706,7 @@ textarea {
   opacity: 0.6;
 }
 
-#news-search {
+.news-search-wrap input {
   border: none;
   background: none;
   outline: none;
@@ -2708,7 +2716,7 @@ textarea {
   width: 100%;
 }
 
-#news-search::placeholder {
+.news-search-wrap input::placeholder {
   color: var(--text3);
 }
 
