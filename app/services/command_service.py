@@ -43,11 +43,20 @@ ALLOWED_BINARIES = {
     # Reconocimiento de subdominios
     "subfinder",
     "dnsx",
+    "dnsx-probe.sh",
     # Web recon
     "photon",
     "finalrecon",
+    "httpx-probe.sh",
+    "httpx-toolkit",
     # Infraestructura / APIs
     "shodan",
+    # URL discovery
+    "gau",
+    "waybackurls",
+    "waybackurls-probe.sh",
+    # Vulnerability scanning
+    "nuclei",
 }
 
 BINARY_PATHS = {
@@ -76,15 +85,24 @@ BINARY_PATHS = {
     "holehe": "/home/kali/Aletheia-Dashboard/venv/bin/holehe",
     "blackbird": "/home/kali/Aletheia-Dashboard/venv/bin/blackbird",
     "subfinder": "/usr/bin/subfinder",
-    "dnsx": "/home/kali/go/bin/dnsx",
+    "dnsx": "/usr/bin/dnsx",
+    "dnsx-probe.sh": "/home/kali/Aletheia-Dashboard/dnsx-probe.sh",
     # Identidad
     "usufy":    "/home/kali/Aletheia-Dashboard/venv/bin/usufy",
     "searchfy": "/home/kali/Aletheia-Dashboard/venv/bin/searchfy",
     # Web recon
     "photon":    "/home/kali/Aletheia-Dashboard/venv/bin/photon",
     "finalrecon":"/home/kali/Aletheia-Dashboard/venv/bin/finalrecon",
+    "httpx-probe.sh": "/home/kali/Aletheia-Dashboard/httpx-probe.sh",
+    "httpx-toolkit":  "/usr/bin/httpx-toolkit",
     # Infraestructura
     "shodan":   "/home/kali/Aletheia-Dashboard/venv/bin/shodan",
+    # URL discovery
+    "gau":         "/home/kali/go/bin/gau",
+    "waybackurls": "/home/kali/go/bin/waybackurls",
+    "waybackurls-probe.sh": "/home/kali/Aletheia-Dashboard/waybackurls-probe.sh",
+    # Vulnerability scanning
+    "nuclei": "/usr/bin/nuclei",
 }
 
 MAX_PROCESSES = 4
@@ -97,6 +115,13 @@ TOOL_TIMEOUTS = {
     "wayback_machine_downloader": 120,
     "photon": 300,
     "finalrecon": 300,
+    "nikto": 600,
+    "maigret": 600,
+    "sherlock": 300,
+    "sslyze": 180,
+    "subfinder": 300,
+    "nuclei": 600,
+    "gau": 300,
     "default": DEFAULT_COMMAND_TIMEOUT,
 }
 
@@ -191,6 +216,16 @@ def _detect_tool(parts):
         "dnsrecon": "dnsrecon",
         "nmap": "nmap",
         "wayback_machine_downloader": "wayback_machine_downloader",
+        "nikto": "nikto",
+        "maigret": "maigret",
+        "sherlock": "sherlock",
+        "sslyze": "sslyze",
+        "subfinder": "subfinder",
+        "katana": "katana",
+        "photon": "photon",
+        "finalrecon": "finalrecon",
+        "nuclei": "nuclei",
+        "gau": "gau",
     }
 
     return aliases.get(tool)

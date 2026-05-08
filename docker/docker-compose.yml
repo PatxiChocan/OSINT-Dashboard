@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+
+  # ── OpenLDAP ────────────────────────────────────────────────────────────────
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: aletheia-ldap
+    restart: unless-stopped
+    environment:
+      LDAP_ORGANISATION: "Aletheia"
+      LDAP_DOMAIN: "aletheia.local"
+      LDAP_ADMIN_PASSWORD: "admin1234"
+      LDAP_CONFIG_PASSWORD: "config1234"
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: "readonly"
+      LDAP_READONLY_USER_PASSWORD: "readonly1234"
+    ports:
+      - "389:389"
+      - "636:636"
+    volumes:
+      - ldap_data:/var/lib/ldap
+      - ldap_config:/etc/ldap/slapd.d
+
+  # ── phpLDAPadmin (interfaz web para gestionar LDAP) ─────────────────────────
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    container_name: aletheia-ldapadmin
+    restart: unless-stopped
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8090:80"
+    depends_on:
+      - openldap
+
+  # ── Keycloak ────────────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: aletheia-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://172.17.0.1:5432/aletheia_db
+      KC_DB_USERNAME: aletheia
+      KC_DB_PASSWORD: aletheia
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8080
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin1234
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  ldap_data:
+  ldap_config:

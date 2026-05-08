@@ -29,9 +29,6 @@ def run():
         )
 
     def generate():
-        yield f"data: {json.dumps({'type': 'start', 'message': 'Ejecutando comando...', 'request_id': request_id})}\n\n"
-
-        # Evento inicial extra para forzar arranque del stream en proxies/buffers
         yield f"data: {json.dumps({'type': 'heartbeat', 'message': 'stream-open', 'request_id': request_id})}\n\n"
 
         for item in run_command(cmd, request_id=request_id):

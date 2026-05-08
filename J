@@ -1,0 +1,90 @@
+# Nmap 7.98 scan initiated Thu May  7 04:42:50 2026 as: /usr/lib/nmap/nmap --privileged -sC -sV -T3 -oJ montejurra.com /tmp/aletheia/bf99a084-9406-4f50-aa42-812350a8c6af.json
+Unable to split netmask from target expression: "/tmp/aletheia/bf99a084-9406-4f50-aa42-812350a8c6af.jsNmapNmap scan report for montejurra.com (82.98.160.149)
+Host is up (0.030s latency).
+rDNS record for 82.98.160.149: d505.dinaserver.com
+Not shown: 989 filtered tcp ports (no-response)
+PORT     STATE SERVICE  VERSION
+21/tcp   open  ftp      vsftpd 2.0.8 or later
+| ssl-cert: Subject: commonName=*.espacioseguro.com
+| Subject Alternative Name: DNS:*.espacioseguro.com, DNS:espacioseguro.com
+| Not valid before: 2025-12-22T09:40:10
+|_Not valid after:  2027-01-23T09:40:09
+|_ssl-date: TLS randomness does not represent time
+22/tcp   open  ssh      OpenSSH 8.4p1 Debian 5+deb11u6 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 32:07:6e:c5:7b:38:b5:4b:14:59:d4:60:d2:2c:22:3d (RSA)
+|   256 5f:e3:22:b3:00:ba:a0:48:e2:78:e1:4f:92:75:00:c2 (ECDSA)
+|_  256 35:0a:ad:ec:4e:d4:b7:ff:70:bd:e0:7b:5d:fe:c1:3c (ED25519)
+80/tcp   open  http     nginx
+|_http-server-header: HTTPd
+|_http-title: montejurra.com
+110/tcp  open  pop3     Dovecot pop3d
+|_pop3-capabilities: AUTH-RESP-CODE TOP UIDL SASL(PLAIN LOGIN) CAPA PIPELINING RESP-CODES USER STLS
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+143/tcp  open  imap     Dovecot imapd
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+|_imap-capabilities: have capabilities LOGIN-REFERRALS AUTH=PLAIN ENABLE OK STARTTLS listed ID AUTH=LOGINA0001 IMAP4rev1 SASL-IR post-login LITERAL+ IDLE Pre-login more
+443/tcp  open  ssl/http nginx
+| ssl-cert: Subject: commonName=montejurra.com
+| Subject Alternative Name: DNS:montejurra.com, DNS:www.montejurra.com
+| Not valid before: 2026-05-02T07:46:51
+|_Not valid after:  2026-07-31T07:46:50
+|_ssl-date: TLS randomness does not represent time
+| tls-alpn: 
+|   h2
+|_  http/1.1
+|_http-server-header: HTTPd
+|_http-title: montejurra.com
+| tls-nextprotoneg: 
+|   h2
+|_  http/1.1
+465/tcp  open  ssl/smtp Postfix smtpd
+|_smtp-commands: d505.dinaserver.com, PIPELINING, SIZE 31457280, ETRN, AUTH PLAIN LOGIN, AUTH=PLAIN LOGIN, ENHANCEDSTATUSCODES, 8BITMIME, DSN, CHUNKING
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+|_ssl-date: TLS randomness does not represent time
+587/tcp  open  smtp     Postfix smtpd
+|_ssl-date: TLS randomness does not represent time
+|_smtp-commands: d505.dinaserver.com, PIPELINING, SIZE 31457280, ETRN, STARTTLS, AUTH PLAIN LOGIN, AUTH=PLAIN LOGIN, ENHANCEDSTATUSCODES, 8BITMIME, DSN, CHUNKING
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+993/tcp  open  ssl/imap Dovecot imapd
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+|_imap-capabilities: have capabilities IDLE post-login IMAP4rev1 LOGIN-REFERRALS AUTH=PLAIN ENABLE SASL-IR Pre-login OK AUTH=LOGINA0001 listed ID LITERAL+ more
+995/tcp  open  ssl/pop3 Dovecot pop3d
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=*.correoseguro.dinaserver.com
+| Subject Alternative Name: DNS:*.correoseguro.dinaserver.com, DNS:correoseguro.dinaserver.com
+| Not valid before: 2025-08-11T11:25:08
+|_Not valid after:  2026-09-12T11:25:07
+|_pop3-capabilities: RESP-CODES AUTH-RESP-CODE USER UIDL TOP CAPA PIPELINING SASL(PLAIN LOGIN)
+3306/tcp open  mysql    MariaDB 5.5.5-10.11.16
+| mysql-info: 
+|   Protocol: 10
+|   Version: 5.5.5-10.11.16-MariaDB-deb11-log
+|   Thread ID: 595660
+|   Capabilities flags: 63486
+|   Some Capabilities: Support41Auth, Speaks41ProtocolOld, ConnectWithDatabase, Speaks41ProtocolNew, SupportsLoadDataLocal, ODBCClient, IgnoreSpaceBeforeParenthesis, IgnoreSigpipes, InteractiveClient, DontAllowDatabaseTableColumn, SupportsTransactions, FoundRows, SupportsCompression, LongColumnFlag, SupportsAuthPlugins, SupportsMultipleStatments, SupportsMultipleResults
+|   Status: Autocommit
+|   Salt: kf@I0R-(}bT^Y%H}]:G9
+|_  Auth Plugin Name: mysql_native_password
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Thu May  7 04:43:37 2026 -- 1 IP address (1 host up) scanned in 47.07 seconds

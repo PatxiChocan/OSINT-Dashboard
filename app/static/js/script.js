@@ -60,15 +60,27 @@ const TOOL_COLORS = {
   subfinder:  { bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' },
   webrecon:   { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' },
   shodancli:  { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' },
+  nuclei:     { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+  urls:       { bg: '#f7fee7', color: '#3f6212', border: '#d9f99d' },
 };
+
+// Extracts apex domain from a subdomain. IPs/CIDRs returned as-is.
+function _apexDomain(t) {
+  if (/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/.test(t)) return t;
+  const parts = t.split('.');
+  if (parts.length <= 2) return t;
+  const twoPartTLDs = ['co.uk','com.au','co.nz','co.jp','com.br','com.mx','com.ar','co.es','org.uk','net.au'];
+  if (twoPartTLDs.includes(parts.slice(-2).join('.'))) return parts.slice(-3).join('.');
+  return parts.slice(-2).join('.');
+}
 
 const SUBTOOLS = {
   discover: [
-    { name: 'theHarvester', func: 'Emails, subdominios, IPs desde APIs OSINT', alert: 'none', cmd: t => `script -q -c "theHarvester -d ${t} -b baidu,certspotter,crtsh,duckduckgo,hackertarget,urlscan" /dev/null` },
-    { name: 'DNSRecon', func: 'Registros DNS: A, AAAA, MX, NS, TXT, SOA', alert: 'low', cmd: t => `dnsrecon -d ${t}` },
-    { name: 'WHOIS', func: 'Propietario, fechas y nameservers', alert: 'none', cmd: t => `whois ${t}` },
+    { name: 'theHarvester', func: 'Emails, subdominios, IPs desde APIs OSINT', alert: 'none', apexOnly: true, cmd: t => `script -q -c "theHarvester -d ${t} -b baidu,certspotter,crtsh,duckduckgo,hackertarget,urlscan" /dev/null` },
+    { name: 'DNSRecon', func: 'Registros DNS: A, AAAA, MX, NS, TXT, SOA', alert: 'low', apexOnly: true, cmd: t => `dnsrecon -d ${t}` },
+    { name: 'WHOIS', func: 'Propietario, fechas y nameservers', alert: 'none', apexOnly: true, cmd: t => `whois ${t}` },
     { name: 'WafW00f', func: 'Detecta y fingerprinta WAFs', alert: 'med', cmd: t => `wafw00f https://${t}` },
-    { name: 'WhatWeb', func: 'CMS, frameworks y versiones del servidor', alert: 'low', cmd: t => `timeout 20 whatweb --no-errors ${t}` },
+    { name: 'WhatWeb', func: 'CMS, frameworks y versiones del servidor', alert: 'low', cmd: t => `timeout 45 whatweb --no-errors --open-timeout=10 --read-timeout=20 ${t}` },
     { name: 'Traceroute', func: 'Ruta de red hasta el objetivo', alert: 'low', cmd: t => `traceroute ${t}` },
     { name: 'Nmap top1000', func: 'SYN scan de los 1000 puertos más comunes', alert: 'high', cmd: t => `nmap -sS -T3 ${t}` },
     { name: 'Nmap + versiones', func: 'Detección de servicios y versiones', alert: 'high', cmd: t => `nmap -sV -T3 ${t}` },
@@ -78,13 +90,15 @@ const SUBTOOLS = {
     { name: 'ike-scan', func: 'Gateways VPN IPsec', alert: 'med', cmd: t => `ike-scan ${t}` },
     { name: 'Nikto', func: '5000+ peticiones buscando configs inseguros', alert: 'high', cmd: t => `nikto -h ${t}` },
     { name: 'sslscan', func: 'Versiones TLS, cipher suites y certificados', alert: 'med', cmd: t => `sslscan ${t}` },
-    { name: 'sslyze', func: 'Análisis profundo TLS: ROBOT, Heartbleed', alert: 'med', cmd: t => `sslyze ${t}` }
+    { name: 'sslyze', func: 'Análisis profundo TLS: ROBOT, Heartbleed', alert: 'med', cmd: t => `sslyze ${t}` },
+    { name: 'httpx — probe', func: 'Estado HTTP, título, servidor y tecnologías detectadas', alert: 'low', cmd: t => `/home/kali/Aletheia-Dashboard/httpx-probe.sh https://${t} -sc -title -web-server -tech-detect -ip -silent -nc` },
+    { name: 'dnsx — registros', func: 'Consulta A, AAAA, MX, NS, TXT, CNAME con respuesta', alert: 'none', apexOnly: true, cmd: t => `/home/kali/Aletheia-Dashboard/dnsx-probe.sh ${t} -a -aaaa -mx -ns -txt -cname -resp -silent` },
   ],
   amass: [
-    { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', cmd: t => `amass intel -whois -d ${t}` },
-    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', cmd: t => `amass enum -passive -d ${t}` },
-    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', cmd: t => `amass enum -active -d ${t}` },
-    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t}` }
+    { name: 'intel', func: 'Dominios por WHOIS inverso y ASNs', alert: 'none', apexOnly: true, cmd: t => `amass intel -whois -d ${t}` },
+    { name: 'enum -passive', func: 'Subdominios solo con fuentes OSINT', alert: 'none', apexOnly: true, cmd: t => `amass enum -passive -d ${t}` },
+    { name: 'enum -active', func: 'Valida subdominios con DNS activo', alert: 'low', apexOnly: true, cmd: t => `amass enum -active -d ${t}` },
+    { name: 'enum -brute', func: 'Fuerza bruta DNS con resolvers públicos', alert: 'med', apexOnly: true, cmd: t => `amass enum -brute -r 8.8.8.8,1.1.1.1 -d ${t}` }
   ],
   katana: [
     { name: 'Estático', func: 'Rastrea HTML sin JS', alert: 'low', cmd: t => `katana -u https://${t} -rl 20 -silent` },
@@ -116,11 +130,11 @@ const SUBTOOLS = {
     { name: 'searchfy (OSRFramework)', func: 'Busca el término en buscadores y redes sociales', alert: 'none', cmd: t => `searchfy -q "${t}"` }
   ],
   subfinder: [
-    { name: 'Pasivo básico', func: 'Descubrimiento de subdominios solo con fuentes OSINT', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -silent` },
-    { name: 'Todas las fuentes', func: 'Usa todas las fuentes disponibles incluyendo APIs', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent` },
-    { name: 'Recursivo', func: 'Enumera subdominios de subdominios (más profundo)', alert: 'low', inputType: 'domain', cmd: t => `subfinder -d ${t} -recursive -silent` },
-    { name: 'Con timeout extendido', func: 'Búsqueda con 60s de timeout por fuente', alert: 'low', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent -timeout 60` },
-    { name: 'Exportar a fichero', func: 'Guarda resultados en /tmp/aletheia/subfinder_dominio.txt', alert: 'none', inputType: 'domain', cmd: t => `subfinder -d ${t} -all -silent -o /tmp/aletheia/subfinder_${t}.txt` }
+    { name: 'Pasivo básico', func: 'Descubrimiento de subdominios solo con fuentes OSINT', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `subfinder -d ${t} -silent` },
+    { name: 'Todas las fuentes', func: 'Usa todas las fuentes disponibles incluyendo APIs', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `subfinder -d ${t} -all -silent` },
+    { name: 'Recursivo', func: 'Enumera subdominios de subdominios (más profundo)', alert: 'low', inputType: 'domain', apexOnly: true, cmd: t => `subfinder -d ${t} -recursive -silent` },
+    { name: 'Con timeout extendido', func: 'Búsqueda con 60s de timeout por fuente', alert: 'low', inputType: 'domain', apexOnly: true, cmd: t => `subfinder -d ${t} -all -silent -timeout 60` },
+    { name: 'Exportar a fichero', func: 'Guarda resultados en /tmp/aletheia/subfinder_dominio.txt', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `subfinder -d ${t} -all -silent -o /tmp/aletheia/subfinder_${t}.txt` }
   ],
   webrecon: [
     { name: 'Photon — rastreo básico', func: 'Extrae URLs, emails y archivos de un sitio web', alert: 'low', inputType: 'domain', cmd: t => `photon -u https://${t} -t 5 -o /tmp/aletheia/photon_${t.replace(/[\/:.]/g,'_')}` },
@@ -132,14 +146,27 @@ const SUBTOOLS = {
   ],
   shodancli: [
     { name: 'Host info', func: 'Puertos, servicios y vulnerabilidades conocidas de una IP', alert: 'none', inputType: 'ip', cmd: t => `shodan host ${t}` },
-    { name: 'Domain info', func: 'IPs, subdominios y historial asociados al dominio', alert: 'none', inputType: 'domain', cmd: t => `shodan domain ${t}` },
-    { name: 'Search hostname', func: 'Busca todos los activos del dominio en el índice de Shodan', alert: 'none', inputType: 'domain', cmd: t => `shodan search --fields ip_str,port,org,hostnames "hostname:${t}"` },
+    { name: 'Domain info', func: 'IPs, subdominios y historial asociados al dominio', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `shodan domain ${t}` },
+    { name: 'Search hostname', func: 'Busca todos los activos del dominio en el índice de Shodan', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `shodan search --fields ip_str,port,org,hostnames "hostname:${t}"` },
     { name: 'Search org', func: 'Activos públicos de la organización en Shodan', alert: 'none', cmd: t => `shodan search --fields ip_str,port,org "org:${t}"` },
-    { name: 'Count activos', func: 'Número total de activos indexados sin gastar créditos', alert: 'none', inputType: 'domain', cmd: t => `shodan count "hostname:${t}"` }
+    { name: 'Count activos', func: 'Número total de activos indexados sin gastar créditos', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `shodan count "hostname:${t}"` }
+  ],
+  nuclei: [
+    { name: 'Severidad media+', func: 'Detecta vulns medium, high y critical con templates por defecto', alert: 'high', cmd: t => `nuclei -u https://${t} -severity medium,high,critical -silent` },
+    { name: 'CVEs conocidos', func: 'Solo templates de CVEs catalogados', alert: 'high', cmd: t => `nuclei -u https://${t} -tags cve -severity medium,high,critical -silent` },
+    { name: 'Misconfigs + exposures', func: 'Configuraciones inseguras y archivos expuestos', alert: 'med', cmd: t => `nuclei -u https://${t} -tags misconfigs,exposures -silent` },
+    { name: 'Tech detect', func: 'Fingerprinting de tecnologías y versiones', alert: 'none', cmd: t => `nuclei -u https://${t} -tags tech -silent` },
+    { name: 'Escaneo completo', func: 'Todos los templates: info, low, medium, high, critical', alert: 'high', cmd: t => `nuclei -u https://${t} -severity info,low,medium,high,critical -silent` },
+  ],
+  urls: [
+    { name: 'gau — todas las fuentes', func: 'URLs históricas desde Wayback, CommonCrawl, OTX y URLScan', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `gau ${t} --threads 5 --subs` },
+    { name: 'gau — Wayback + OTX', func: 'Solo fuentes Wayback Machine y AlienVault OTX', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `gau ${t} --threads 5 --providers wayback,otx` },
+    { name: 'gau — desde 2020', func: 'URLs archivadas a partir de enero 2020', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `gau ${t} --threads 5 --from 202001` },
+    { name: 'waybackurls', func: 'URLs desde Wayback Machine (tomnomnom)', alert: 'none', inputType: 'domain', apexOnly: true, cmd: t => `/home/kali/Aletheia-Dashboard/waybackurls-probe.sh ${t}` },
   ],
 };
 
-const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli'];
+const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli', 'nuclei', 'urls'];
 
 const toolMeta = {
   discover: {
@@ -185,6 +212,16 @@ const toolMeta = {
   shodancli: {
     title: '📡 Shodan CLI',
     desc: 'Consultas directas a Shodan desde terminal: hosts, dominios, búsquedas y conteos.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  nuclei: {
+    title: '☢ Nuclei',
+    desc: 'Scanner de vulnerabilidades basado en templates: CVEs, misconfigs, exposures y tech-detect.',
+    tags: '<span class="tag tag-mit">MIT</span>'
+  },
+  urls: {
+    title: '🔗 URL Discovery',
+    desc: 'Recopila URLs históricas y archivadas desde Wayback Machine, CommonCrawl, OTX y URLScan.',
     tags: '<span class="tag tag-mit">MIT</span>'
   },
 };
@@ -375,7 +412,7 @@ function buildToolPanels() {
 
 function buildParallelGrid() {
   const parallelGrid = $('parallel-subtool-grid');
-  if (!parallelGrid) return;
+  if (!parallelGrid || parallelGrid.hasChildNodes()) return;
 
   toolList.forEach(tool => {
     const color = TOOL_COLORS[tool];
@@ -747,6 +784,18 @@ function parseOutput(tool, lines) {
     if (groups.length) return groups;
   }
 
+  // ── Subfinder ────────────────────────────────────────────────────────────
+  if (tool === 'subfinder') {
+    const domRe = /^[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,}$/;
+    const subs = [...new Set(
+      lines.map(l => l.trim()).filter(l => domRe.test(l) && !l.includes(' '))
+    )].sort();
+    if (subs.length) {
+      groups.push({ title: `Subdominios (${subs.length})`, icon: '🌐', type: 'host', items: subs });
+      return groups;
+    }
+  }
+
   // ── Katana ───────────────────────────────────────────────────────────────
   if (tool === 'katana') {
     const urls = [...new Set(lines.flatMap(l => l.match(/https?:\/\/[^\s]+/g) || []))];
@@ -798,6 +847,218 @@ function parseOutput(tool, lines) {
     if (sitesFound.length) {
       groups.push({ title: `Perfiles encontrados (${sitesFound.length})${total}`, icon: '🐦', type: 'url', items: sitesFound });
     }
+    if (groups.length) return groups;
+  }
+
+  // ── WafW00f ───────────────────────────────────────────────────────────────
+  const isWafw00f = /WAFW00F|Checking https?:\/\/|No WAF detected|is behind .+ WAF|The site .+ is behind/i.test(joined);
+  if (isWafw00f && tool === 'discover') {
+    const wafLines = lines.filter(l => /\[\+\].*(?:WAF|Generic Detection|behind)/i.test(l) || /No WAF detected/i.test(l));
+    const wafItems = wafLines.map(l => l.replace(/\[\+\]\s*|\[\-\]\s*/g, '').trim()).filter(Boolean);
+    if (!wafItems.length) wafItems.push(lines.find(l => /No WAF detected/i.test(l)) ? 'No WAF detectado' : 'Resultado no determinado');
+    groups.push({ title: 'Detección WAF', icon: '🛡️', type: 'generic', items: wafItems });
+    const wafIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (wafIps.length) groups.push({ title: 'IPs detectadas', icon: '📡', type: 'ip', items: wafIps });
+    return groups;
+  }
+
+  // ── sslscan ───────────────────────────────────────────────────────────────
+  const isSslscan = /Testing SSL server|SSLv2\s+(enabled|disabled)|TLSv1\.\d\s+(enabled|disabled)|Heartbleed/i.test(joined);
+  if (isSslscan && tool === 'discover') {
+    const protocols = [];
+    lines.forEach(l => {
+      const m = l.match(/(SSLv\d|TLSv\d(?:\.\d)?)\s+(enabled|disabled)/i);
+      if (m) protocols.push(`${m[1]}: ${m[2]}`);
+    });
+    if (protocols.length) groups.push({ title: 'Protocolos SSL/TLS', icon: '🔐', type: 'generic', items: protocols });
+    const certLines = lines.filter(l => /^\s*(Subject|Issuer|Not valid|Signature Algorithm|Altnames)/i.test(l)).map(l => l.trim());
+    if (certLines.length) groups.push({ title: 'Certificado', icon: '📜', type: 'generic', items: certLines });
+    const vulnLines = lines.filter(l => /vulnerable|heartbleed|POODLE|ROBOT|DROWN|BREACH/i.test(l)).map(l => l.trim());
+    if (vulnLines.length) groups.push({ title: 'Vulnerabilidades TLS', icon: '⚠️', type: 'generic', items: vulnLines });
+    const sslIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (sslIps.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: sslIps });
+    if (groups.length) return groups;
+  }
+
+  // ── sslyze ────────────────────────────────────────────────────────────────
+  const isSslyze = /sslyze|CHECKING HOST|SSL 2\.0 Cipher|TLS 1\.[0-9] Cipher|Certificate Information/i.test(joined);
+  if (isSslyze && tool === 'discover') {
+    const tlsEnabled = [...new Set(lines.filter(l => /TLS \d\.\d Cipher suites/i.test(l)).map(l => {
+      const m = l.match(/TLS (\d\.\d)/i); return m ? `TLS ${m[1]}: soportado` : null;
+    }).filter(Boolean))];
+    const tlsDisabled = lines.filter(l => /SSL 2\.0|SSL 3\.0/.test(l) && /rejected|not support/i.test(joined)).map(l => l.trim());
+    if (tlsEnabled.length) groups.push({ title: 'Protocolos TLS soportados', icon: '🔐', type: 'generic', items: tlsEnabled });
+    const vulns = lines.filter(l => /VULNERABLE|Heartbleed|ROBOT|FALLBACK/i.test(l)).map(l => l.trim().replace(/^\*\s*/, ''));
+    if (vulns.length) groups.push({ title: 'Vulnerabilidades', icon: '⚠️', type: 'generic', items: vulns });
+    const certInfo = lines.filter(l => /Subject:|Issuer:|Not Before|Not After|SHA-|Signature/i.test(l)).map(l => l.trim().replace(/^\s*/, ''));
+    if (certInfo.length) groups.push({ title: 'Certificado', icon: '📜', type: 'generic', items: certInfo });
+    if (groups.length) return groups;
+  }
+
+  // ── Nikto ─────────────────────────────────────────────────────────────────
+  const isNikto = /Nikto v\d|Target IP:|Target Hostname:|OSVDB-\d|requests: \d/i.test(joined);
+  if (isNikto && tool === 'discover') {
+    const findings = lines.filter(l => /^\+ /.test(l) && !/^\+ (Target IP|Target Hostname|Target Port|End Time|Start Time|Server:)/i.test(l)).map(l => l.replace(/^\+\s*/, '').trim());
+    const server = lines.find(l => /^\+ Server:/i.test(l));
+    const targetIp = lines.find(l => /^\+ Target IP:/i.test(l));
+    const info = [];
+    if (targetIp) info.push(targetIp.replace(/^\+\s*/, '').trim());
+    if (server) info.push(server.replace(/^\+\s*/, '').trim());
+    if (info.length) groups.push({ title: 'Objetivo', icon: '🎯', type: 'generic', items: info });
+    if (findings.length) groups.push({ title: `Hallazgos (${findings.length})`, icon: '⚠️', type: 'generic', items: findings });
+    const niktoIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (niktoIps.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: niktoIps });
+    if (groups.length) return groups;
+  }
+
+  // ── Holehe ────────────────────────────────────────────────────────────────
+  const isHolehe = tool === 'identidad' && /websites checked|Email used|holehe/i.test(joined);
+  if (isHolehe) {
+    const registered = lines.filter(l => /^\[\+\]\s+\S/.test(l) && !/Email used|Email not used|Rate limit/i.test(l)).map(l => {
+      const m = l.match(/^\[\+\]\s+(.+)/); return m ? m[1].trim() : null;
+    }).filter(Boolean);
+    if (registered.length) groups.push({ title: `Servicios con cuenta registrada (${registered.length})`, icon: '📧', type: 'generic', items: registered });
+    if (groups.length) return groups;
+  }
+
+  // ── Maigret ───────────────────────────────────────────────────────────────
+  const isMaigret = tool === 'identidad' && /Maigret database|Starting a search|Checking username .+ on:/i.test(joined);
+  if (isMaigret) {
+    const found = [];
+    lines.forEach(l => {
+      const m = l.match(/\[\+\]\s+([^:]+):\s+(https?:\/\/\S+)/);
+      if (m) found.push(`${m[1].trim()}: ${m[2].trim()}`);
+    });
+    if (found.length) groups.push({ title: `Perfiles encontrados (${found.length})`, icon: '🔍', type: 'url', items: found });
+    if (groups.length) return groups;
+  }
+
+  // ── usufy / searchfy (OSRFramework) ──────────────────────────────────────
+  const isOSRF = tool === 'identidad' && /i3visio|OSRFramework|platform.*url|query.*results/i.test(joined);
+  if (isOSRF) {
+    const urlItems = [...new Set(lines.flatMap(l => l.match(/https?:\/\/\S+/g) || []))];
+    if (urlItems.length) groups.push({ title: `Perfiles / resultados (${urlItems.length})`, icon: '🔗', type: 'url', items: urlItems });
+    if (groups.length) return groups;
+  }
+
+  // ── Shodan CLI ────────────────────────────────────────────────────────────
+  if (tool === 'shodancli') {
+    // shodan count → single number output
+    const nonEmpty = lines.map(l => l.trim()).filter(Boolean);
+    if (nonEmpty.length <= 3 && /^\d+$/.test(nonEmpty[0])) {
+      groups.push({ title: 'Total activos indexados en Shodan', icon: '🔢', type: 'generic', items: [nonEmpty[0]] });
+      return groups;
+    }
+    const shodanIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    const shodanPorts = [...new Set(lines.flatMap(l => l.match(/\b\d{2,5}\/(?:tcp|udp)\b/g) || []))];
+    const shodanHosts = [...new Set(lines.filter(l => /Hostnames?:/i.test(l)).flatMap(l => {
+      const m = l.match(/Hostnames?:\s*(.+)/i); return m ? m[1].split(',').map(h => h.trim()) : [];
+    }).filter(Boolean))];
+    const shodanCves = [...new Set(lines.flatMap(l => l.match(/CVE-\d{4}-\d+/g) || []))];
+    const shodanInfo = lines.filter(l => /^(Country|Organization|ISP|OS|City|ASN):/i.test(l.trim())).map(l => l.trim());
+    if (shodanInfo.length) groups.push({ title: 'Información del host', icon: '🏢', type: 'generic', items: shodanInfo });
+    if (shodanIps.length) groups.push({ title: `IPs (${shodanIps.length})`, icon: '📡', type: 'ip', items: shodanIps });
+    if (shodanPorts.length) groups.push({ title: `Puertos (${shodanPorts.length})`, icon: '🔌', type: 'port-open', items: shodanPorts });
+    if (shodanHosts.length) groups.push({ title: `Hostnames (${shodanHosts.length})`, icon: '🌐', type: 'host', items: shodanHosts });
+    if (shodanCves.length) groups.push({ title: `CVEs (${shodanCves.length})`, icon: '⚠️', type: 'generic', items: shodanCves });
+    // shodan search tabular output: ip_str,port,org,...
+    const tabRows = lines.filter(l => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\s+\d+/.test(l.trim())).map(l => l.trim());
+    if (tabRows.length && !shodanIps.length) groups.push({ title: `Resultados (${tabRows.length})`, icon: '📋', type: 'generic', items: tabRows });
+    if (groups.length) return groups;
+  }
+
+  // ── FinalRecon ────────────────────────────────────────────────────────────
+  if (tool === 'webrecon' && /FinalRecon|Banner Grab|SSL Info|DNS Enum|Subdomain Enum/i.test(joined)) {
+    const freDomRe = /^[a-zA-Z0-9][a-zA-Z0-9.\-]*\.[a-zA-Z]{2,}$/;
+    const freIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    const freSubs = [...new Set(lines.flatMap(l => l.match(/\b[a-zA-Z0-9][\w.\-]*\.[a-zA-Z]{2,}\b/g) || []).filter(h => freDomRe.test(h)))];
+    const freHeaders = lines.filter(l => /^(Server|X-|Content-|Strict-|Access-Control|Set-Cookie)/i.test(l.trim())).map(l => l.trim());
+    const freInfo = lines.filter(l => /^\[.+\]/.test(l.trim()) && l.length < 120).map(l => l.trim());
+    if (freIps.length) groups.push({ title: `IPs (${freIps.length})`, icon: '📡', type: 'ip', items: freIps });
+    if (freSubs.length) groups.push({ title: `Dominios / Subdominios (${freSubs.length})`, icon: '🌐', type: 'host', items: freSubs });
+    if (freHeaders.length) groups.push({ title: 'Cabeceras HTTP', icon: '📋', type: 'generic', items: freHeaders });
+    if (freInfo.length) groups.push({ title: 'Información recopilada', icon: '📰', type: 'generic', items: freInfo.slice(0, 30) });
+    if (groups.length) return groups;
+  }
+
+  // ── httpx (discover) ─────────────────────────────────────────────────────
+  // Output: https://domain.com [STATUS] [TITLE] [SERVER] [TECH] [IP]
+  const isHttpx = tool === 'discover' && lines.some(l => /^https?:\/\/\S+\s+\[\d{3}\]/.test(l));
+  if (isHttpx) {
+    const httpxLines = lines.filter(l => /^https?:\/\/\S+\s+\[\d{3}\]/.test(l));
+    const hosts = [], techs = new Set(), ips = new Set();
+    httpxLines.forEach(l => {
+      const urlM = l.match(/^(https?:\/\/\S+)/);
+      const codeM = l.match(/\[(\d{3})\]/);
+      const titleM = l.match(/\[(\d{3})\][^\[]*\[([^\]]+)\]/);
+      const ipM = l.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+      const techMs = [...l.matchAll(/\[([A-Za-z][^\]]{1,40})\]/g)].slice(2).map(m => m[1]);
+      if (urlM && codeM) {
+        const title = titleM ? titleM[2] : '';
+        hosts.push(`${urlM[1]} [${codeM[1]}]${title ? ' — ' + title : ''}`);
+      }
+      if (ipM) ips.add(ipM[1]);
+      techMs.forEach(t => { if (!/^\d+$/.test(t)) techs.add(t); });
+    });
+    if (hosts.length)  groups.push({ title: `Hosts HTTP (${hosts.length})`, icon: '🌐', type: 'url', items: hosts });
+    if (ips.size)      groups.push({ title: `IPs (${ips.size})`, icon: '📡', type: 'ip', items: [...ips] });
+    if (techs.size)    groups.push({ title: `Tecnologías (${techs.size})`, icon: '🧩', type: 'generic', items: [...techs] });
+    if (groups.length) return groups;
+  }
+
+  // ── dnsx (discover) ───────────────────────────────────────────────────────
+  // Output: domain.com [A] [1.2.3.4]
+  const isDnsx = tool === 'discover' && lines.some(l => /\[(A|AAAA|MX|NS|TXT|CNAME|SOA)\]/.test(l));
+  if (isDnsx) {
+    const byType = { A: [], AAAA: [], MX: [], NS: [], TXT: [], CNAME: [], OTHER: [] };
+    lines.forEach(l => {
+      const m = l.match(/\[(A|AAAA|MX|NS|TXT|CNAME|SOA|CAA|SRV)\]\s*\[([^\]]+)\]/i);
+      if (!m) return;
+      const type = m[1].toUpperCase(), val = m[2].trim();
+      (byType[type] || byType.OTHER).push(val);
+    });
+    const iconMap = { A:'📍', AAAA:'📍', MX:'📧', NS:'🧭', TXT:'📝', CNAME:'🔀', OTHER:'📋' };
+    const titleMap = { A:'Registros A (IPv4)', AAAA:'Registros AAAA (IPv6)', MX:'Registros MX', NS:'Nameservers', TXT:'Registros TXT', CNAME:'CNAME', OTHER:'Otros' };
+    Object.entries(byType).forEach(([k, items]) => {
+      if (items.length) groups.push({ title: titleMap[k], icon: iconMap[k], type: k==='A'||k==='AAAA'?'ip':k==='NS'||k==='CNAME'||k==='MX'?'host':'generic', items: [...new Set(items)] });
+    });
+    if (groups.length) return groups;
+  }
+
+  // ── Nuclei ────────────────────────────────────────────────────────────────
+  if (tool === 'nuclei') {
+    // Format: [template-id] [type] [severity] URL [info]
+    const sevOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    const sevIcon  = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵', info: 'ℹ️' };
+    const sevGroups = {};
+    lines.forEach(l => {
+      const m = l.match(/\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[(critical|high|medium|low|info)\]\s*(\S+)/i);
+      if (!m) return;
+      const [, tmpl, type, sev, url] = m;
+      const key = sev.toLowerCase();
+      if (!sevGroups[key]) sevGroups[key] = [];
+      sevGroups[key].push(`${tmpl} (${type}) → ${url}`);
+    });
+    Object.keys(sevGroups).sort((a, b) => (sevOrder[a]??9) - (sevOrder[b]??9)).forEach(sev => {
+      const items = sevGroups[sev];
+      groups.push({ title: `${sevIcon[sev] || '▪'} ${sev.charAt(0).toUpperCase()+sev.slice(1)} (${items.length})`, icon: sevIcon[sev] || '▪', type: 'generic', items });
+    });
+    const nucleiIps = [...new Set(lines.flatMap(l => l.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []))];
+    if (nucleiIps.length) groups.push({ title: 'IPs', icon: '📡', type: 'ip', items: nucleiIps });
+    if (groups.length) return groups;
+  }
+
+  // ── URL Discovery (gau / waybackurls) ────────────────────────────────────
+  if (tool === 'urls') {
+    const allUrls = [...new Set(lines.map(l => l.trim()).filter(l => /^https?:\/\//.test(l)))];
+    const js    = allUrls.filter(u => /\.js(\?|$)/.test(u));
+    const api   = allUrls.filter(u => /\/api\/|\/v\d+\/|graphql/i.test(u));
+    const params = allUrls.filter(u => u.includes('?') && !js.includes(u) && !api.includes(u));
+    const other  = allUrls.filter(u => !js.includes(u) && !api.includes(u) && !params.includes(u));
+    if (api.length)    groups.push({ title: `Endpoints API (${api.length})`, icon: '⚡', type: 'url', items: api });
+    if (js.length)     groups.push({ title: `Archivos JS (${js.length})`, icon: '📜', type: 'url', items: js });
+    if (params.length) groups.push({ title: `URLs con parámetros (${params.length})`, icon: '🔍', type: 'url', items: params });
+    if (other.length)  groups.push({ title: `Rutas / URLs (${other.length})`, icon: '🔗', type: 'url', items: other });
     if (groups.length) return groups;
   }
 
@@ -1281,6 +1542,8 @@ function launchParallel() {
   const _isDomain  = t => !_isIPRange(t) && !_isEmail(t);
 
   // Each checkbox × each compatible target = one job
+  // Deduplicate: same command string must never appear twice regardless of cause
+  const seenCmds = new Set();
   const jobs = [];
   checked.forEach(checkbox => {
     const tool = checkbox.dataset.tool;
@@ -1288,10 +1551,17 @@ function launchParallel() {
     const subtool = (SUBTOOLS[tool] || [])[idx];
     const inputType = subtool?.inputType || 'any';
 
+    const seenEffective = new Set();
     targets.forEach(tgt => {
       if (inputType === 'domain' && !_isDomain(tgt)) return;
       if (inputType === 'email'  && !_isEmail(tgt))  return;
-      jobs.push({ checkbox, tgt });
+      const effectiveTgt = subtool.apexOnly ? _apexDomain(tgt) : tgt;
+      if (seenEffective.has(effectiveTgt)) return;
+      seenEffective.add(effectiveTgt);
+      const dedupeKey = `${tool}::${idx}::${effectiveTgt}`;
+      if (seenCmds.has(dedupeKey)) return;
+      seenCmds.add(dedupeKey);
+      jobs.push({ checkbox, tgt: effectiveTgt });
     });
   });
 
@@ -1423,14 +1693,22 @@ function appendParallelLine(tool, message, color, isHeader = false) {
   const output = $('parallel-out');
   if (!output) return;
 
+  // Remove empty-state placeholder on first real line
+  const placeholder = output.querySelector('.parallel-empty-terminal');
+  if (placeholder) placeholder.remove();
+
+  // Color-code by message type
+  let msgColor;
+  if (/^✖|^\[ERROR\]/.test(message))       msgColor = '#f87171'; // red — error
+  else if (/^⚠/.test(message))             msgColor = '#fbbf24'; // yellow — warning
+  else if (/^✓/.test(message))             msgColor = '#4ade80'; // green — success
+  else if (/^▶/.test(message))             msgColor = '#93c5fd'; // blue — command header
+  else                                      msgColor = '#c9d8ed'; // default terminal
+
   const line = document.createElement('div');
   line.className = 'pline';
-  line.innerHTML = `
-    <span class="ptag" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
-      ${tool}
-    </span>
-    <span class="ptext ${isHeader ? 'ptext-strong' : ''}">${escHtml(message)}</span>
-  `;
+  line.innerHTML = `<span class="ptag" style="color:${color.color}">[${tool}]</span> <span class="ptext ${isHeader ? 'ptext-strong' : ''}" style="color:${msgColor}">${escHtml(message)}</span>`;
+
   output.appendChild(line);
   output.scrollTop = output.scrollHeight;
 }
@@ -1460,7 +1738,7 @@ function clearParallel() {
 
 setHtml('parallel-out', `
   <div class="parallel-empty-terminal">
-    <span class="empty-output-text">Esperando selección de herramientas...</span>
+    <span class="empty-output-text">$ _</span>
   </div>
 `);
 }
@@ -1930,21 +2208,83 @@ function runPlanStep(cmdTemplate, tool) {
 // ── Parallel scan profiles ────────────────────────────────────────────────────
 
 const PARALLEL_PROFILES = [
-  { id: 'recon',    name: 'Recon dominio',   icon: '🌐', tools: ['theHarvester', 'DNSRecon', 'WHOIS', 'intel', 'enum -passive'] },
-  { id: 'web',      name: 'Análisis web',     icon: '🕸', tools: ['WhatWeb', 'WafW00f', 'Nikto', 'Estático', 'Con JS (-jc)']   },
-  { id: 'osint',    name: 'OSINT pasivo',      icon: '📡', tools: ['theHarvester', 'WHOIS', 'WhatWeb', 'enum -passive']          },
-  { id: 'puertos',  name: 'Puertos',           icon: '🔌', tools: ['Nmap top1000', 'Nmap + versiones', 'Traceroute']             },
-  { id: 'tls',      name: 'TLS / SSL',         icon: '🔒', tools: ['sslscan', 'sslyze']                                          },
-  { id: 'infra',    name: 'Infraestructura',   icon: '🖧', tools: ['Nmap top1000', 'Nmap + versiones', 'Nmap + NSE', 'sslscan', 'sslyze', 'Traceroute'] },
-  { id: 'pasivo',   name: 'Completo pasivo',   icon: '⚡', tools: ['theHarvester', 'DNSRecon', 'WHOIS', 'WhatWeb', 'sslscan', 'enum -passive', 'intel', 'Listar snapshots'] },
-  { id: 'full',     name: 'Análisis completo', icon: '🎯', tools: null },
+  {
+    id: 'inicial',
+    name: 'Reconocimiento inicial',
+    icon: '🔎',
+    desc: 'Punto de partida pasivo: WHOIS, DNS, theHarvester, subdominios OSINT y registros DNS',
+    tools: ['WHOIS', 'theHarvester', 'DNSRecon', 'dnsx — registros', 'enum -passive', 'Pasivo básico'],
+  },
+  {
+    id: 'subdominios',
+    name: 'Subdominios',
+    icon: '🌐',
+    desc: 'Enumeración completa de subdominios con todas las fuentes disponibles',
+    tools: ['intel', 'enum -passive', 'enum -active', 'Pasivo básico', 'Todas las fuentes'],
+  },
+  {
+    id: 'dns',
+    name: 'DNS / Infraestructura',
+    icon: '🌍',
+    desc: 'Resolución DNS, registros, transferencias de zona y probe HTTP de hosts activos',
+    tools: ['WHOIS', 'DNSRecon', 'dnsx — registros', 'intel', 'httpx — probe'],
+  },
+  {
+    id: 'web',
+    name: 'Superficie web',
+    icon: '🕸',
+    desc: 'Fingerprinting web, WAF, TLS, crawling y probe HTTP',
+    tools: ['httpx — probe', 'WhatWeb', 'WafW00f', 'sslscan', 'FinalRecon — cabeceras + SSL', 'Estático', 'Con JS (-jc)'],
+  },
+  {
+    id: 'urls',
+    name: 'URL Discovery',
+    icon: '🔗',
+    desc: 'Recolección de URLs desde archivos históricos y crawling activo',
+    tools: ['gau — todas las fuentes', 'waybackurls', 'Estático', 'Con JS (-jc)'],
+  },
+  {
+    id: 'vuln',
+    name: 'Vulnerabilidades',
+    icon: '☢',
+    desc: 'Nuclei sobre el objetivo: CVEs, misconfigs y exposures',
+    tools: ['CVEs conocidos', 'Misconfigs + exposures', 'Tech detect'],
+  },
+  {
+    id: 'red',
+    name: 'Escaneo de red',
+    icon: '🔌',
+    desc: 'Nmap con scripts NSE, TLS y traza de red (un solo escaneo completo)',
+    tools: ['Nmap + NSE', 'sslscan', 'sslyze', 'Traceroute'],
+  },
+  {
+    id: 'identidad',
+    name: 'Identidad / OSINT',
+    icon: '👤',
+    desc: 'Búsqueda de alias en redes sociales, plataformas y verificación de email',
+    tools: ['Sherlock', 'Maigret', 'Blackbird (username)', 'usufy (OSRFramework)', 'Holehe (email)', 'Blackbird (email)'],
+  },
+  {
+    id: 'pasivo',
+    name: 'Completo pasivo',
+    icon: '⚡',
+    desc: 'Todo lo pasivo: sin interacción directa con el objetivo',
+    tools: ['WHOIS', 'theHarvester', 'DNSRecon', 'dnsx — registros', 'intel', 'enum -passive', 'Pasivo básico', 'WhatWeb', 'sslscan', 'FinalRecon — DNS + subdominios', 'gau — todas las fuentes', 'Listar snapshots'],
+  },
+  {
+    id: 'full',
+    name: 'Análisis completo',
+    icon: '🎯',
+    desc: 'Todas las herramientas disponibles',
+    tools: null,
+  },
 ];
 
 function _buildParallelProfilesBar() {
   const list = $('parallel-profiles-list');
   if (!list) return;
   list.innerHTML = PARALLEL_PROFILES.map(p =>
-    `<button class="pp-btn" data-id="${p.id}" onclick="applyParallelProfile('${p.id}')" title="${escHtml(p.tools ? p.tools.join(' · ') : 'Todas las herramientas')}">
+    `<button class="pp-btn" data-id="${p.id}" onclick="applyParallelProfile('${p.id}')" title="${escHtml(p.desc || '')}">
       ${p.icon} ${escHtml(p.name)}
     </button>`
   ).join('');
