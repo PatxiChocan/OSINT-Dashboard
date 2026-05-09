@@ -1,152 +1,137 @@
 from datetime import datetime, timezone
-from flask_login import UserMixin
-from app.extensions import db, bcrypt
+from app.extensions import db
 
-# ── Roles ─────────────────────────────────────────────────────────────────────
 ROLE_ADMIN   = "admin"
 ROLE_ANALYST = "analyst"
 ROLE_CLIENT  = "client"
-VALID_ROLES  = (ROLE_ADMIN, ROLE_ANALYST, ROLE_CLIENT)
 
 
-# ── Association: analistas ↔ clientes ────────────────────────────────────────
-analyst_clients = db.Table(
-    "analyst_clients",
-    db.Column("analyst_id", db.Integer, db.ForeignKey("users.id",   ondelete="CASCADE"), primary_key=True),
-    db.Column("client_id",  db.Integer, db.ForeignKey("clients.id", ondelete="CASCADE"), primary_key=True),
-    db.Column("assigned_at", db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)),
-)
+class Organisation(db.Model):
+    __tablename__ = "organisations"
 
-# ── Association: usuarios cliente ↔ clientes ─────────────────────────────────
-client_user_access = db.Table(
-    "client_user_access",
-    db.Column("user_id",   db.Integer, db.ForeignKey("users.id",   ondelete="CASCADE"), primary_key=True),
-    db.Column("client_id", db.Integer, db.ForeignKey("clients.id", ondelete="CASCADE"), primary_key=True),
-)
+    id                  = db.Column(db.Integer,     primary_key=True)
+    nombre              = db.Column(db.String(200), nullable=False)
+    nif                 = db.Column(db.String(20),  nullable=False, unique=True)
+    pais                = db.Column(db.String(100))
+    industria           = db.Column(db.String(100))
+    fecha_incorporacion = db.Column(db.DateTime,    default=lambda: datetime.now(timezone.utc))
+    email_contacto      = db.Column(db.String(120))
+    web                 = db.Column(db.String(200))
+    plan                = db.Column(db.String(20),  nullable=False, default="basic")
+    is_active           = db.Column(db.SmallInteger, nullable=False, default=1)
+
+    users   = db.relationship("User",   back_populates="organisation", lazy="dynamic")
+    scope   = db.relationship("Scope",  back_populates="organisation", lazy="dynamic", cascade="all, delete-orphan")
+    reports = db.relationship("Report", back_populates="organisation", lazy="dynamic", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Organisation {self.nombre}>"
 
 
-# ── User ──────────────────────────────────────────────────────────────────────
-class User(UserMixin, db.Model):
+class User(db.Model):
     __tablename__ = "users"
 
-    id            = db.Column(db.Integer, primary_key=True)
-    username      = db.Column(db.String(80),  unique=True, nullable=False)
-    email         = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False)
-    role          = db.Column(db.String(20),  nullable=False, default=ROLE_ANALYST)
-    is_active     = db.Column(db.Boolean,     nullable=False, default=True)
-    created_at    = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    last_login    = db.Column(db.DateTime(timezone=True), nullable=True)
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id          = db.Column(db.Integer,     primary_key=True)
+    nombre      = db.Column(db.String(100), nullable=False)
+    apellido    = db.Column(db.String(100), nullable=False)
+    email       = db.Column(db.String(120), nullable=False, unique=True)
+    org_id      = db.Column(db.Integer,     db.ForeignKey("organisations.id", ondelete="SET NULL"), nullable=True)
+    keycloak_id = db.Column(db.String(36),  nullable=False, unique=True)
+    role        = db.Column(db.String(20),  nullable=False, default=ROLE_CLIENT)
+    is_active   = db.Column(db.SmallInteger, nullable=False, default=1)
+    last_login  = db.Column(db.DateTime,    nullable=True)
+    created_at  = db.Column(db.DateTime,    default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
-    created_by = db.relationship("User", remote_side=[id], backref="created_users", foreign_keys=[created_by_id])
-
-    # Analysts ↔ clients (for analyst role)
-    assigned_clients = db.relationship(
-        "Client", secondary=analyst_clients, back_populates="analysts",
-        lazy="dynamic"
-    )
-    # Client users ↔ clients (for client role)
-    accessible_clients = db.relationship(
-        "Client", secondary=client_user_access, back_populates="client_users",
-        lazy="dynamic"
-    )
-
-    def set_password(self, password: str):
-        self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
-
-    def check_password(self, password: str) -> bool:
-        return bcrypt.check_password_hash(self.password_hash, password)
+    organisation = db.relationship("Organisation", back_populates="users", foreign_keys=[org_id])
+    scope_added  = db.relationship("Scope",  back_populates="added_by_user", lazy="dynamic")
+    reports      = db.relationship("Report", back_populates="analyst",       lazy="dynamic")
 
     @property
-    def is_admin(self)    -> bool: return self.role == ROLE_ADMIN
+    def is_admin(self)   -> bool: return self.role == ROLE_ADMIN
     @property
-    def is_analyst(self)  -> bool: return self.role == ROLE_ANALYST
+    def is_analyst(self) -> bool: return self.role == ROLE_ANALYST
     @property
-    def is_client_role(self) -> bool: return self.role == ROLE_CLIENT
-
-    def can_access_client(self, client_id: int) -> bool:
-        if self.is_admin:
-            return True
-        if self.is_analyst:
-            return self.assigned_clients.filter_by(id=client_id).first() is not None
-        if self.is_client_role:
-            return self.accessible_clients.filter_by(id=client_id).first() is not None
-        return False
+    def is_client(self)  -> bool: return self.role == ROLE_CLIENT
+    @property
+    def nombre_completo(self) -> str: return f"{self.nombre} {self.apellido}"
 
     def __repr__(self):
-        return f"<User {self.username} ({self.role})>"
+        return f"<User {self.email} ({self.role})>"
 
 
-# ── Client (organización objetivo) ────────────────────────────────────────────
-class Client(db.Model):
-    __tablename__ = "clients"
+class Scope(db.Model):
+    __tablename__ = "scope"
 
-    id             = db.Column(db.Integer, primary_key=True)
-    name           = db.Column(db.String(200), nullable=False)
-    description    = db.Column(db.Text,   nullable=True)
-    scope_domains  = db.Column(db.Text,   nullable=True)  # CSV de dominios
-    scope_ips      = db.Column(db.Text,   nullable=True)  # CSV de rangos IP
-    is_active      = db.Column(db.Boolean, nullable=False, default=True)
-    created_at     = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    created_by_id  = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id          = db.Column(db.Integer,     primary_key=True)
+    org_id      = db.Column(db.Integer,     db.ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False)
+    added_by    = db.Column(db.Integer,     db.ForeignKey("users.id",         ondelete="SET NULL"), nullable=True)
+    tipo        = db.Column(db.String(20),  nullable=False)
+    valor       = db.Column(db.String(300), nullable=False)
+    descripcion = db.Column(db.String(400))
+    is_active   = db.Column(db.SmallInteger, nullable=False, default=1)
+    added_at    = db.Column(db.DateTime,    default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
-    created_by   = db.relationship("User", foreign_keys=[created_by_id])
-    analysts     = db.relationship("User", secondary=analyst_clients,   back_populates="assigned_clients")
-    client_users = db.relationship("User", secondary=client_user_access, back_populates="accessible_clients")
-    reports      = db.relationship("Report", back_populates="client", lazy="dynamic", cascade="all, delete-orphan")
+    organisation  = db.relationship("Organisation", back_populates="scope",       foreign_keys=[org_id])
+    added_by_user = db.relationship("User",         back_populates="scope_added", foreign_keys=[added_by])
 
     def __repr__(self):
-        return f"<Client {self.name}>"
+        return f"<Scope {self.tipo}:{self.valor}>"
 
 
-# ── Report (sesión de análisis guardada) ──────────────────────────────────────
 class Report(db.Model):
     __tablename__ = "reports"
 
-    id          = db.Column(db.Integer, primary_key=True)
-    client_id   = db.Column(db.Integer, db.ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    analyst_id  = db.Column(db.Integer, db.ForeignKey("users.id",   ondelete="SET NULL"), nullable=True)
-    title       = db.Column(db.String(300), nullable=False)
-    scope       = db.Column(db.JSON,  nullable=True)   # snapshot del scope
-    summary     = db.Column(db.JSON,  nullable=True)   # resumen estructurado
-    raw_output  = db.Column(db.Text,  nullable=True)   # output completo de consola
-    is_visible  = db.Column(db.Boolean, nullable=False, default=False)  # visible al rol cliente
-    created_at  = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    id             = db.Column(db.Integer,     primary_key=True)
+    org_id         = db.Column(db.Integer,     db.ForeignKey("organisations.id", ondelete="CASCADE"),  nullable=False)
+    analyst_id     = db.Column(db.Integer,     db.ForeignKey("users.id",         ondelete="SET NULL"), nullable=True)
+    titulo         = db.Column(db.String(300), nullable=False)
+    descripcion    = db.Column(db.Text)
+    scope_snapshot = db.Column(db.JSON)
+    resultados     = db.Column(db.JSON)
+    output_path    = db.Column(db.String(500))
+    is_visible     = db.Column(db.SmallInteger, nullable=False, default=0)
+    created_at     = db.Column(db.DateTime,    nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
-    client  = db.relationship("Client", back_populates="reports")
-    analyst = db.relationship("User", foreign_keys=[analyst_id])
-    tool_executions = db.relationship("ToolExecution", back_populates="report", lazy="dynamic", cascade="all, delete-orphan")
+    organisation    = db.relationship("Organisation", back_populates="reports",         foreign_keys=[org_id])
+    analyst         = db.relationship("User",         back_populates="reports",         foreign_keys=[analyst_id])
+    tool_executions = db.relationship("ToolExecution", back_populates="report",         lazy="dynamic", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Report #{self.id} '{self.title}'>"
+        return f"<Report #{self.id} '{self.titulo}'>"
 
 
-# ── ToolExecution (log de cada herramienta ejecutada) ─────────────────────────
+class PipelineAnalysis(db.Model):
+    __tablename__ = "pipeline_analyses"
+
+    id         = db.Column(db.Integer,  primary_key=True)
+    user_id    = db.Column(db.Integer,  db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    seeds      = db.Column(db.JSON,     nullable=False)
+    assets     = db.Column(db.JSON,     nullable=False, default=list)
+    score      = db.Column(db.Integer,  nullable=False, default=0)
+    findings   = db.Column(db.JSON,     nullable=False, default=list)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f"<PipelineAnalysis #{self.id} score={self.score}>"
+
+
 class ToolExecution(db.Model):
     __tablename__ = "tool_executions"
 
-    id           = db.Column(db.Integer, primary_key=True)
-    report_id    = db.Column(db.Integer, db.ForeignKey("reports.id",  ondelete="SET NULL"), nullable=True)
-    analyst_id   = db.Column(db.Integer, db.ForeignKey("users.id",    ondelete="SET NULL"), nullable=True)
-    client_id    = db.Column(db.Integer, db.ForeignKey("clients.id",  ondelete="SET NULL"), nullable=True)
-    tool_name    = db.Column(db.String(100), nullable=False)
-    command      = db.Column(db.Text,        nullable=False)
-    status       = db.Column(db.String(20),  nullable=False, default="running")
-    # status: running | success | error | timeout
-    exit_code      = db.Column(db.Integer, nullable=True)
-    error_message  = db.Column(db.Text,    nullable=True)
-    started_at     = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    finished_at    = db.Column(db.DateTime(timezone=True), nullable=True)
-    duration_secs  = db.Column(db.Integer, nullable=True)
+    id            = db.Column(db.Integer,     primary_key=True)
+    report_id     = db.Column(db.Integer,     db.ForeignKey("reports.id", ondelete="CASCADE"), nullable=False)
+    tool_name     = db.Column(db.String(100), nullable=False)
+    comando       = db.Column(db.Text,        nullable=False)
+    status        = db.Column(db.String(20),  nullable=False, default="running")
+    exit_code     = db.Column(db.Integer)
+    error_message = db.Column(db.Text)
+    started_at    = db.Column(db.DateTime,    nullable=False, default=lambda: datetime.now(timezone.utc))
+    finished_at   = db.Column(db.DateTime)
+    duration_secs = db.Column(db.Integer)
 
-    # Relationships
-    report  = db.relationship("Report", back_populates="tool_executions")
-    analyst = db.relationship("User",   foreign_keys=[analyst_id])
-    client  = db.relationship("Client", foreign_keys=[client_id])
+    report = db.relationship("Report", back_populates="tool_executions")
 
     def __repr__(self):
         return f"<ToolExecution {self.tool_name} [{self.status}]>"

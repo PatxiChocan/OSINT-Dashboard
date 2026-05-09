@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import requests
 import os
 
@@ -10,6 +12,7 @@ HEADERS = {"User-Agent": "AletheiaOSINT/1.0", "Content-Type": "application/json"
 
 
 @urlscan_bp.route("/api/urlscan/search")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def search():
     q = request.args.get("q", "").strip()
     if not q:
@@ -61,6 +64,7 @@ def search():
 
 
 @urlscan_bp.route("/api/urlscan/scan", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def scan():
     if not API_KEY:
         return jsonify({"error": "URLSCAN_API_KEY no configurada en .env"}), 403

@@ -25,14 +25,20 @@
         <span class="icon">⌂</span>
         <span>Inicio</span>
       </button>
+      {% if current_role in ('admin', 'analyst') %}
       <button class="nav-btn" onclick="show('scope',this)">
         <span class="icon">📁</span>
         <span>Alcance</span>
       </button>
-      <button class="nav-btn" onclick="show('parallel',this)">
+      <button class="nav-btn" onclick="show('pipeline',this)">
         <span class="icon">⚡</span>
-        <span>Modo paralelo</span>
+        <span>Análisis automático</span>
       </button>
+      <button class="nav-btn" onclick="show('parallel',this)">
+        <span class="icon">▶</span>
+        <span>Análisis manual</span>
+      </button>
+      {% endif %}
 
       <div class="nav-divider"></div>
 
@@ -54,6 +60,7 @@
         <span>Fuentes</span>
       </button>
 
+      {% if current_role in ('admin', 'analyst') %}
       <div class="nav-divider"></div>
 
       <div class="sidebar-section">Herramientas</div>
@@ -73,16 +80,25 @@
         <span class="icon">🔬</span>
         <span>Urlscan.io</span>
       </button>
+      {% endif %}
 
+      <div style="flex:1"></div>
+      <div class="nav-divider"></div>
 
-      <!--<div class="sidebar-status sidebar-status-card">
-        <div class="sidebar-status-row">
-          <span class="status-dot"></span>
-          <span>Backend online</span>
-        </div>
-        <div class="sidebar-status-meta">Host: localhost:5000</div>
-        <div class="sidebar-status-meta">Entorno: Kali Linux</div>
-      </div>-->
+      {% if current_role == 'admin' %}
+      <a href="/admin" class="nav-btn" style="text-decoration:none">
+        <span class="icon">⚙</span>
+        <span>Administración</span>
+      </a>
+      {% endif %}
+
+      <div style="padding:.75rem 1rem; font-size:.8rem; opacity:.5">
+        {{ current_name }} &middot; {{ current_role }}
+      </div>
+      <a href="/auth/logout" class="nav-btn" style="text-decoration:none; color:inherit;">
+        <span class="icon">⏻</span>
+        <span>Cerrar sesión</span>
+      </a>
     </nav>
 
     <div class="main">
@@ -418,9 +434,137 @@
           </div>
         </div>
 
+        <div class="panel" id="panel-pipeline">
+          <div class="page-header">
+            <div>
+              <div class="page-title">⚡ Análisis automático</div>
+              <div class="page-desc">Introduce dominios, IPs o emails del cliente. El pipeline los analiza automáticamente y extrae todos los activos relacionados.</div>
+            </div>
+          </div>
+
+          <!-- Input -->
+          <div class="scope-card" style="margin-bottom:1.5rem">
+            <div class="scope-card-title">Activos a analizar</div>
+            <div style="display:flex;gap:.75rem;align-items:flex-start">
+              <textarea id="pl-seeds" rows="3" class="scope-inp" style="flex:1;resize:vertical;font-family:monospace;font-size:.85rem"
+                placeholder="empresa.com&#10;mail.empresa.com&#10;admin@empresa.com"></textarea>
+              <button class="run-btn" onclick="startPipeline()" id="pl-btn" style="white-space:nowrap">
+                Iniciar análisis
+              </button>
+            </div>
+            <div style="font-size:.75rem;opacity:.5;margin-top:.5rem">Un activo por línea. Dominios, IPs y emails son soportados.</div>
+          </div>
+
+          <!-- Historial -->
+          <div class="scope-card" id="pl-history-card" style="margin-bottom:1.5rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+              <div class="scope-card-title" style="margin:0">Análisis anteriores</div>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="loadHistory()">↻ Actualizar</button>
+            </div>
+            <div id="pl-history-list">
+              <div style="font-size:.8rem;opacity:.4;text-align:center;padding:.5rem">Cargando historial...</div>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div id="pl-progress" style="display:none;margin-bottom:1.5rem">
+            <div class="scope-card">
+              <!-- Scope chips -->
+              <div id="pl-scope-bar" style="margin-bottom:1.1rem">
+                <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;opacity:.4;margin-bottom:.35rem">Scope</div>
+                <div id="pl-scope-chips" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
+              </div>
+
+              <!-- Fases -->
+              <div style="display:flex;gap:0;margin-bottom:1.1rem;border-radius:.5rem;overflow:hidden;border:1px solid rgba(255,255,255,.08)">
+                <div class="pl-phase" data-phase="domain">🌐 Dominios</div>
+                <div class="pl-phase" data-phase="ip" style="border-left:1px solid rgba(255,255,255,.08)">🖥️ IPs</div>
+                <div class="pl-phase" data-phase="email" style="border-left:1px solid rgba(255,255,255,.08)">📧 Emails</div>
+                <div class="pl-phase" data-phase="username" style="border-left:1px solid rgba(255,255,255,.08)">👤 Identidades</div>
+              </div>
+
+              <!-- Estado actual -->
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem">
+                <div id="pl-spinner" class="news-spinner"></div>
+                <div style="font-weight:600;font-size:.9rem" id="pl-status-txt">Iniciando...</div>
+                <div id="pl-finding-count" style="margin-left:auto;font-size:.75rem;opacity:.5;font-weight:600"></div>
+              </div>
+
+              <!-- Barra de severidad en vivo -->
+              <div style="margin-bottom:.75rem">
+                <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06);gap:2px" id="pl-sev-bar-live"></div>
+                <div style="display:flex;gap:1rem;margin-top:.35rem" id="pl-sev-legend-live"></div>
+              </div>
+
+              <!-- Terminal -->
+              <div id="pl-log" style="font-family:'JetBrains Mono',monospace;font-size:.71rem;max-height:160px;overflow-y:auto;background:#0a0e17;border-radius:.45rem;padding:.65rem .85rem;display:flex;flex-direction:column;gap:.14rem;color:#64748b;border:1px solid rgba(255,255,255,.06)"></div>
+            </div>
+          </div>
+
+          <!-- Resultados -->
+          <div id="pl-findings" style="display:none">
+
+            <!-- Dashboard de resumen -->
+            <div id="pl-summary" style="margin-bottom:1.5rem">
+              <!-- Score principal + contadores -->
+              <div style="display:grid;grid-template-columns:auto 1fr;gap:1.25rem;margin-bottom:1rem;align-items:center">
+                <!-- Gauge circular -->
+                <div style="position:relative;width:110px;height:110px;flex-shrink:0">
+                  <svg width="110" height="110" id="pl-score-svg" style="transform:rotate(-90deg)">
+                    <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="10"/>
+                    <circle id="pl-score-arc" cx="55" cy="55" r="46" fill="none" stroke="#60a5fa" stroke-width="10"
+                      stroke-dasharray="289" stroke-dashoffset="289" stroke-linecap="round"
+                      style="transition:stroke-dashoffset .8s ease,stroke .5s ease"/>
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem">
+                    <div id="pl-score-num" style="font-size:1.6rem;font-weight:800;line-height:1">—</div>
+                    <div style="font-size:.6rem;opacity:.4;text-transform:uppercase;letter-spacing:.06em">/ 100</div>
+                  </div>
+                </div>
+                <!-- Label + contadores -->
+                <div style="display:flex;flex-direction:column;gap:.65rem">
+                  <div>
+                    <div id="pl-score-label" style="font-size:1.1rem;font-weight:700;margin-bottom:.2rem">—</div>
+                    <div id="pl-score-desc" style="font-size:.78rem;opacity:.55"></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem" id="pl-sev-cards"></div>
+                </div>
+              </div>
+              <!-- Activos analizados -->
+              <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;opacity:.4;margin-bottom:.35rem">Activos analizados</div>
+              <div id="pl-assets-analyzed" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
+            </div>
+
+            <!-- Barra de filtros -->
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.85rem;padding:.65rem .85rem;background:rgba(255,255,255,.03);border-radius:.5rem;border:1px solid rgba(255,255,255,.06)">
+              <div style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1">
+                <button class="pl-filter-btn active" data-sev="all"      onclick="setFilter('all',this)">Todos</button>
+                <button class="pl-filter-btn"        data-sev="critical" onclick="setFilter('critical',this)">🔴 Crítico</button>
+                <button class="pl-filter-btn"        data-sev="high"     onclick="setFilter('high',this)">🟠 Alto</button>
+                <button class="pl-filter-btn"        data-sev="medium"   onclick="setFilter('medium',this)">🟡 Medio</button>
+                <button class="pl-filter-btn"        data-sev="info"     onclick="setFilter('info',this)">🔵 Info</button>
+              </div>
+              <input id="pl-search" type="text" placeholder="Buscar en hallazgos..."
+                oninput="applyFilters()"
+                style="padding:.3rem .7rem;border-radius:.4rem;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.2);color:inherit;font-size:.8rem;width:200px;outline:none">
+              <span id="pl-filter-count" style="font-size:.75rem;opacity:.45;white-space:nowrap"></span>
+            </div>
+
+            <!-- Tabs de vista + exportar -->
+            <div style="display:flex;gap:.4rem;margin-bottom:1rem;align-items:center">
+              <button class="pl-view-tab active" id="pl-tab-asset" onclick="switchFindingsView('asset')">📦 Por activo</button>
+              <button class="pl-view-tab" id="pl-tab-severity" onclick="switchFindingsView('severity')">🔴 Por severidad</button>
+              <button id="pl-export-pdf-btn" class="secondary-btn" style="display:none;margin-left:auto;font-size:.78rem;padding:.3rem .85rem;align-items:center;gap:.4rem" onclick="exportPdf(_currentAnalysisId)">⬇ Exportar PDF</button>
+            </div>
+
+            <div id="pl-view-asset"></div>
+            <div id="pl-view-severity" style="display:none"></div>
+          </div>
+        </div>
+
         <div class="panel" id="panel-parallel">
           <div class="page-header">
-            <div class="page-title">⚡ Modo paralelo</div>
+            <div class="page-title">⚡ Análisis manual</div>
             <div class="page-desc">
               Selecciona varias subherramientas para ejecutarlas a la vez y visualizar el output unificado abajo.
             </div>
@@ -1009,6 +1153,7 @@
                 <option value="apt">APT</option>
                 <option value="compliance">Compliance</option>
                 <option value="tools">Herramientas</option>
+                <option value="ics">ICS/SCADA/OT</option>
               </select>
             </div>
           </div>
@@ -1065,6 +1210,550 @@
   </div>
 
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script>
+  // ── Pipeline ────────────────────────────────────────────────────────────────
+  const SEV_COLOR = { critical:'#ef4444', high:'#f97316', medium:'#eab308', info:'#60a5fa' };
+  const SEV_LABEL = { critical:'CRÍTICO', high:'ALTO', medium:'MEDIO', info:'INFO' };
+  const SEV_BG    = { critical:'rgba(239,68,68,.1)', high:'rgba(249,115,22,.1)', medium:'rgba(234,179,8,.1)', info:'rgba(96,165,250,.1)' };
+  const TOOL_COLOR = {
+    whois:'#818cf8', dns:'#22d3ee', subfinder:'#a78bfa', 'crt.sh':'#a78bfa',
+    shodan:'#fb923c', virustotal:'#60a5fa', urlscan:'#f472b6', intelx:'#f87171',
+    harvester:'#2dd4bf', nmap:'#f97316', exposure:'#fb923c',
+    blackbird:'#c084fc', sherlock:'#34d399', maigret:'#34d399'
+  };
+  const ASSET_ICON = { domain:'🌐', ip:'🖥️', email:'📧', username:'👤' };
+  const PHASE_ORDER  = ['domain','ip','email','username'];
+  const PHASE_LABELS = { domain:'🌐 Dominios', ip:'🖥️ IPs', email:'📧 Emails', username:'👤 Identidades' };
+
+  let _plEs       = null;
+  let _plId             = null;
+  let _plSeeds          = [];
+  let _findings         = [];
+  let _assets           = new Set();
+  let _curView          = 'asset';
+  let _curPhase         = null;
+  let _currentAnalysisId = null;
+
+  function _esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function _assetType(s) {
+    if (/^\d+\.\d+\.\d+\.\d+/.test(s)) return 'ip';
+    if (s.includes('@')) return 'email';
+    return 'domain';
+  }
+
+  function _setPhase(phase) {
+    if (_curPhase === phase) return;
+    const idx = PHASE_ORDER.indexOf(phase);
+    document.querySelectorAll('.pl-phase').forEach((el, i) => {
+      const key = PHASE_ORDER[i];
+      el.classList.remove('active','done');
+      if (i < idx) {
+        el.classList.add('done');
+        el.innerHTML = `✓ ${PHASE_LABELS[key]}`;
+      } else if (i === idx) {
+        el.classList.add('active');
+        el.innerHTML = PHASE_LABELS[key];
+      } else {
+        el.innerHTML = PHASE_LABELS[key];
+      }
+    });
+    _curPhase = phase;
+  }
+
+  function _updateLiveSevBar() {
+    const counts = { critical:0, high:0, medium:0, info:0 };
+    _findings.forEach(f => { if (counts[f.severity] !== undefined) counts[f.severity]++; });
+    const total = _findings.length || 1;
+
+    const bar = document.getElementById('pl-sev-bar-live');
+    const legend = document.getElementById('pl-sev-legend-live');
+    if (!bar) return;
+
+    bar.innerHTML = '';
+    legend.innerHTML = '';
+    [['critical','#ef4444','CRÍTICO'],['high','#f97316','ALTO'],['medium','#eab308','MEDIO'],['info','#60a5fa','INFO']].forEach(([sev, color, lbl]) => {
+      if (!counts[sev]) return;
+      const seg = document.createElement('div');
+      seg.style.cssText = `flex:${counts[sev]};background:${color};height:100%;border-radius:2px;transition:flex .4s`;
+      seg.title = `${lbl}: ${counts[sev]}`;
+      bar.appendChild(seg);
+
+      const leg = document.createElement('span');
+      leg.style.cssText = `font-size:.67rem;font-weight:700;color:${color};display:flex;align-items:center;gap:.25rem`;
+      leg.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block"></span>${counts[sev]} ${lbl}`;
+      legend.appendChild(leg);
+    });
+  }
+
+  function startPipeline() {
+    const raw   = document.getElementById('pl-seeds').value.trim();
+    const seeds = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!seeds.length) { alert('Introduce al menos un dominio, IP o email'); return; }
+
+    _findings = []; _assets = new Set(); _curPhase = null; _curView = 'asset';
+    _filterSev = 'all'; _filterText = '';
+    document.querySelectorAll('.pl-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sev === 'all'));
+    const srch = document.getElementById('pl-search'); if (srch) srch.value = '';
+
+    document.getElementById('pl-btn').disabled = true;
+    document.getElementById('pl-progress').style.display = 'block';
+    document.getElementById('pl-findings').style.display = 'none';
+    document.getElementById('pl-log').innerHTML = '';
+    document.getElementById('pl-view-asset').innerHTML = '';
+    document.getElementById('pl-view-severity').innerHTML = '';
+    document.getElementById('pl-sev-cards').innerHTML = '';
+    document.getElementById('pl-assets-analyzed').innerHTML = '';
+    document.getElementById('pl-status-txt').textContent = 'Iniciando...';
+    document.getElementById('pl-finding-count').textContent = '';
+    document.getElementById('pl-spinner').style.display = '';
+    document.querySelectorAll('.pl-phase').forEach(el => el.classList.remove('active','done'));
+
+    // Scope chips
+    const chipsEl = document.getElementById('pl-scope-chips');
+    chipsEl.innerHTML = '';
+    seeds.forEach(s => {
+      const type = _assetType(s);
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .6rem;border-radius:999px;background:rgba(255,255,255,.08);font-family:monospace;font-size:.77rem;font-weight:600';
+      chip.textContent = (ASSET_ICON[type]||'▶') + ' ' + s;
+      chipsEl.appendChild(chip);
+    });
+
+    if (_plEs) _plEs.close();
+
+    fetch('/api/pipeline/start', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({seeds})
+    })
+    .then(r => r.json())
+    .then(({pipeline_id, error}) => {
+      if (error) { alert(error); document.getElementById('pl-btn').disabled = false; return; }
+
+      _plId = pipeline_id;
+      _plSeeds = seeds;
+      _plEs = new EventSource(`/api/pipeline/stream/${pipeline_id}`);
+      _plEs.onmessage = e => {
+        const ev = JSON.parse(e.data);
+        const log = document.getElementById('pl-log');
+
+        if (ev.type === 'stage') {
+          const d = document.createElement('div');
+          d.innerHTML = '<span style="opacity:.4">›</span> ' + _esc(ev.msg);
+          log.appendChild(d); log.scrollTop = log.scrollHeight;
+        }
+        if (ev.type === 'error') {
+          const d = document.createElement('div');
+          d.style.color = '#f87171';
+          d.innerHTML = '<span>✗</span> ' + _esc(ev.msg);
+          log.appendChild(d); log.scrollTop = log.scrollHeight;
+        }
+        if (ev.type === 'asset_start') {
+          const icon = ASSET_ICON[ev.asset_type] || '▶';
+          _setPhase(ev.asset_type);
+          document.getElementById('pl-status-txt').textContent = `${icon} ${ev.asset}`;
+          _assets.add(ev.asset);
+          const d = document.createElement('div');
+          d.style.cssText = 'color:#e2e8f0;font-weight:700;margin-top:.25rem';
+          d.innerHTML = icon + ' <span style="color:#a5b4fc">' + _esc(ev.asset) + '</span>';
+          log.appendChild(d); log.scrollTop = log.scrollHeight;
+        }
+        if (ev.type === 'finding') {
+          _findings.push(ev);
+          document.getElementById('pl-findings').style.display = 'block';
+          document.getElementById('pl-finding-count').textContent = _findings.length + ' hallazgos';
+          _updateLiveSevBar();
+          _rebuildViews();
+        }
+        if (ev.type === 'pipeline_complete') {
+          _plEs.close();
+          document.getElementById('pl-spinner').style.display = 'none';
+          const score = ev.score ?? 0;
+          document.getElementById('pl-status-txt').textContent = `✓ Completado — ${_findings.length} hallazgos · Score ${score}/100`;
+          document.getElementById('pl-btn').disabled = false;
+          document.querySelectorAll('.pl-phase').forEach((el, i) => {
+            el.classList.remove('active');
+            el.classList.add('done');
+            el.innerHTML = `✓ ${PHASE_LABELS[PHASE_ORDER[i]]}`;
+          });
+          _renderSummary(score);
+          _autoSave(pipeline_id, score);
+        }
+      };
+      _plEs.onerror = () => {
+        _plEs.close();
+        document.getElementById('pl-btn').disabled = false;
+        document.getElementById('pl-status-txt').textContent = 'Conexión perdida';
+      };
+    })
+    .catch(err => {
+      alert('Error: ' + err);
+      document.getElementById('pl-btn').disabled = false;
+    });
+  }
+
+  const CVSS_SEV = [
+    [9.0, 'CRÍTICA', '#ef4444', 'rgba(239,68,68,.15)'],
+    [7.0, 'ALTA',    '#f97316', 'rgba(249,115,22,.15)'],
+    [4.0, 'MEDIA',   '#eab308', 'rgba(234,179,8,.15)'],
+    [0.1, 'BAJA',    '#60a5fa', 'rgba(96,165,250,.15)'],
+  ];
+
+  function _cvssInfo(title) {
+    // Detecta "CVSS v3.1 9.8" o "CVSS v2.0 7.5" en el título
+    const m = title.match(/CVSS\s+(v[\d.]+)\s+([\d.]+)/);
+    if (!m) return null;
+    const ver = m[1], score = parseFloat(m[2]);
+    const [,lbl,color,bg] = CVSS_SEV.find(([t]) => score >= t) || [0,'—','#94a3b8','rgba(148,163,184,.1)'];
+    return { ver, score, lbl, color, bg };
+  }
+
+  function _makeFindingCard(f) {
+    const color      = SEV_COLOR[f.severity] || '#94a3b8';
+    const label      = SEV_LABEL[f.severity] || f.severity;
+    const tbg        = TOOL_COLOR[f.tool] || '#94a3b8';
+    const uid        = 'fc_' + Math.random().toString(36).slice(2);
+    const assetType  = _assetType(f.asset);
+    const assetIcon  = ASSET_ICON[assetType] || '▶';
+    const assetShort = f.asset.length > 30 ? f.asset.slice(0, 28) + '…' : f.asset;
+    const cvss       = _cvssInfo(f.title);
+    const isKev      = f.title.includes('[KEV]');
+
+    const cvssBadge = cvss ? `
+      <span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;padding:.12rem .5rem;border-radius:.25rem;background:${cvss.bg};color:${cvss.color};white-space:nowrap;flex-shrink:0;border:1px solid ${cvss.color}44">
+        CVSS ${cvss.ver} ${cvss.score} · ${cvss.lbl}
+      </span>` : '';
+
+    const kevBadge = isKev ? `
+      <span style="font-size:.63rem;font-weight:800;padding:.1rem .45rem;border-radius:.25rem;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid rgba(239,68,68,.4);white-space:nowrap;flex-shrink:0">
+        ⚠ KEV
+      </span>` : '';
+
+    const div = document.createElement('div');
+    div.className = 'pl-finding-card';
+    div.style.borderLeft = `3px solid ${color}`;
+    div.innerHTML = `
+      <div class="pl-finding-header" onclick="document.getElementById('${uid}').classList.toggle('open')">
+        <span class="pl-sev-badge" style="background:${SEV_BG[f.severity]||'rgba(148,163,184,.1)'};color:${color}">${label}</span>
+        <span class="pl-tool-badge" style="background:rgba(255,255,255,.07);color:${tbg}">${_esc(f.tool)}</span>
+        <span style="font-family:monospace;font-size:.7rem;color:#94a3b8;background:rgba(255,255,255,.05);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0" title="${_esc(f.asset)}">${assetIcon} ${_esc(assetShort)}</span>
+        ${cvssBadge}${kevBadge}
+        <span style="font-weight:600;font-size:.83rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(f.title)}</span>
+        <span style="opacity:.35;font-size:.75rem;flex-shrink:0">▾</span>
+      </div>
+      <div class="pl-finding-body" id="${uid}">
+        <div class="pl-finding-detail">${_esc(f.detail)}</div>
+        ${f.recommendation ? `<div class="pl-finding-rec">▶ ${_esc(f.recommendation)}</div>` : ''}
+      </div>`;
+    return div;
+  }
+
+  function _rebuildViews() {
+    const filtered = _filteredFindings();
+    const countEl = document.getElementById('pl-filter-count');
+    if (countEl) {
+      countEl.textContent = filtered.length === _findings.length
+        ? `${_findings.length} hallazgos`
+        : `${filtered.length} de ${_findings.length}`;
+    }
+    _renderByAsset(filtered);
+    _renderBySeverity(filtered);
+  }
+
+  function _renderByAsset(filtered) {
+    filtered = filtered || _filteredFindings();
+    const container = document.getElementById('pl-view-asset');
+    container.innerHTML = '';
+    const byAsset = {};
+    filtered.forEach(f => {
+      (byAsset[f.asset] = byAsset[f.asset] || []).push(f);
+    });
+    Object.entries(byAsset).forEach(([asset, items]) => {
+      const type  = _assetType(asset);
+      const icon  = ASSET_ICON[type] || '▶';
+      const crit  = items.filter(f => f.severity === 'critical').length;
+      const high  = items.filter(f => f.severity === 'high').length;
+      const uid   = 'ag_' + Math.random().toString(36).slice(2);
+
+      const group = document.createElement('div');
+      group.className = 'pl-asset-group';
+
+      const badges = [
+        crit ? `<span class="pl-sev-badge" style="background:${SEV_BG.critical};color:${SEV_COLOR.critical}">${crit} CRÍTICO</span>` : '',
+        high ? `<span class="pl-sev-badge" style="background:${SEV_BG.high};color:${SEV_COLOR.high}">${high} ALTO</span>` : '',
+      ].filter(Boolean).join('');
+
+      group.innerHTML = `
+        <div class="pl-asset-group-header" onclick="const b=document.getElementById('${uid}');b.style.display=b.style.display==='none'?'flex':'none'">
+          <span style="font-size:1rem">${icon}</span>
+          <span style="font-weight:700;font-size:.88rem;flex:1;font-family:monospace">${_esc(asset)}</span>
+          ${badges}
+          <span style="opacity:.35;font-size:.75rem;margin-left:.25rem">${items.length} hallazgo${items.length!==1?'s':''}</span>
+          <span style="opacity:.3;font-size:.75rem">▾</span>
+        </div>
+        <div class="pl-asset-group-body" id="${uid}" style="display:flex;flex-direction:column;gap:.5rem"></div>`;
+
+      const body = group.querySelector('.pl-asset-group-body');
+      items.forEach(f => body.appendChild(_makeFindingCard(f)));
+      container.appendChild(group);
+    });
+  }
+
+  function _renderBySeverity(filtered) {
+    filtered = filtered || _filteredFindings();
+    const container = document.getElementById('pl-view-severity');
+    container.innerHTML = '';
+    const order = ['critical','high','medium','info'];
+    order.forEach(sev => {
+      const items = filtered.filter(f => f.severity === sev);
+      if (!items.length) return;
+      const color = SEV_COLOR[sev];
+      const label = SEV_LABEL[sev];
+      const section = document.createElement('div');
+      section.className = 'pl-sev-section';
+      const header = document.createElement('div');
+      header.className = 'pl-sev-section-header';
+      header.style.cssText = `background:${SEV_BG[sev]||'rgba(255,255,255,.04)'};color:${color}`;
+      header.innerHTML = `<span style="font-weight:800">${label}</span><span style="opacity:.6;font-size:.75rem;font-weight:400">${items.length} hallazgo${items.length!==1?'s':''}</span>`;
+      section.appendChild(header);
+      const body = document.createElement('div');
+      body.style.cssText = 'display:flex;flex-direction:column;gap:.5rem';
+      items.forEach(f => body.appendChild(_makeFindingCard(f)));
+      section.appendChild(body);
+      container.appendChild(section);
+    });
+  }
+
+  function _scoreColor(s) {
+    if (s === 0)   return '#4ade80';
+    if (s <= 20)   return '#86efac';
+    if (s <= 40)   return '#a3e635';
+    if (s <= 60)   return '#eab308';
+    if (s <= 75)   return '#f97316';
+    if (s <= 89)   return '#ef4444';
+    return '#dc2626';
+  }
+
+  function _scoreDesc(s) {
+    if (s === 0)   return 'No se detectaron riesgos significativos en el análisis.';
+    if (s <= 20)   return 'Superficie de exposición mínima. Muy pocas mejoras necesarias.';
+    if (s <= 40)   return 'Exposición contenida. Hay mejoras recomendables sin urgencia.';
+    if (s <= 60)   return 'Nivel de riesgo moderado. Requiere atención en hallazgos altos.';
+    if (s <= 75)   return 'Exposición elevada. Prioriza los hallazgos críticos y altos.';
+    if (s <= 89)   return 'Riesgo muy alto. Actúa de inmediato sobre los puntos críticos.';
+    return 'Exposición máxima. Intervención urgente requerida.';
+  }
+
+  function _renderScore(score) {
+    const color    = _scoreColor(score);
+    const circumf  = 2 * Math.PI * 46;
+    const offset   = circumf * (1 - score / 100);
+
+    const arc = document.getElementById('pl-score-arc');
+    if (arc) { arc.style.stroke = color; arc.style.strokeDashoffset = offset; }
+
+    const numEl = document.getElementById('pl-score-num');
+    if (numEl) { numEl.textContent = score; numEl.style.color = color; }
+
+    const lblEl = document.getElementById('pl-score-label');
+    if (lblEl) {
+      const labels = ['Sin exposición','Muy baja','Baja','Moderada','Alta','Muy alta','Crítica'];
+      const idx = score === 0 ? 0 : score <= 20 ? 1 : score <= 40 ? 2 : score <= 60 ? 3 : score <= 75 ? 4 : score <= 89 ? 5 : 6;
+      lblEl.textContent = labels[idx];
+      lblEl.style.color = color;
+    }
+
+    const descEl = document.getElementById('pl-score-desc');
+    if (descEl) descEl.textContent = _scoreDesc(score);
+  }
+
+  function _renderSummary(score) {
+    const counts = { critical:0, high:0, medium:0, info:0 };
+    _findings.forEach(f => { if (counts[f.severity] !== undefined) counts[f.severity]++; });
+
+    // Score gauge
+    _renderScore(score ?? 0);
+
+    // Tarjetas de contadores
+    const cards = document.getElementById('pl-sev-cards');
+    cards.innerHTML = '';
+    [['critical','CRÍTICO'],['high','ALTO'],['medium','MEDIO'],['info','INFO']].forEach(([sev, lbl]) => {
+      const c = document.createElement('div');
+      c.className = 'pl-sev-card';
+      c.style.cssText = `background:${SEV_BG[sev]};border-color:${SEV_COLOR[sev]}33;cursor:pointer`;
+      c.title = `Filtrar por ${lbl}`;
+      c.innerHTML = `<div class="pl-sev-num" style="color:${SEV_COLOR[sev]}">${counts[sev]}</div><div class="pl-sev-lbl">${lbl}</div>`;
+      c.onclick = () => {
+        const btn = document.querySelector(`.pl-filter-btn[data-sev="${sev}"]`);
+        if (btn) setFilter(sev, btn);
+      };
+      cards.appendChild(c);
+    });
+
+    // Activos analizados
+    const assetsEl = document.getElementById('pl-assets-analyzed');
+    assetsEl.innerHTML = '';
+    _assets.forEach(a => {
+      const type = _assetType(a);
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .6rem;border-radius:999px;background:rgba(255,255,255,.07);font-family:monospace;font-size:.75rem;font-weight:600;border:1px solid rgba(255,255,255,.08)';
+      chip.textContent = (ASSET_ICON[type]||'▶') + ' ' + a;
+      assetsEl.appendChild(chip);
+    });
+  }
+
+  let _filterSev  = 'all';
+  let _filterText = '';
+
+  function setFilter(sev, btn) {
+    _filterSev = sev;
+    document.querySelectorAll('.pl-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  }
+
+  function applyFilters() {
+    _filterText = (document.getElementById('pl-search')?.value || '').toLowerCase().trim();
+    _rebuildViews();
+  }
+
+  function _filteredFindings() {
+    return _findings.filter(f => {
+      if (_filterSev !== 'all' && f.severity !== _filterSev) return false;
+      if (_filterText) {
+        const hay = (f.title + f.detail + f.asset + f.tool).toLowerCase();
+        if (!hay.includes(_filterText)) return false;
+      }
+      return true;
+    });
+  }
+
+  // ── Historial ──────────────────────────────────────────────────────────────
+
+  function _autoSave(pid, score) {
+    const statusEl = document.getElementById('pl-status-txt');
+    fetch('/api/analyses/save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({pipeline_id: pid, score})
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        _currentAnalysisId = d.id;
+        statusEl.textContent += ' · 💾 Guardado';
+        const expBtn = document.getElementById('pl-export-pdf-btn');
+        if (expBtn) expBtn.style.display = 'inline-flex';
+        loadHistory();
+      }
+    })
+    .catch(() => {});
+  }
+
+  function loadHistory() {
+    fetch('/api/analyses')
+      .then(r => r.json())
+      .then(rows => {
+        const el = document.getElementById('pl-history-list');
+        if (!rows.length) {
+          el.innerHTML = '<div style="font-size:.8rem;opacity:.35;text-align:center;padding:.5rem">Sin análisis guardados</div>';
+          return;
+        }
+        el.innerHTML = '';
+        rows.forEach(a => {
+          const color  = _scoreColor(a.score);
+          const seeds  = (a.seeds || []).join(', ');
+          const date   = new Date(a.created_at).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          const item   = document.createElement('div');
+          item.className = 'pl-history-item';
+          item.innerHTML = `
+            <div class="pl-history-score" style="color:${color};border-color:${color}40;background:${color}12">${a.score}</div>
+            <div class="pl-history-meta">
+              <div class="pl-history-seeds" title="${_esc(seeds)}">${_esc(seeds)}</div>
+              <div class="pl-history-sub">${date} · ${a.finding_count} hallazgos · ${a.critical} críticos · ${a.high} altos</div>
+            </div>
+            <div class="pl-history-actions">
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="loadAnalysis(${a.id})">Cargar</button>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="exportPdf(${a.id})">⬇ PDF</button>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem;color:#f87171;border-color:#f8717133" onclick="deleteAnalysis(${a.id},this)">✕</button>
+            </div>`;
+          el.appendChild(item);
+        });
+      })
+      .catch(() => {});
+  }
+
+  function exportPdf(id) {
+    window.location.href = `/api/analyses/${id}/export/pdf`;
+  }
+
+  function loadAnalysis(id) {
+    fetch(`/api/analyses/${id}`)
+      .then(r => r.json())
+      .then(a => {
+        _currentAnalysisId = id;
+        _findings = a.findings || [];
+        _assets   = new Set(a.assets || []);
+        _filterSev = 'all'; _filterText = '';
+        document.querySelectorAll('.pl-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sev === 'all'));
+        const srch = document.getElementById('pl-search'); if (srch) srch.value = '';
+
+        // Mostrar seeds en el textarea
+        const seedsEl = document.getElementById('pl-seeds');
+        if (seedsEl) seedsEl.value = (a.seeds || []).join('\n');
+
+        // Mostrar scope chips
+        const chipsEl = document.getElementById('pl-scope-chips');
+        if (chipsEl) {
+          chipsEl.innerHTML = '';
+          (a.seeds || []).forEach(s => {
+            const type = _assetType(s);
+            const chip = document.createElement('span');
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .6rem;border-radius:999px;background:rgba(255,255,255,.08);font-family:monospace;font-size:.77rem;font-weight:600';
+            chip.textContent = (ASSET_ICON[type]||'▶') + ' ' + s;
+            chipsEl.appendChild(chip);
+          });
+        }
+
+        document.getElementById('pl-progress').style.display = 'block';
+        document.getElementById('pl-spinner').style.display  = 'none';
+        document.getElementById('pl-status-txt').textContent = `📂 Análisis cargado del ${new Date(a.created_at).toLocaleDateString('es-ES')} · ${_findings.length} hallazgos`;
+        document.getElementById('pl-finding-count').textContent = _findings.length + ' hallazgos';
+        document.getElementById('pl-log').innerHTML = '';
+        document.querySelectorAll('.pl-phase').forEach((el, i) => {
+          el.classList.remove('active');
+          el.classList.add('done');
+          el.innerHTML = `✓ ${PHASE_LABELS[PHASE_ORDER[i]]}`;
+        });
+
+        document.getElementById('pl-findings').style.display = 'block';
+        const expBtn = document.getElementById('pl-export-pdf-btn');
+        if (expBtn) expBtn.style.display = 'inline-flex';
+        _updateLiveSevBar();
+        _rebuildViews();
+        _renderSummary(a.score);
+      })
+      .catch(e => alert('Error cargando análisis: ' + e));
+  }
+
+  function deleteAnalysis(id, btn) {
+    if (!confirm('¿Eliminar este análisis?')) return;
+    fetch(`/api/analyses/${id}`, {method:'DELETE'})
+      .then(r => r.json())
+      .then(d => { if (d.ok) loadHistory(); })
+      .catch(() => {});
+  }
+
+  function switchFindingsView(view) {
+    _curView = view;
+    document.getElementById('pl-view-asset').style.display    = view === 'asset'    ? 'block' : 'none';
+    document.getElementById('pl-view-severity').style.display = view === 'severity' ? 'block' : 'none';
+    document.getElementById('pl-tab-asset').classList.toggle('active',    view === 'asset');
+    document.getElementById('pl-tab-severity').classList.toggle('active', view === 'severity');
+  }
+  </script>
 
 </body>
 </html>

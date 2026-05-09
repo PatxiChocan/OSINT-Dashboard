@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify
+from app.routes.auth import login_required
 import requests
 import time
 import concurrent.futures
@@ -198,6 +199,7 @@ def _check_source(source):
 
 
 @sources_bp.route("/api/sources")
+@login_required
 def get_sources():
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
         results = list(ex.map(_check_source, SOURCES))

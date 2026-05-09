@@ -11,6 +11,11 @@ def _patched_request(self, method, url, **kwargs):
     return _orig_request(self, method, url, **kwargs)
 requests.Session.request = _patched_request
 
+KEYCLOAK_URL    = "http://localhost:8080"
+KEYCLOAK_REALM  = "aletheia"
+KEYCLOAK_CLIENT = "aletheia-app"
+KEYCLOAK_SECRET = "2Xvg8UMSzxZGI3Hs9GZP2niOEjKZvvj6"
+
 def create_app():
     app = Flask(__name__)
 
@@ -21,20 +26,50 @@ def create_app():
         "postgresql://aletheia:aletheia@localhost:5432/aletheia_db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"]   = False
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_PERMANENT"]       = False
+    app.config["SESSION_TYPE"]            = "filesystem"
+    app.config["SESSION_FILE_DIR"]        = "/tmp/aletheia-sessions"
+
+    import os as _os
+    _os.makedirs("/tmp/aletheia-sessions", exist_ok=True)
+
+    from flask_session import Session
+    Session(app)
 
     # ── Extensiones ────────────────────────────────────────────────────────────
-    from .extensions import db, login_manager, bcrypt, migrate
+    from .extensions import db, migrate, oauth
     db.init_app(app)
-    login_manager.init_app(app)
-    bcrypt.init_app(app)
     migrate.init_app(app, db)
+    oauth.init_app(app)
 
-    from .models import User
+    # ── Keycloak OIDC ──────────────────────────────────────────────────────────
+    oauth.register(
+        name="keycloak",
+        client_id=KEYCLOAK_CLIENT,
+        client_secret=KEYCLOAK_SECRET,
+        server_metadata_url=(
+            f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}/"
+            ".well-known/openid-configuration"
+        ),
+        client_kwargs={"scope": "openid email profile"},
+    )
 
-    @login_manager.user_loader
-    def load_user(user_id):
-        return db.session.get(User, int(user_id))
+    # ── Context processor ─────────────────────────────────────────────────────
+    from flask import session as _session
 
+    @app.context_processor
+    def inject_user():
+        return {
+            "current_role": _session.get("user_role", ""),
+            "current_name": _session.get("user_name", ""),
+        }
+
+    # ── Blueprints ─────────────────────────────────────────────────────────────
+    from .routes.auth import auth_bp
+    from .routes.admin import admin_bp
     from .routes.main import main
     from .routes.runner import runner
     from .routes.news import news_bp
@@ -51,7 +86,10 @@ def create_app():
     from .routes.misp import misp_bp
     from .routes.urlscan import urlscan_bp
     from .routes.nmap_discover import nmap_discover_bp
+    from .routes.pipeline import pipeline_bp
 
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
     app.register_blueprint(main)
     app.register_blueprint(runner)
     app.register_blueprint(news_bp)
@@ -68,5 +106,6 @@ def create_app():
     app.register_blueprint(misp_bp)
     app.register_blueprint(urlscan_bp)
     app.register_blueprint(nmap_discover_bp)
+    app.register_blueprint(pipeline_bp)
 
     return app

@@ -311,6 +311,18 @@ function show(id, btn) {
 
   const content = document.querySelector('.content');
   if (content) content.scrollTop = 0;
+
+  if (id === 'pipeline') {
+    const seedsEl = document.getElementById('pl-seeds');
+    if (seedsEl && !seedsEl.value.trim()) {
+      const scope = getScope();
+      if (scope) {
+        const targets = [...(scope.domains || []), ...(scope.ipRanges || [])];
+        if (targets.length) seedsEl.value = targets.join('\n');
+      }
+    }
+    if (typeof loadHistory === 'function') loadHistory();
+  }
 }
 
 function alertBadge(level) {

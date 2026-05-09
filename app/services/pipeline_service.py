@@ -1,0 +1,994 @@
+import threading
+import uuid
+import time
+import socket
+import subprocess
+import re
+import xml.etree.ElementTree as ET
+import requests
+import os
+from datetime import datetime, timezone, timedelta
+
+_pipelines: dict = {}
+_lock = threading.Lock()
+
+SHODAN_KEY = os.environ.get("SHODAN_API_KEY", "")
+INTELX_KEY = os.environ.get("INTELX_API_KEY", "")
+VT_KEY     = os.environ.get("VIRUSTOTAL_API_KEY", "")
+
+_IP_RE      = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+_PRIVATE_RE = re.compile(r'^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.)')
+_EMAIL_RE   = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+
+# Puertos con descripción y riesgo
+PORT_INFO = {
+    21:    ("FTP",                    "high",   "Transferencia de ficheros sin cifrado. Credenciales viajan en texto plano."),
+    22:    ("SSH",                    "medium", "Acceso remoto cifrado. Riesgo si versión desactualizada o contraseñas débiles."),
+    23:    ("Telnet",                 "critical","Acceso remoto SIN cifrado. Credenciales expuestas en texto plano."),
+    25:    ("SMTP",                   "medium", "Servidor de correo. Puede usarse para spam o relay abierto."),
+    53:    ("DNS",                    "medium", "Servidor DNS expuesto. Riesgo de transferencia de zona o amplificación DDoS."),
+    80:    ("HTTP",                   "low",    "Servidor web sin cifrado. Toda la comunicación es visible."),
+    110:   ("POP3",                   "high",   "Correo entrante sin cifrado. Credenciales expuestas."),
+    135:   ("RPC",                    "high",   "RPC de Windows. Vector frecuente de ataques laterales."),
+    139:   ("NetBIOS",                "high",   "Compartición de ficheros Windows. Frecuente en ataques de red interna."),
+    143:   ("IMAP",                   "medium", "Correo IMAP. Revisar si usa TLS."),
+    389:   ("LDAP",                   "high",   "Directorio activo expuesto. Puede filtrar usuarios y estructura interna."),
+    443:   ("HTTPS",                  "low",    "Servidor web cifrado. Revisar certificado y versión TLS."),
+    445:   ("SMB",                    "critical","Compartición de ficheros Windows. Blanco de ransomware (EternalBlue, WannaCry)."),
+    1433:  ("MSSQL",                  "critical","Base de datos SQL Server expuesta a Internet."),
+    1521:  ("Oracle DB",              "critical","Base de datos Oracle expuesta a Internet."),
+    3306:  ("MySQL",                  "critical","Base de datos MySQL expuesta a Internet."),
+    3389:  ("RDP",                    "critical","Escritorio remoto Windows expuesto. Blanco de ataques de fuerza bruta y BlueKeep."),
+    5432:  ("PostgreSQL",             "critical","Base de datos PostgreSQL expuesta a Internet."),
+    5900:  ("VNC",                    "critical","Control remoto de escritorio. Frecuentemente sin autenticación fuerte."),
+    6379:  ("Redis",                  "critical","Base de datos en memoria. Por defecto sin autenticación."),
+    8080:  ("HTTP Alternativo",       "medium", "Servidor web en puerto alternativo. Puede ser panel de administración."),
+    8443:  ("HTTPS Alternativo",      "medium", "Servidor web cifrado en puerto alternativo."),
+    9200:  ("Elasticsearch",          "critical","Motor de búsqueda. Por defecto sin autenticación — datos expuestos."),
+    27017: ("MongoDB",                "critical","Base de datos NoSQL expuesta. Por defecto sin autenticación."),
+    50000: ("SAP",                    "high",   "Puerto SAP. Sistemas ERP corporativos expuestos."),
+}
+
+RISKY_PORTS = set(PORT_INFO.keys())
+
+# Subdominios de alto interés por nombre
+INTERESTING_SUBS = {
+    "ftp":      ("critical", "Servidor FTP expuesto", "FTP transfiere datos sin cifrado. Cierra o reemplaza por SFTP."),
+    "smtp":     ("high",     "Servidor SMTP expuesto", "Verifica que no sea relay abierto y que use TLS."),
+    "mail":     ("medium",   "Infraestructura de correo expuesta", "Asegura SPF, DKIM y DMARC correctamente configurados."),
+    "webmail":  ("medium",   "Webmail expuesto", "Acceso web al correo corporativo. Asegura MFA y versión actualizada."),
+    "owa":      ("high",     "Outlook Web Access (OWA) expuesto", "Panel de Exchange expuesto. Vector frecuente de ataques de credenciales."),
+    "vpn":      ("medium",   "Servidor VPN expuesto", "Verifica versión y que no tenga vulnerabilidades conocidas (Fortinet, Pulse, etc.)."),
+    "admin":    ("high",     "Panel de administración expuesto", "Paneles de admin no deben ser accesibles desde Internet."),
+    "dev":      ("high",     "Entorno de desarrollo expuesto", "Los entornos dev suelen tener menos controles de seguridad."),
+    "staging":  ("high",     "Entorno de staging expuesto", "Puede contener versiones desactualizadas o datos reales."),
+    "test":     ("high",     "Entorno de pruebas expuesto", "Entornos de test frecuentemente sin medidas de seguridad."),
+    "api":      ("medium",   "API expuesta", "Revisa autenticación, rate limiting y que no exponga datos sensibles."),
+    "portal":   ("medium",   "Portal de cliente/empleado expuesto", "Verifica autenticación fuerte y control de acceso."),
+    "remote":   ("high",     "Acceso remoto expuesto", "Acceso remoto directo a Internet es un riesgo alto."),
+    "citrix":   ("high",     "Citrix expuesto", "Plataforma de virtualización — revisar versión y CVEs recientes."),
+    "git":      ("critical", "Repositorio Git expuesto", "Puede contener código fuente, credenciales y secretos."),
+    "jenkins":  ("critical", "Jenkins expuesto", "Sistema CI/CD — frecuentemente usado para movimiento lateral."),
+    "jira":     ("medium",   "Jira expuesto", "Gestión de proyectos — puede filtrar información interna."),
+    "confluence":("medium",  "Confluence expuesto", "Wiki corporativa — puede contener documentación sensible."),
+}
+
+SESSION = requests.Session()
+SESSION.verify = False
+import urllib3; urllib3.disable_warnings()
+
+
+# ── Lifecycle ──────────────────────────────────────────────────────────────────
+
+def calculate_score(findings):
+    """Score de exposición 0-100. Mayor score = mayor riesgo."""
+    c = sum(1 for f in findings if f["severity"] == "critical")
+    h = sum(1 for f in findings if f["severity"] == "high")
+    m = sum(1 for f in findings if f["severity"] == "medium")
+    i = sum(1 for f in findings if f["severity"] == "info")
+
+    pts  = min(c * 25, 50)
+    pts += min(h * 10, 30)
+    pts += min(m *  3, 15)
+    pts += min(i *  1,  5)
+    return min(100, pts)
+
+
+def score_label(score):
+    if score == 0:    return "Sin exposición detectada",    "low"
+    if score <= 20:   return "Exposición muy baja",         "low"
+    if score <= 40:   return "Exposición baja",             "low"
+    if score <= 60:   return "Exposición moderada",         "medium"
+    if score <= 75:   return "Exposición alta",             "high"
+    if score <= 89:   return "Exposición muy alta",         "high"
+    return                   "Exposición crítica",          "critical"
+
+
+def create_pipeline(seeds):
+    pid = str(uuid.uuid4())
+    with _lock:
+        _pipelines[pid] = {"status": "running", "events": [], "findings": [], "_seen": set(), "assets": [], "seeds": seeds}
+    threading.Thread(target=_run, args=(pid, seeds), daemon=True).start()
+    return pid
+
+
+def get_pipeline_data(pid):
+    with _lock:
+        p = _pipelines.get(pid)
+        if not p:
+            return None
+        return {
+            "seeds":    p.get("seeds", []),
+            "assets":   p.get("assets", []),
+            "score":    p.get("score", 0),
+            "findings": p.get("findings", []),
+            "status":   p.get("status", ""),
+        }
+
+def get_events(pid, from_idx=0):
+    with _lock:
+        p = _pipelines.get(pid)
+        if not p: return None, None
+        return p["events"][from_idx:], p["status"]
+
+def get_findings(pid):
+    with _lock:
+        p = _pipelines.get(pid)
+        return p["findings"] if p else []
+
+def _push(pid, ev):
+    with _lock:
+        if pid in _pipelines:
+            _pipelines[pid]["events"].append(ev)
+
+def _log(pid, msg):  _push(pid, {"type": "stage",   "msg": msg})
+def _err(pid, msg):  _push(pid, {"type": "error",   "msg": msg})
+
+def _finding(pid, asset, tool, severity, title, detail, rec=""):
+    # Dedup key: mismo activo + título normalizado — herramienta excluida para eliminar
+    # duplicados cross-tool (subfinder + crt.sh, nmap + shodan en mismo puerto, etc.)
+    dedup_key = (asset.lower(), title.strip()[:80].lower())
+    with _lock:
+        p = _pipelines.get(pid)
+        if not p:
+            return
+        if dedup_key in p["_seen"]:
+            return
+        p["_seen"].add(dedup_key)
+        f = {"asset": asset, "tool": tool, "severity": severity,
+             "title": title, "detail": detail, "recommendation": rec}
+        p["findings"].append(f)
+    _push(pid, {"type": "finding", **f})
+
+def _is_ip(s):       return bool(_IP_RE.fullmatch(s.strip()))
+def _is_public(ip):  return not _PRIVATE_RE.match(ip)
+def _is_email(s):    return bool(_EMAIL_RE.fullmatch(s.strip()))
+def _asset_type(s):
+    if _is_ip(s):    return "ip"
+    if _is_email(s): return "email"
+    return "domain"
+
+def _usernames_from_email(email):
+    local = email.split("@")[0].lower()
+    c = {local, local.replace(".", ""), local.replace(".", "_")}
+    if "." in local: c.add(local.split(".")[0])
+    return list(c)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FASE 1 — DOMINIO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _whois(pid, domain):
+    _log(pid, f"[WHOIS] Consultando registro de {domain}...")
+    usernames = []
+    try:
+        out = subprocess.run(["whois", domain], capture_output=True, text=True, timeout=15).stdout
+        fields = {}
+        for line in out.splitlines():
+            if ":" in line:
+                k, _, v = line.partition(":")
+                k = k.strip().lower(); v = v.strip()
+                if v and k not in fields:
+                    fields[k] = v
+
+        registrant  = fields.get("registrant name") or fields.get("registrant") or "Privado / Oculto"
+        registrar   = fields.get("registrar", "—")
+        created     = fields.get("creation date") or fields.get("created", "—")
+        expires_raw = fields.get("registry expiry date") or fields.get("expiry date") or fields.get("expires", "")
+        nameservers = [v for k, v in fields.items() if "name server" in k or "nserver" in k]
+        privacy     = "redacted" in registrant.lower() or "privacy" in registrant.lower()
+
+        detail_parts = [
+            f"Registrante: {'[PRIVADO — datos ocultos por privacy protection]' if privacy else registrant}",
+            f"Registrar: {registrar}",
+            f"Fecha de creación: {created[:25] if created != '—' else '—'}",
+            f"Expiración: {expires_raw[:25] if expires_raw else '—'}",
+            f"Nameservers: {', '.join(nameservers[:4]) if nameservers else '—'}",
+        ]
+
+        # Alerta de expiración próxima
+        expiry_warning = ""
+        if expires_raw:
+            for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    exp_dt = datetime.strptime(expires_raw[:19], fmt[:len(expires_raw[:19])])
+                    days_left = (exp_dt - datetime.utcnow()).days
+                    if days_left < 90:
+                        expiry_warning = f"⚠ El dominio expira en {days_left} días ({expires_raw[:10]})."
+                    break
+                except Exception:
+                    continue
+
+        _finding(pid, domain, "whois", "high" if expiry_warning else "info",
+                 f"Registro WHOIS de {domain}",
+                 "\n".join(detail_parts) + (f"\n{expiry_warning}" if expiry_warning else ""),
+                 expiry_warning if expiry_warning else
+                 "Verifica que el registrante y nameservers sean los esperados. Renueva con antelación.")
+
+        if privacy:
+            _finding(pid, domain, "whois", "info",
+                     "Privacy protection activa en WHOIS",
+                     "Los datos del registrante están ocultos (privacy protection). "
+                     "Esto es una buena práctica — impide correlacionar el dominio con datos personales.",
+                     "Mantén la privacy protection activa.")
+
+        # Extraer username del registrante solo si es un nombre real (no texto de privacy)
+        skip_words = {"redacted", "privacy", "protected", "withheld", "masked", "hidden", "data"}
+        if registrant and not privacy and " " in registrant and len(registrant) < 40:
+            parts = registrant.lower().split()
+            if len(parts) >= 2 and not any(w in skip_words for w in parts):
+                usernames.extend([parts[0][0] + parts[-1], parts[0] + "." + parts[-1]])
+
+    except FileNotFoundError:
+        _log(pid, "[WHOIS] whois no instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[WHOIS] Error: {e}")
+    return usernames
+
+
+def _dns_quick(pid, domain) -> list:
+    """Solo resuelve IPs — para subdominios, sin análisis SPF/DMARC."""
+    ips = set()
+    try:
+        for info in socket.getaddrinfo(domain, None, socket.AF_INET):
+            ip = info[4][0]
+            if _is_public(ip): ips.add(ip)
+    except Exception:
+        pass
+    if ips:
+        _log(pid, f"[DNS] {domain} → {', '.join(ips)}")
+    return list(ips)
+
+
+def _dns(pid, domain):
+    _log(pid, f"[DNS] Analizando registros DNS de {domain}...")
+    ips = set()
+
+    # A records
+    try:
+        for info in socket.getaddrinfo(domain, None, socket.AF_INET):
+            ip = info[4][0]
+            if _is_public(ip): ips.add(ip)
+        if ips:
+            _finding(pid, domain, "dns", "info",
+                     f"Registros A — IPs públicas de {domain}",
+                     f"El dominio resuelve a: {', '.join(ips)}\n"
+                     f"Estas IPs son el punto de entrada público de la infraestructura.",
+                     "Verifica que solo estén expuestas las IPs estrictamente necesarias.")
+    except Exception:
+        pass
+
+    # MX — infraestructura de correo
+    try:
+        mx_out = subprocess.run(["dig", "+short", "MX", domain],
+                                capture_output=True, text=True, timeout=8).stdout.strip()
+        if mx_out:
+            _finding(pid, domain, "dns", "info",
+                     f"Registros MX — Infraestructura de correo de {domain}",
+                     f"Servidores de correo: {mx_out[:300]}\n"
+                     f"Estos servidores gestionan el correo entrante de la organización.",
+                     "Verifica SPF, DKIM y DMARC para proteger el correo de suplantación.")
+    except Exception:
+        pass
+
+    # TXT — SPF / DMARC / DKIM
+    try:
+        txt_out = subprocess.run(["dig", "+short", "TXT", domain],
+                                 capture_output=True, text=True, timeout=8).stdout.strip()
+        if txt_out:
+            has_spf   = "v=spf1"  in txt_out
+            has_dmarc_check = subprocess.run(
+                ["dig", "+short", "TXT", f"_dmarc.{domain}"],
+                capture_output=True, text=True, timeout=8).stdout.strip()
+            has_dmarc = bool(has_dmarc_check)
+
+            if not has_spf:
+                _finding(pid, domain, "dns", "high",
+                         f"SPF no configurado en {domain}",
+                         "No se detectó registro SPF en los TXT del dominio.\n"
+                         "Sin SPF cualquiera puede enviar correos suplantando este dominio.",
+                         "Configura un registro SPF: ej. 'v=spf1 include:tu-proveedor.com -all'")
+            else:
+                _finding(pid, domain, "dns", "info",
+                         f"SPF configurado en {domain}",
+                         f"SPF detectado: {[l for l in txt_out.splitlines() if 'spf1' in l][0][:200]}",
+                         "Revisa que el SPF cubra todos los servidores de envío y use '-all' al final.")
+
+            if not has_dmarc:
+                _finding(pid, domain, "dns", "high",
+                         f"DMARC no configurado en {domain}",
+                         "No se detectó política DMARC (_dmarc.dominio).\n"
+                         "Sin DMARC los correos falsos que pasen SPF/DKIM no se bloquean ni reportan.",
+                         "Configura DMARC: 'v=DMARC1; p=reject; rua=mailto:dmarc@tudominio.com'")
+            else:
+                _finding(pid, domain, "dns", "info",
+                         f"DMARC configurado en {domain}",
+                         f"DMARC detectado: {has_dmarc_check[:200]}",
+                         "Verifica que la política sea 'p=reject' para máxima protección.")
+    except Exception:
+        pass
+
+    # NS
+    try:
+        ns_out = subprocess.run(["dig", "+short", "NS", domain],
+                                capture_output=True, text=True, timeout=8).stdout.strip()
+        if ns_out:
+            _finding(pid, domain, "dns", "info",
+                     f"Nameservers de {domain}",
+                     f"DNS autoritativos: {ns_out[:200]}",
+                     "Asegúrate de que los nameservers sean los correctos y estén configurados con DNSSEC si es posible.")
+    except Exception:
+        pass
+
+    return list(ips)
+
+
+def _subfinder(pid, domain):
+    _log(pid, f"[Subfinder] Enumerando subdominios de {domain}...")
+    subs = []
+    try:
+        out = subprocess.run(
+            ["subfinder", "-d", domain, "-silent", "-timeout", "30"],
+            capture_output=True, text=True, timeout=60
+        ).stdout.strip()
+        subs = [s.strip() for s in out.splitlines() if s.strip()]
+        if subs:
+            _log(pid, f"[Subfinder] {len(subs)} subdominios encontrados")
+            _analizar_subdominios(pid, domain, subs, "subfinder")
+        else:
+            _log(pid, "[Subfinder] Sin subdominios")
+    except FileNotFoundError:
+        _log(pid, "[Subfinder] No instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[Subfinder] Error: {e}")
+    return subs
+
+
+def _crtsh(pid, domain):
+    _log(pid, f"[crt.sh] Certificados SSL de {domain}...")
+    subs = set()
+    try:
+        r = SESSION.get(f"https://crt.sh/?q=%.{domain}&output=json", timeout=15)
+        if r.status_code == 200:
+            for entry in r.json():
+                for name in entry.get("name_value", "").splitlines():
+                    name = name.strip().lstrip("*.")
+                    if name.endswith(f".{domain}") or name == domain:
+                        subs.add(name)
+        if subs:
+            _log(pid, f"[crt.sh] {len(subs)} subdominios en certificados")
+            _analizar_subdominios(pid, domain, list(subs), "crt.sh")
+        else:
+            _log(pid, "[crt.sh] Sin resultados")
+    except Exception as e:
+        _err(pid, f"[crt.sh] Error: {e}")
+    return list(subs)
+
+
+def _analizar_subdominios(pid, domain, subs, tool):
+    """Analiza la lista de subdominios y genera hallazgos por categoría y riesgo."""
+    interesting = []
+    random_looking = []
+    normal = []
+
+    for sub in subs:
+        prefix = sub.replace(f".{domain}", "").split(".")[0].lower()
+        if prefix in INTERESTING_SUBS:
+            interesting.append((sub, prefix))
+        elif re.match(r'^[a-z0-9]{10,}$', prefix):  # subdominio aleatorio
+            random_looking.append(sub)
+        else:
+            normal.append(sub)
+
+    # Hallazgo por subdominio interesante
+    for sub, prefix in interesting:
+        sev, title_suffix, rec = INTERESTING_SUBS[prefix]
+        _finding(pid, sub, tool, sev,
+                 f"{title_suffix}: {sub}",
+                 f"Subdominio '{sub}' detectado — {INTERESTING_SUBS[prefix][1]}.\n"
+                 f"Herramienta: {tool}. Este tipo de subdominio suele exponer servicios sensibles.",
+                 rec)
+
+    # Subdominios con nombre aleatorio (posible CDN o takeover risk)
+    if random_looking:
+        _finding(pid, domain, tool, "medium",
+                 f"{len(random_looking)} subdominios con nombre aleatorio detectados",
+                 f"Subdominios: {', '.join(random_looking[:10])}\n"
+                 f"Los nombres aleatorios pueden indicar CDN, servicios de terceros o subdominios huérfanos "
+                 f"susceptibles a subdomain takeover.",
+                 "Verifica que estos subdominios estén activos y controlados. "
+                 "Si apuntan a servicios externos ya no usados, elimínalos para evitar subdomain takeover.")
+
+    # Resumen de todos
+    if subs:
+        _finding(pid, domain, tool, "info",
+                 f"{len(subs)} subdominios encontrados con {tool}",
+                 f"Lista completa: {', '.join(subs[:30])}{'...' if len(subs)>30 else ''}",
+                 "Revisa que todos los subdominios sean legítimos y necesarios.")
+
+
+def _shodan_domain(pid, domain):
+    if not SHODAN_KEY: return []
+    _log(pid, f"[Shodan] Servicios indexados de {domain}...")
+    ips = set()
+    try:
+        r = SESSION.get("https://api.shodan.io/shodan/host/search",
+                        params={"key": SHODAN_KEY, "query": f"hostname:{domain}"},
+                        timeout=20)
+        if r.status_code == 200:
+            for m in r.json().get("matches", []):
+                ip = m.get("ip_str", "")
+                if ip and _is_public(ip):
+                    ips.add(ip)
+                    port    = m.get("port", "")
+                    product = m.get("product", "")
+                    version = m.get("version", "")
+                    banner  = (m.get("data") or "")[:200].replace("\n", " ")
+                    if port:
+                        pinfo = PORT_INFO.get(port, ("", "info", ""))
+                        _finding(pid, ip, "shodan", pinfo[1] if pinfo else "info",
+                                 f"Shodan indexó {ip}:{port} ({product} {version})".strip(),
+                                 f"IP: {ip} | Puerto: {port} | Servicio: {product} {version}\n"
+                                 f"Banner: {banner}\n"
+                                 f"Contexto: {pinfo[2] if pinfo else ''}",
+                                 f"Verifica que este servicio deba estar expuesto públicamente.")
+            if ips:
+                _log(pid, f"[Shodan] {len(ips)} IPs indexadas: {', '.join(ips)}")
+    except Exception as e:
+        _err(pid, f"[Shodan] Error: {e}")
+    return list(ips)
+
+
+def _virustotal_domain(pid, domain):
+    if not VT_KEY: return []
+    _log(pid, f"[VirusTotal] Reputación de {domain}...")
+    extra_ips = []
+    try:
+        r = SESSION.get(f"https://www.virustotal.com/api/v3/domains/{domain}",
+                        headers={"x-apikey": VT_KEY}, timeout=20)
+        if r.status_code != 200: return []
+        attrs     = r.json().get("data", {}).get("attributes", {})
+        stats     = attrs.get("last_analysis_stats", {})
+        malicious = stats.get("malicious", 0)
+        suspicious = stats.get("suspicious", 0)
+        total     = sum(stats.values()) or 1
+        cats      = set(attrs.get("categories", {}).values())
+
+        if malicious > 0:
+            _finding(pid, domain, "virustotal", "critical",
+                     f"{domain} marcado como MALICIOSO por {malicious}/{total} motores AV",
+                     f"Detecciones: {malicious} malicioso, {suspicious} sospechoso de {total} motores.\n"
+                     f"Categorías: {', '.join(cats)}",
+                     "El dominio puede estar comprometido, usarse para phishing o distribuir malware. Investiga de inmediato.")
+        elif suspicious > 0:
+            _finding(pid, domain, "virustotal", "medium",
+                     f"{domain} sospechoso en {suspicious}/{total} motores AV",
+                     f"Sospechoso: {suspicious}/{total}\nCategorías: {', '.join(cats)}",
+                     "Monitoriza y revisa actividad maliciosa reciente.")
+        else:
+            _finding(pid, domain, "virustotal", "info",
+                     f"{domain} limpio en VirusTotal ({total} motores)",
+                     f"Ningún motor AV lo marca como malicioso.\nCategorías: {', '.join(cats) or '—'}",
+                     "Continúa monitorizando periódicamente.")
+
+        for rec in attrs.get("last_dns_records", []):
+            if rec.get("type") == "A":
+                ip = rec.get("value", "")
+                if _is_ip(ip) and _is_public(ip):
+                    extra_ips.append(ip)
+    except Exception as e:
+        _err(pid, f"[VirusTotal] Error dominio: {e}")
+    return extra_ips
+
+
+def _urlscan(pid, domain):
+    _log(pid, f"[urlscan] Análisis web de {domain}...")
+    ips = []
+    try:
+        r = SESSION.get("https://urlscan.io/api/v1/search/",
+                        params={"q": f"domain:{domain}", "size": 10},
+                        headers={"User-Agent": "AletheiaOSINT/1.0"}, timeout=15)
+        if r.status_code != 200: return []
+        results   = r.json().get("results", [])
+        malicious = [x for x in results if x.get("verdicts", {}).get("overall", {}).get("malicious")]
+        techs_all = set()
+        for item in results:
+            ip = item.get("page", {}).get("ip", "")
+            if ip and _is_public(ip) and ip not in ips:
+                ips.append(ip)
+            for t in item.get("verdicts", {}).get("overall", {}).get("tags", []):
+                techs_all.add(t)
+
+        _log(pid, f"[urlscan] {len(results)} escaneos previos para {domain}")
+
+        if results:
+            sample = results[0]
+            page   = sample.get("page", {})
+            _finding(pid, domain, "urlscan", "critical" if malicious else "info",
+                     f"urlscan: {'⚠ MALICIOSO' if malicious else 'Análisis web'} de {domain}",
+                     f"Escaneos previos: {len(results)} | IP: {page.get('ip','—')} | País: {page.get('country','—')}\n"
+                     f"Servidor: {page.get('server','—')} | ASN: {page.get('asnname','—')}\n"
+                     f"Tags detectados: {', '.join(techs_all) if techs_all else '—'}\n"
+                     f"Veredictos maliciosos: {len(malicious)}/{len(results)}",
+                     "Revisa el contenido del sitio regularmente en urlscan.io" +
+                     (" — SE HAN DETECTADO VEREDICTOS MALICIOSOS." if malicious else "."))
+    except Exception as e:
+        _err(pid, f"[urlscan] Error: {e}")
+    return ips
+
+
+def _intelx(pid, asset):
+    if not INTELX_KEY: return
+    _log(pid, f"[IntelX] Buscando '{asset}' en filtraciones...")
+    try:
+        r = SESSION.post("https://2.intelx.io/intelligent/search",
+                         headers={"x-key": INTELX_KEY},
+                         json={"term": asset, "maxresults": 20, "media": 0,
+                               "sort": 4, "terminate": []}, timeout=15)
+        if r.status_code != 200: return
+        sid = r.json().get("id", "")
+        if not sid: return
+        time.sleep(3)
+        r2 = SESSION.get(f"https://2.intelx.io/intelligent/search/result?id={sid}&limit=20",
+                         headers={"x-key": INTELX_KEY}, timeout=15)
+        records = r2.json().get("records", []) if r2.status_code == 200 else []
+        if records:
+            buckets = {}
+            for rec in records:
+                bucket = rec.get("bucket", "desconocido")
+                buckets[bucket] = buckets.get(bucket, 0) + 1
+            bucket_detail = ", ".join(f"{k}: {v}" for k, v in buckets.items())
+            _finding(pid, asset, "intelx", "high",
+                     f"{len(records)} registros de '{asset}' en filtraciones / dark web",
+                     f"IntelX encontró {len(records)} apariciones en bases de datos comprometidas.\n"
+                     f"Fuentes por tipo: {bucket_detail}\n"
+                     f"Esto indica que datos asociados a '{asset}' han sido expuestos en brechas de seguridad.",
+                     "Revisa qué credenciales o datos están expuestos. "
+                     "Cambia contraseñas afectadas y notifica a los usuarios si procede.")
+        else:
+            _finding(pid, asset, "intelx", "info",
+                     f"Sin filtraciones de '{asset}' en IntelX",
+                     f"No se encontraron registros de '{asset}' en bases de datos de filtraciones conocidas.",
+                     "Continúa monitorizando periódicamente.")
+    except Exception as e:
+        _err(pid, f"[IntelX] Error: {e}")
+
+
+def _harvester(pid, domain):
+    _log(pid, f"[theHarvester] Emails y subdominios de {domain}...")
+    emails = []
+    try:
+        proc = subprocess.run(
+            ["theHarvester", "-d", domain, "-b", "crtsh,certspotter,hackertarget,duckduckgo"],
+            capture_output=True, text=True, timeout=60
+        )
+        output = proc.stdout + proc.stderr
+        found  = list(set(re.findall(r'[a-zA-Z0-9._%+\-]+@' + re.escape(domain), output)))
+        emails = [e for e in found if _EMAIL_RE.fullmatch(e)]
+        if emails:
+            _finding(pid, domain, "harvester", "medium",
+                     f"{len(emails)} emails corporativos expuestos públicamente",
+                     f"Emails encontrados indexados en fuentes públicas:\n" +
+                     "\n".join(f"  • {e}" for e in emails[:15]) +
+                     (f"\n  ... y {len(emails)-15} más" if len(emails)>15 else "") +
+                     "\n\nEstos emails pueden usarse para ataques de phishing dirigido (spear phishing) "
+                     "o credential stuffing contra servicios corporativos.",
+                     "Minimiza la exposición pública de emails corporativos. "
+                     "Usa alias genéricos (info@, contacto@) en la web. "
+                     "Forma a los empleados sobre phishing.")
+            _log(pid, f"[theHarvester] {len(emails)} emails: {', '.join(emails[:5])}")
+        else:
+            _log(pid, "[theHarvester] Sin emails encontrados")
+    except FileNotFoundError:
+        _log(pid, "[theHarvester] No instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[theHarvester] Error: {e}")
+    return emails
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FASE 2 — IPs
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _nmap(pid, ip):
+    _log(pid, f"[Nmap] Escaneando {ip} — puertos, versiones y scripts...")
+    try:
+        proc = subprocess.run(
+            ["/usr/bin/nmap", "-sV", "--open", "-T4", "--top-ports", "1000",
+             "--script", "banner,http-title,ssl-cert,smtp-commands,ftp-anon",
+             "--script-timeout", "10s",
+             "-oX", "-", ip],
+            capture_output=True, text=True, timeout=120
+        )
+        if not proc.stdout.strip():
+            _log(pid, f"[Nmap] Sin output para {ip}")
+            return
+
+        root = ET.fromstring(proc.stdout)
+
+        for port_el in root.findall(".//port"):
+            state_el = port_el.find("state")
+            if state_el is None or state_el.get("state") != "open":
+                continue
+
+            portid   = int(port_el.get("portid", 0))
+            protocol = port_el.get("protocol", "tcp")
+            svc      = port_el.find("service")
+            name     = svc.get("name", "")    if svc is not None else ""
+            product  = svc.get("product", "") if svc is not None else ""
+            version  = svc.get("version", "") if svc is not None else ""
+            extra    = svc.get("extrainfo","") if svc is not None else ""
+
+            pinfo = PORT_INFO.get(portid)
+            sev   = pinfo[1] if pinfo else ("medium" if portid not in (80, 443) else "low")
+            ctx   = pinfo[2] if pinfo else ""
+
+            # Scripts output para este puerto
+            scripts_txt = []
+            vuln_found  = False
+            for script in port_el.findall("script"):
+                sid    = script.get("id", "")
+                sout   = script.get("output", "").strip()
+                if not sout:
+                    continue
+                # Ignorar scripts que fallaron (no son hallazgos reales)
+                if "ERROR:" in sout and "Script execution failed" in sout:
+                    continue
+                scripts_txt.append(f"[{sid}]: {sout[:300]}")
+                sout_upper = sout.upper()
+                if "VULNERABLE" in sout_upper and "NOT VULNERABLE" not in sout_upper:
+                    vuln_found = True
+
+            if vuln_found:
+                sev = "critical"
+
+            detail = (
+                f"Puerto: {portid}/{protocol}\n"
+                f"Servicio: {name} {product} {version} {extra}".strip() + "\n"
+                f"Contexto: {ctx}\n"
+            )
+            if scripts_txt:
+                detail += "Scripts Nmap:\n" + "\n".join(scripts_txt[:5])
+
+            _finding(pid, ip, "nmap", sev,
+                     f"{'⚠ VULNERABLE — ' if vuln_found else ''}"
+                     f"Puerto {portid}/{protocol} abierto: {name} {product} {version}".strip(),
+                     detail,
+                     f"{'VULNERABILIDAD CONFIRMADA — parchea de inmediato.' if vuln_found else ''} "
+                     f"{ctx}")
+
+    except subprocess.TimeoutExpired:
+        _err(pid, f"[Nmap] Timeout en {ip}")
+    except ET.ParseError:
+        _err(pid, f"[Nmap] Error parseando XML de {ip}")
+    except FileNotFoundError:
+        _err(pid, "[Nmap] nmap no encontrado")
+    except Exception as e:
+        _err(pid, f"[Nmap] Error: {e}")
+
+
+def _shodan_host(pid, ip):
+    if not SHODAN_KEY: return
+    _log(pid, f"[Shodan] Datos de host {ip}...")
+    try:
+        r = SESSION.get(f"https://api.shodan.io/shodan/host/{ip}",
+                        params={"key": SHODAN_KEY}, timeout=20)
+        if r.status_code == 404:
+            _log(pid, f"[Shodan] {ip} no indexado"); return
+        if r.status_code != 200: return
+        d         = r.json()
+        vulns     = d.get("vulns", {})
+        org       = d.get("org", "—")
+        country   = d.get("country_name", "")
+        os_       = d.get("os") or "desconocido"
+        hostnames = d.get("hostnames", [])
+        isp       = d.get("isp", "—")
+        asn       = d.get("asn", "—")
+
+        _finding(pid, ip, "shodan", "info",
+                 f"Perfil de host {ip} en Shodan",
+                 f"Organización: {org}\nISP: {isp}\nASN: {asn}\nPaís: {country}\n"
+                 f"Sistema operativo: {os_}\nHostnames: {', '.join(hostnames[:5]) or '—'}\n"
+                 f"CVEs conocidos: {len(vulns)}",
+                 "Verifica que esta IP pertenezca a la organización y que los datos sean correctos.")
+
+        for cve, info in (vulns.items() if isinstance(vulns, dict) else {}.items()):
+            if not isinstance(info, dict):
+                continue
+            cvss2   = float(info.get("cvss",  0) or 0)
+            cvss3   = float(info.get("cvss3", 0) or 0)
+            kev     = bool(info.get("kev", False))
+            epss    = float(info.get("epss", 0) or 0)
+            summary = info.get("summary", "")[:300]
+
+            # Usar CVSS v3 si disponible, si no v2
+            if cvss3 > 0:
+                score, cvss_ver = cvss3, "v3.1"
+            else:
+                score, cvss_ver = cvss2, "v2.0"
+
+            sev = "critical" if score >= 9 else "high" if score >= 7 else "medium" if score >= 4 else "low"
+            sev_label = "CRÍTICA" if score >= 9 else "ALTA" if score >= 7 else "MEDIA" if score >= 4 else "BAJA"
+
+            kev_note = "\n⚠ KEV: Esta vulnerabilidad está siendo explotada activamente (CISA KEV)." if kev else ""
+            epss_note = f"\nEPSS: {epss:.1%} probabilidad de explotación en los próximos 30 días." if epss > 0 else ""
+
+            _finding(pid, ip, "shodan", sev,
+                     f"{cve} — CVSS {cvss_ver} {score} ({sev_label}){' [KEV]' if kev else ''}",
+                     f"CVE: {cve}\nCVSS {cvss_ver}: {score}/10 — Gravedad: {sev_label}"
+                     f"{f' | CVSS v2: {cvss2}' if cvss3 > 0 and cvss2 > 0 else ''}\n"
+                     f"Descripción: {summary}"
+                     f"{kev_note}{epss_note}",
+                     f"Parchea {cve} de inmediato — CVSS {score}/10.{' Explotación activa confirmada (KEV).' if kev else ''}")
+    except Exception as e:
+        _err(pid, f"[Shodan] Error host: {e}")
+
+
+def _internetdb(pid, ip):
+    _log(pid, f"[InternetDB] Exposición rápida de {ip}...")
+    try:
+        r = SESSION.get(f"https://internetdb.shodan.io/{ip}", timeout=10)
+        if r.status_code != 200: return
+        d = r.json()
+        risky = [p for p in d.get("ports", []) if p in RISKY_PORTS]
+        if risky:
+            descs = []
+            for p in risky:
+                pinfo = PORT_INFO.get(p, ("", "high", ""))
+                descs.append(f"  • Puerto {p} ({pinfo[0]}): {pinfo[2]}")
+            _finding(pid, ip, "exposure", "high",
+                     f"Servicios de alto riesgo expuestos en {ip}",
+                     f"Puertos críticos detectados por InternetDB:\n" + "\n".join(descs),
+                     "Aplica firewall o VPN para proteger estos servicios. "
+                     "Ningún servicio de administración debe estar expuesto directamente a Internet.")
+        for cve in d.get("vulns", []):
+            _finding(pid, ip, "exposure", "high",
+                     f"{cve} activo en {ip}",
+                     f"InternetDB (Shodan) confirma la vulnerabilidad {cve} activa en este host.",
+                     f"Parchea {cve} de inmediato.")
+    except Exception as e:
+        _err(pid, f"[InternetDB] Error: {e}")
+
+
+def _virustotal_ip(pid, ip):
+    if not VT_KEY: return
+    _log(pid, f"[VirusTotal] Reputación de {ip}...")
+    try:
+        r = SESSION.get(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}",
+                        headers={"x-apikey": VT_KEY}, timeout=20)
+        if r.status_code != 200: return
+        attrs     = r.json().get("data", {}).get("attributes", {})
+        stats     = attrs.get("last_analysis_stats", {})
+        malicious = stats.get("malicious", 0)
+        total     = sum(stats.values()) or 1
+        country   = attrs.get("country", "—")
+        asn       = attrs.get("asn", "—")
+        owner     = attrs.get("as_owner", "—")
+
+        if malicious > 0:
+            _finding(pid, ip, "virustotal", "high",
+                     f"{ip} malicioso en {malicious}/{total} motores AV",
+                     f"Detecciones: {malicious}/{total}\nPaís: {country}\nASN: {asn} ({owner})\n"
+                     f"Esta IP ha sido reportada como maliciosa por motores de seguridad.",
+                     "Investiga el uso de esta IP. Puede estar comprometida o ser infraestructura C2.")
+        else:
+            _finding(pid, ip, "virustotal", "info",
+                     f"{ip} limpio en VirusTotal",
+                     f"0 detecciones de {total} motores.\nPaís: {country} | ASN: {asn} ({owner})",
+                     "Sin alertas. Monitoriza periódicamente.")
+    except Exception as e:
+        _err(pid, f"[VirusTotal] Error IP: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FASE 3 — Emails
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _blackbird(pid, email):
+    _log(pid, f"[Blackbird] Presencia de {email} en plataformas...")
+    usernames = _usernames_from_email(email)
+    try:
+        proc = subprocess.run(
+            ["blackbird", "-u", email.split("@")[0], "--no-update"],
+            capture_output=True, text=True, timeout=120
+        )
+        output = proc.stdout + proc.stderr
+        found  = re.findall(r'\[✓\]\s+(.+)', output)
+        if found:
+            _finding(pid, email, "blackbird", "medium",
+                     f"Presencia de '{email.split('@')[0]}' en {len(found)} plataformas online",
+                     f"Plataformas donde se encontró el username:\n" +
+                     "\n".join(f"  • {p}" for p in found[:20]) +
+                     f"\n\nEsta presencia pública puede usarse para OSINT del empleado "
+                     f"(ingeniería social, spear phishing, acceso a cuentas corporativas).",
+                     "Evalúa si estas cuentas deben existir públicamente. "
+                     "Forma a los empleados sobre el riesgo de usar el email/username corporativo en servicios externos.")
+            _log(pid, f"[Blackbird] {len(found)} plataformas para {email}")
+        else:
+            _log(pid, f"[Blackbird] Sin resultados para {email}")
+    except FileNotFoundError:
+        _log(pid, "[Blackbird] No instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[Blackbird] Error: {e}")
+    return usernames
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FASE 4 — Usernames
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _sherlock(pid, username):
+    _log(pid, f"[Sherlock] Buscando '{username}' en redes sociales...")
+    try:
+        proc = subprocess.run(
+            ["sherlock", username, "--timeout", "10", "--print-found"],
+            capture_output=True, text=True, timeout=120
+        )
+        found = re.findall(r'\[\+\]\s+(https?://\S+)', proc.stdout)
+        if found:
+            _finding(pid, username, "sherlock", "medium",
+                     f"Username '{username}' encontrado en {len(found)} plataformas",
+                     f"Perfiles encontrados:\n" + "\n".join(f"  • {u}" for u in found[:20]) +
+                     f"\n\nLa presencia de este username en plataformas públicas permite "
+                     f"construir un perfil del empleado para ingeniería social.",
+                     "Revisa si estas cuentas pertenecen a empleados y si contienen información sensible.")
+            _log(pid, f"[Sherlock] {len(found)} perfiles para '{username}'")
+        else:
+            _log(pid, f"[Sherlock] Sin perfiles para '{username}'")
+    except FileNotFoundError:
+        _log(pid, "[Sherlock] No instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[Sherlock] Error: {e}")
+
+
+def _maigret(pid, username):
+    _log(pid, f"[Maigret] OSINT de username '{username}'...")
+    try:
+        proc = subprocess.run(
+            ["maigret", username, "--no-color", "-a", "--timeout", "10", "--retries", "1"],
+            capture_output=True, text=True, timeout=180
+        )
+        found = re.findall(r'\[\+\]\s+\w+:\s+(https?://\S+)', proc.stdout)
+        if found:
+            _finding(pid, username, "maigret", "medium",
+                     f"Maigret: '{username}' en {len(found)} sitios",
+                     f"Sitios detectados:\n" + "\n".join(f"  • {u}" for u in found[:20]) +
+                     f"\n\nMaigret usa análisis avanzado para correlacionar identidades online.",
+                     "Analiza los perfiles encontrados — pueden revelar datos personales o profesionales.")
+            _log(pid, f"[Maigret] {len(found)} sitios para '{username}'")
+        else:
+            _log(pid, f"[Maigret] Sin resultados para '{username}'")
+    except FileNotFoundError:
+        _log(pid, "[Maigret] No instalado, omitiendo")
+    except Exception as e:
+        _err(pid, f"[Maigret] Error: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ORCHESTRATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _run(pid, seeds):
+    visited_domains   = set()
+    visited_ips       = set()
+    visited_emails    = set()
+    visited_usernames = set()
+    ip_queue          = []
+    email_queue       = []
+    username_queue    = []
+
+    try:
+        for seed in seeds:
+            seed  = seed.strip().lower()
+            atype = _asset_type(seed)
+
+            if atype == "domain" and seed not in visited_domains:
+                visited_domains.add(seed)
+                _push(pid, {"type": "asset_start", "asset": seed, "asset_type": "domain"})
+
+                new_ips = set()
+                username_queue.extend(_whois(pid, seed))
+                new_ips.update(_dns(pid, seed))
+
+                all_subs = set(_subfinder(pid, seed)) | set(_crtsh(pid, seed))
+                for sub in list(all_subs)[:10]:
+                    if sub not in visited_domains:
+                        visited_domains.add(sub)
+                        new_ips.update(_dns_quick(pid, sub))
+
+                new_ips.update(_shodan_domain(pid, seed))
+                new_ips.update(_virustotal_domain(pid, seed) or [])
+                new_ips.update(_urlscan(pid, seed) or [])
+                _intelx(pid, seed)
+
+                for em in _harvester(pid, seed):
+                    if em not in visited_emails:
+                        email_queue.append(em)
+
+                for ip in new_ips:
+                    if _is_public(ip) and ip not in visited_ips:
+                        ip_queue.append(ip)
+
+                _push(pid, {"type": "asset_done", "asset": seed})
+
+            elif atype == "ip" and seed not in visited_ips:
+                ip_queue.append(seed)
+            elif atype == "email" and seed not in visited_emails:
+                email_queue.append(seed)
+
+        # Fase 2: IPs
+        unique_ips = list(dict.fromkeys(ip_queue))
+        if unique_ips:
+            _log(pid, f"\n▶ Fase 2 — Analizando {len(unique_ips)} IPs...")
+        for ip in unique_ips:
+            if ip in visited_ips: continue
+            visited_ips.add(ip)
+            _push(pid, {"type": "asset_start", "asset": ip, "asset_type": "ip"})
+            _nmap(pid, ip)
+            _shodan_host(pid, ip)
+            _internetdb(pid, ip)
+            _virustotal_ip(pid, ip)
+            _push(pid, {"type": "asset_done", "asset": ip})
+
+        # Fase 3: Emails
+        unique_emails = list(dict.fromkeys(email_queue))
+        if unique_emails:
+            _log(pid, f"\n▶ Fase 3 — Analizando {len(unique_emails)} emails...")
+        for em in unique_emails:
+            if em in visited_emails: continue
+            visited_emails.add(em)
+            _push(pid, {"type": "asset_start", "asset": em, "asset_type": "email"})
+            _intelx(pid, em)
+            username_queue.extend(_blackbird(pid, em))
+            _push(pid, {"type": "asset_done", "asset": em})
+
+        # Fase 4: Usernames
+        unique_users = list(dict.fromkeys(username_queue))
+        if unique_users:
+            _log(pid, f"\n▶ Fase 4 — Analizando {len(unique_users)} usernames...")
+        for uname in unique_users:
+            if uname in visited_usernames or len(uname) < 3: continue
+            visited_usernames.add(uname)
+            _push(pid, {"type": "asset_start", "asset": uname, "asset_type": "username"})
+            _sherlock(pid, uname)
+            _maigret(pid, uname)
+            _push(pid, {"type": "asset_done", "asset": uname})
+
+    except Exception as e:
+        _err(pid, f"[Pipeline] Error: {e}")
+    finally:
+        findings = get_findings(pid)
+        total    = len(findings)
+        score    = calculate_score(findings)
+        lbl, _   = score_label(score)
+        _log(pid, f"\n✓ Análisis completado — {total} hallazgos. Score de exposición: {score}/100 ({lbl})")
+        _push(pid, {"type": "pipeline_complete", "score": score, "score_label": lbl})
+        with _lock:
+            if pid in _pipelines:
+                _pipelines[pid]["status"] = "done"
+                _pipelines[pid]["score"]  = score
+                # Consolidar todos los activos visitados
+                _pipelines[pid]["assets"] = list(
+                    visited_domains | visited_ips | visited_emails | visited_usernames
+                )

@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify
+from app.routes.auth import login_required
 import requests
 import concurrent.futures
 from datetime import datetime, timezone
@@ -91,6 +92,7 @@ def fetch_kev_only(kev_dict):
 
 
 @threat_bp.route("/api/cves")
+@login_required
 def get_cves():
     try:
         kev_dict = fetch_cisa_kev()
@@ -214,6 +216,7 @@ def fetch_malwarebazaar():
 
 
 @threat_bp.route("/api/iocs")
+@login_required
 def get_iocs():
     iocs = []
     errors = []

@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify
+from app.routes.auth import login_required
 import feedparser
 import concurrent.futures
 import re
@@ -10,6 +11,7 @@ news_bp = Blueprint("news", __name__)
 
 FEEDS = [
     {"name": "INCIBE-AVISOS", "url": "https://www.incibe.es/index.php/incibe-cert/alerta-temprana/avisos/feed", "region": "spain"},
+    {"name": "INCIBE-SCI", "url": "https://www.incibe.es/incibe-cert/alerta-temprana/avisos-sci/feed", "region": "spain"},
     {"name": "HackPlayers", "url": "https://www.hackplayers.com/feeds/posts/default?alt=rss", "region": "spain"},
     {"name": "Hispasec", "url": "https://unaaldia.hispasec.com/feed", "region": "spain"},
     {"name": "CyberSecurity News ES", "url": "https://cybersecuritynews.es/feed/", "region": "spain"},
@@ -30,6 +32,7 @@ CATEGORIES = [
     ("apt", r"apt|threat actor|nation.?state|espionaje|advanced persistent|campaign"),
     ("compliance", r"gdpr|rgpd|cumplimiento|normativa|regulaci|nis2|ens|compliance|iso 27001"),
     ("tools", r"herramienta|tool|framework|pentest|red team|ctf|poc|exploit kit|scanner"),
+    ("ics", r"scada|plc|ics|ot |industrial|control system|siemens|schneider|rockwell|modbus|dnp3|iec 61850|sci "),
 ]
 
 
@@ -87,6 +90,7 @@ def fetch_feed(feed_info):
 
 
 @news_bp.route("/api/news")
+@login_required
 def get_news():
     all_news = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:

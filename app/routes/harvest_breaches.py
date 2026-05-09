@@ -3,6 +3,8 @@ import re
 import json
 import subprocess
 import tempfile
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 from flask import Blueprint, jsonify, request
 
 harvest_bp = Blueprint("harvest", __name__)
@@ -14,6 +16,7 @@ _MAX_EMAILS = 10
 
 
 @harvest_bp.route("/api/harvest-breaches")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def harvest_breaches():
     domain = request.args.get("target", "").strip().lower()
     if not domain:

@@ -3,6 +3,8 @@ import requests
 import urllib3
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -141,6 +143,7 @@ def _attach_tags(url, event_id, tags):
 
 
 @misp_bp.route("/api/misp/status")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def misp_status():
     url = _MISP_URL()
     key = _MISP_KEY()
@@ -160,6 +163,7 @@ def misp_status():
 
 
 @misp_bp.route("/api/misp/push", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def push_to_misp():
     url = _MISP_URL()
     key = _MISP_KEY()

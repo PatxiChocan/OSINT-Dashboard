@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import requests
 import socket
 import os
@@ -149,6 +151,7 @@ def _ipapi(ip):
 
 
 @shodan_full_bp.route("/api/shodan-full")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def shodan_lookup():
     target = request.args.get("target", "").strip()
     if not target:

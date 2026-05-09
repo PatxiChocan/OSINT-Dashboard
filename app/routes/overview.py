@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify
+from app.routes.auth import login_required
 import requests
 import concurrent.futures
 import csv
@@ -169,6 +170,7 @@ def _calc_risk_score(kev, urlhaus, feodo, bazaar):
 
 
 @overview_bp.route("/api/overview")
+@login_required
 def get_overview():
     results = {}
     errors = {}

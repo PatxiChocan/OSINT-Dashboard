@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import requests
 import os
 import re
@@ -75,6 +77,7 @@ def _parse(data):
 
 
 @vt_bp.route("/api/virustotal")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def vt_lookup():
     if not API_KEY:
         return jsonify({"error": "VIRUSTOTAL_API_KEY no configurada en .env"}), 400

@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import requests
 import socket
 import re
@@ -43,6 +45,7 @@ def _internetdb(ip):
 
 
 @exposure_bp.route("/api/exposure")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def get_exposure():
     target = request.args.get("target", "").strip()
     if not target:

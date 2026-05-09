@@ -1,5 +1,7 @@
 from flask import Blueprint, request, Response, stream_with_context
 from app.services.command_service import run_command, is_valid_command, stop_command
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import json
 import uuid
 
@@ -7,6 +9,7 @@ runner = Blueprint("runner", __name__)
 
 
 @runner.route("/run", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def run():
     data = request.get_json(silent=True) or {}
     cmd = (data.get("cmd") or "").strip()
@@ -46,6 +49,7 @@ def run():
 
 
 @runner.route("/stop", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def stop():
     data = request.get_json(silent=True) or {}
     request_id = (data.get("request_id") or "").strip()

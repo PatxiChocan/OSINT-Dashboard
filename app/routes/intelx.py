@@ -2,6 +2,8 @@ import os
 import time
 import requests
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 
 intelx_bp = Blueprint("intelx", __name__)
 
@@ -15,6 +17,7 @@ _STYPES = {
 
 
 @intelx_bp.route("/api/intelx")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def search_intelx():
     term = request.args.get("target", "").strip()
     if not term:

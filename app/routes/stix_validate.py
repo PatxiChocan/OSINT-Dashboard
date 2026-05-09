@@ -1,10 +1,13 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import json
 
 stix_validate_bp = Blueprint("stix_validate", __name__)
 
 
 @stix_validate_bp.route("/api/validate-stix", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def validate_stix():
     bundle = request.get_json(silent=True)
     if not bundle:

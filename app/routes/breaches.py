@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import subprocess
 import tempfile
 import json
@@ -12,6 +14,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @breaches_bp.route("/api/breaches")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def get_breaches():
     target = request.args.get("target", "").strip()
     if not target:

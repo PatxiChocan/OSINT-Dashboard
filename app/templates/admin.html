@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Aletheia — Panel de Administración</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/aletheia-favicon.svg') }}">
+  <style>
+    .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .admin-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:2rem; }
+    .admin-title { font-size:1.5rem; font-weight:700; }
+    .admin-back { color: var(--accent, #7c6af7); text-decoration:none; font-size:.9rem; }
+    .admin-back:hover { text-decoration:underline; }
+
+    .admin-section { margin-bottom:2.5rem; }
+    .admin-section-title { font-size:1rem; font-weight:600; margin-bottom:1rem; opacity:.7; text-transform:uppercase; letter-spacing:.08em; }
+
+    .admin-table { width:100%; border-collapse:collapse; }
+    .admin-table th { text-align:left; padding:.6rem 1rem; font-size:.75rem; font-weight:600; opacity:.5; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid rgba(255,255,255,.08); }
+    .admin-table td { padding:.75rem 1rem; font-size:.875rem; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:middle; }
+    .admin-table tr:last-child td { border-bottom:none; }
+
+    .role-badge { display:inline-block; padding:.2rem .6rem; border-radius:.25rem; font-size:.75rem; font-weight:600; }
+    .role-admin   { background:rgba(239,68,68,.15);  color:#f87171; }
+    .role-analyst { background:rgba(124,106,247,.15); color:#a78bfa; }
+    .role-client  { background:rgba(34,197,94,.15);  color:#4ade80; }
+
+    .status-active   { color:#4ade80; font-size:.75rem; font-weight:600; }
+    .status-inactive { color:#f87171; font-size:.75rem; font-weight:600; }
+
+    .btn-sm { padding:.3rem .75rem; border-radius:.35rem; font-size:.8rem; font-weight:500; cursor:pointer; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:inherit; transition:background .15s; }
+    .btn-sm:hover { background:rgba(255,255,255,.1); }
+    .btn-danger { border-color:rgba(239,68,68,.4); color:#f87171; }
+    .btn-danger:hover { background:rgba(239,68,68,.1); }
+
+    .role-select { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); border-radius:.35rem; padding:.25rem .5rem; font-size:.8rem; color:inherit; cursor:pointer; }
+
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:#1a1a2e; border:1px solid rgba(255,255,255,.1); border-radius:.75rem; padding:2rem; width:100%; max-width:480px; }
+    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; }
+    .modal-field { margin-bottom:1rem; }
+    .modal-field label { display:block; font-size:.8rem; opacity:.6; margin-bottom:.35rem; }
+    .modal-field input, .modal-field select { width:100%; padding:.5rem .75rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); border-radius:.35rem; color:inherit; font-size:.875rem; box-sizing:border-box; }
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
+    .btn-primary { background:var(--accent,#7c6af7); border:none; color:#fff; padding:.5rem 1.25rem; border-radius:.4rem; font-size:.875rem; font-weight:600; cursor:pointer; }
+    .btn-primary:hover { opacity:.85; }
+    .btn-cancel { background:transparent; border:1px solid rgba(255,255,255,.2); color:inherit; padding:.5rem 1rem; border-radius:.4rem; font-size:.875rem; cursor:pointer; }
+
+    .flash { padding:.75rem 1rem; border-radius:.5rem; margin-bottom:1rem; font-size:.875rem; }
+    .flash-err  { background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .flash-ok   { background:rgba(34,197,94,.15);  color:#4ade80;  border:1px solid rgba(34,197,94,.3); }
+  </style>
+</head>
+<body>
+<div class="admin-wrap">
+  <div class="admin-header">
+    <div class="admin-title">Panel de Administración</div>
+    <a class="admin-back" href="/">← Volver al dashboard</a>
+  </div>
+
+  <div id="flash-area"></div>
+
+  <div class="admin-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div class="admin-section-title" style="margin-bottom:0">Usuarios</div>
+      <button class="btn-sm" onclick="openModal()">+ Nuevo usuario</button>
+    </div>
+
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th>Último acceso</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr id="row-{{ u.id }}">
+          <td>{{ u.nombre_completo }}</td>
+          <td style="font-family:monospace;font-size:.8rem">{{ u.email }}</td>
+          <td>
+            <select class="role-select" data-uid="{{ u.id }}" onchange="setRole({{ u.id }}, this.value)">
+              <option value="{{ ROLE_ADMIN }}"   {% if u.role == ROLE_ADMIN %}selected{% endif %}>Admin</option>
+              <option value="{{ ROLE_ANALYST }}" {% if u.role == ROLE_ANALYST %}selected{% endif %}>Analista</option>
+              <option value="{{ ROLE_CLIENT }}"  {% if u.role == ROLE_CLIENT %}selected{% endif %}>Cliente</option>
+            </select>
+          </td>
+          <td>
+            <span id="status-{{ u.id }}" class="{{ 'status-active' if u.is_active else 'status-inactive' }}">
+              {{ 'Activo' if u.is_active else 'Inactivo' }}
+            </span>
+          </td>
+          <td style="opacity:.6;font-size:.8rem">
+            {{ u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else '—' }}
+          </td>
+          <td>
+            <button class="btn-sm btn-danger" onclick="toggleUser({{ u.id }})">
+              {{ 'Desactivar' if u.is_active else 'Activar' }}
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo usuario -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">Nuevo usuario</div>
+    <div class="modal-field">
+      <label>Nombre *</label>
+      <input type="text" id="m-nombre" placeholder="Juan">
+    </div>
+    <div class="modal-field">
+      <label>Apellido *</label>
+      <input type="text" id="m-apellido" placeholder="García">
+    </div>
+    <div class="modal-field">
+      <label>Email *</label>
+      <input type="email" id="m-email" placeholder="juan@empresa.com">
+    </div>
+    <div class="modal-field">
+      <label>Keycloak ID *</label>
+      <input type="text" id="m-kcid" placeholder="UUID del usuario en Keycloak">
+    </div>
+    <div class="modal-field">
+      <label>Rol</label>
+      <select id="m-role">
+        <option value="{{ ROLE_CLIENT }}">Cliente</option>
+        <option value="{{ ROLE_ANALYST }}">Analista</option>
+        <option value="{{ ROLE_ADMIN }}">Admin</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" onclick="createUser()">Crear usuario</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function flash(msg, type) {
+  const el = document.getElementById('flash-area');
+  el.innerHTML = `<div class="flash flash-${type}">${msg}</div>`;
+  setTimeout(() => el.innerHTML = '', 4000);
+}
+
+async function setRole(uid, role) {
+  const r = await fetch(`/admin/users/${uid}/role`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({role})
+  });
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  flash('Rol actualizado', 'ok');
+}
+
+async function toggleUser(uid) {
+  const r = await fetch(`/admin/users/${uid}/toggle`, {method: 'POST'});
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  const sp = document.getElementById(`status-${uid}`);
+  sp.textContent = d.is_active ? 'Activo' : 'Inactivo';
+  sp.className   = d.is_active ? 'status-active' : 'status-inactive';
+  const btn = sp.closest('tr').querySelector('.btn-danger');
+  btn.textContent = d.is_active ? 'Desactivar' : 'Activar';
+  flash(d.is_active ? 'Usuario activado' : 'Usuario desactivado', 'ok');
+}
+
+function openModal()  { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+async function createUser() {
+  const body = {
+    nombre:      document.getElementById('m-nombre').value.trim(),
+    apellido:    document.getElementById('m-apellido').value.trim(),
+    email:       document.getElementById('m-email').value.trim(),
+    keycloak_id: document.getElementById('m-kcid').value.trim(),
+    role:        document.getElementById('m-role').value,
+  };
+  const r = await fetch('/admin/users', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  flash('Usuario creado. Recarga la página para verlo.', 'ok');
+  closeModal();
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>

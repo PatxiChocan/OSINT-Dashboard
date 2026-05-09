@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from app.routes.auth import role_required
+from app.models import ROLE_ADMIN, ROLE_ANALYST
 import subprocess
 import threading
 import signal
@@ -15,6 +17,7 @@ _lock  = threading.Lock()
 
 
 @nmap_discover_bp.route("/api/nmap/discover", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def discover():
     body   = request.get_json(silent=True) or {}
     ranges = [r.strip() for r in body.get("ranges", []) if r.strip()]
@@ -81,6 +84,7 @@ def discover():
 
 
 @nmap_discover_bp.route("/api/nmap/status/<scan_id>")
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def status(scan_id):
     with _lock:
         scan = _scans.get(scan_id)
@@ -95,6 +99,7 @@ def status(scan_id):
 
 
 @nmap_discover_bp.route("/api/nmap/stop/<scan_id>", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_ANALYST)
 def stop(scan_id):
     with _lock:
         scan = _scans.get(scan_id)
