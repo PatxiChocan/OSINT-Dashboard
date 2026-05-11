@@ -42,11 +42,32 @@ PORT_INFO = {
     5432:  ("PostgreSQL",             "critical","Base de datos PostgreSQL expuesta a Internet."),
     5900:  ("VNC",                    "critical","Control remoto de escritorio. Frecuentemente sin autenticación fuerte."),
     6379:  ("Redis",                  "critical","Base de datos en memoria. Por defecto sin autenticación."),
+    465:   ("SMTPS",                  "medium", "Correo SMTP cifrado (SSL). Verifica certificado válido y TLS ≥ 1.2. Requiere autenticación."),
+    587:   ("SMTP Submission",        "medium", "Puerto de envío de correo autenticado (STARTTLS). Verifica que requiera auth y no sea relay abierto."),
+    993:   ("IMAPS",                  "low",    "Correo IMAP cifrado (SSL/TLS). Verifica certificado válido y versión TLS ≥ 1.2."),
+    995:   ("POP3S",                  "low",    "Correo POP3 cifrado (SSL/TLS). Verifica certificado válido y versión TLS ≥ 1.2."),
     8080:  ("HTTP Alternativo",       "medium", "Servidor web en puerto alternativo. Puede ser panel de administración."),
     8443:  ("HTTPS Alternativo",      "medium", "Servidor web cifrado en puerto alternativo."),
+    9080:  ("HTTP Alternativo (9080)","medium", "Puerto web no estándar. Posible panel de administración o interfaz de aplicación interna."),
+    9090:  ("HTTP Alternativo (9090)","medium", "Puerto web no estándar. Posible interfaz de administración o aplicación interna."),
     9200:  ("Elasticsearch",          "critical","Motor de búsqueda. Por defecto sin autenticación — datos expuestos."),
     27017: ("MongoDB",                "critical","Base de datos NoSQL expuesta. Por defecto sin autenticación."),
     50000: ("SAP",                    "high",   "Puerto SAP. Sistemas ERP corporativos expuestos."),
+
+    # ── Protocolos OT/ICS/SCADA ──────────────────────────────────────────────
+    102:   ("Siemens S7 (ISO-TSAP)",  "critical","PLC Siemens expuesto. Permite leer/escribir variables de proceso y reprogramar el autómata sin autenticación."),
+    502:   ("Modbus",                 "critical","Protocolo industrial sin autenticación. Permite leer/escribir registros de PLCs, actuadores y sensores directamente."),
+    1911:  ("Niagara Fox (Tridium)",  "critical","Plataforma BMS/HVAC (Tridium Niagara). Controla climatización, accesos y sistemas de edificio. Sin cifrado por defecto."),
+    2404:  ("IEC 60870-5-104",        "critical","Protocolo de telecontrol para infraestructura eléctrica (subestaciones, red de distribución). Exposición crítica."),
+    4840:  ("OPC UA",                 "high",    "Protocolo OPC UA de comunicación industrial. Revisar autenticación, certificados y versión del servidor (vulnerabilidades conocidas en implementaciones antiguas)."),
+    9600:  ("OMRON FINS",             "critical","Protocolo OMRON FINS sin autenticación. Permite acceso completo a PLCs OMRON: lectura/escritura de memoria y E/S."),
+    18245: ("GE SRTP",                "critical","Protocolo GE SRTP para PLCs Series 90. Acceso sin autenticación a lógica de control y datos de proceso."),
+    20000: ("DNP3",                   "critical","Protocolo DNP3 usado en infraestructura eléctrica y agua. Sin autenticación por defecto — permite enviar comandos a RTUs y subestaciones."),
+    44818: ("EtherNet/IP (ENIP/CIP)", "critical","Protocolo EtherNet/IP de Rockwell/Allen-Bradley. Acceso a PLCs industriales sin autenticación — lectura/escritura de datos de proceso."),
+    47808: ("BACnet",                 "critical","Protocolo BACnet para automatización de edificios (HVAC, iluminación, accesos, ascensores). Expuesto sin autenticación."),
+    1962:  ("PCWorx",                 "critical","Protocolo Phoenix Contact PCWorx. Acceso a PLCs sin autenticación — lectura/escritura de programa y datos."),
+    789:   ("Red Lion Crimson",       "high",    "Protocolo Red Lion Crimson v3. HMIs y gateways industriales expuestos. Vulnerabilidades conocidas en versiones antiguas."),
+    4000:  ("Emerson ROC",            "high",    "Protocolo Emerson ROC para controladores de campo (petróleo y gas). Posible acceso sin autenticación a datos de proceso."),
 }
 
 RISKY_PORTS = set(PORT_INFO.keys())
@@ -71,6 +92,24 @@ INTERESTING_SUBS = {
     "jenkins":  ("critical", "Jenkins expuesto", "Sistema CI/CD — frecuentemente usado para movimiento lateral."),
     "jira":     ("medium",   "Jira expuesto", "Gestión de proyectos — puede filtrar información interna."),
     "confluence":("medium",  "Confluence expuesto", "Wiki corporativa — puede contener documentación sensible."),
+
+    # ── OT / ICS / SCADA ─────────────────────────────────────────────────────
+    "scada":     ("critical", "Interfaz SCADA expuesta", "Sistema de supervisión y control industrial accesible desde Internet. Riesgo de consecuencias físicas. Aisla inmediatamente detrás de VPN o firewall."),
+    "ics":       ("critical", "Sistema de Control Industrial (ICS) expuesto", "Infraestructura de control industrial accesible públicamente. Segmenta y protege con acceso privilegiado (PAM/jump host)."),
+    "plc":       ("critical", "PLC expuesto", "Controlador lógico programable accesible desde Internet — permite reprogramación y manipulación de procesos físicos."),
+    "hmi":       ("critical", "HMI (Interfaz Hombre-Máquina) expuesta", "Panel de operación industrial accesible públicamente. Vector directo de manipulación de procesos físicos."),
+    "historian":  ("high",    "Historian industrial expuesto", "Base de datos de series temporales de proceso (OSIsoft PI, Wonderware, etc.). Puede filtrar datos operacionales y de producción sensibles."),
+    "dcs":       ("critical", "Sistema de Control Distribuido (DCS) expuesto", "DCS accesible desde Internet — control directo sobre procesos de producción continuos (químico, petroquímico, energía)."),
+    "rtu":       ("critical", "RTU (Unidad Terminal Remota) expuesta", "RTU accesible públicamente — control de infraestructura crítica distribuida (agua, gas, electricidad)."),
+    "ems":       ("critical", "EMS (Sistema de Gestión de Energía) expuesto", "Sistema de gestión de red eléctrica accesible desde Internet. Impacto potencial en suministro eléctrico."),
+    "bms":       ("critical", "BMS (Sistema de Gestión de Edificio) expuesto", "Control de climatización, accesos, iluminación y ascensores accesible públicamente. Riesgo físico y de seguridad."),
+    "bacnet":    ("critical", "Servidor BACnet expuesto", "Protocolo BACnet de automatización de edificios expuesto. Sin autenticación — control total sobre HVAC, accesos y sistemas del edificio."),
+    "modbus":    ("critical", "Servidor Modbus expuesto", "Protocolo Modbus industrial expuesto — sin autenticación ni cifrado. Acceso directo a registros de PLCs y sensores."),
+    "opcua":     ("high",     "Servidor OPC UA expuesto", "Middleware de comunicación industrial OPC UA accesible públicamente. Revisa autenticación y versión del servidor."),
+    "opcda":     ("critical", "Servidor OPC DA expuesto", "OPC Data Access clásico — protocolo DCOM sin cifrado, expuesto a Internet. Vector de ataque frecuente en entornos legacy."),
+    "niagara":   ("critical", "Plataforma Niagara (Tridium) expuesta", "Framework BMS Tridium Niagara accesible públicamente. Vulnerabilidades críticas conocidas. Control total del edificio."),
+    "ignition":  ("high",     "Ignition SCADA expuesto", "Plataforma SCADA Ignition (Inductive Automation) accesible desde Internet. Revisa autenticación y versión."),
+    "wonderware":("high",     "Wonderware expuesto", "SCADA/Historian Wonderware/AVEVA accesible públicamente. Puede filtrar datos de proceso y permitir control remoto no autorizado."),
 }
 
 SESSION = requests.Session()
@@ -110,6 +149,66 @@ def create_pipeline(seeds):
         _pipelines[pid] = {"status": "running", "events": [], "findings": [], "_seen": set(), "assets": [], "seeds": seeds}
     threading.Thread(target=_run, args=(pid, seeds), daemon=True).start()
     return pid
+
+
+def create_pipeline_single(tool, target):
+    """Ejecuta un único módulo del pipeline sobre un objetivo."""
+    pid = str(uuid.uuid4())
+    with _lock:
+        _pipelines[pid] = {"status": "running", "events": [], "findings": [], "_seen": set(), "assets": [target], "seeds": [target]}
+    threading.Thread(target=_run_single, args=(pid, tool, target), daemon=True).start()
+    return pid
+
+
+def _run_single(pid, tool, target):
+    atype = _asset_type(target)
+    try:
+        _push(pid, {"type": "asset_start", "asset": target, "asset_type": atype})
+        _log(pid, f"▶ Módulo '{tool}' sobre {target}")
+
+        if   tool == "whois":          _whois(pid, target)
+        elif tool == "dns":            _dns(pid, target)
+        elif tool == "subfinder":      _subfinder(pid, target); _crtsh(pid, target)
+        elif tool == "nmap":           _nmap(pid, target)
+        elif tool == "shodan_host":    _shodan_host(pid, target); _internetdb(pid, target)
+        elif tool == "shodan_domain":  _shodan_domain(pid, target)
+        elif tool == "virustotal":
+            if atype == "ip": _virustotal_ip(pid, target)
+            else:             _virustotal_domain(pid, target)
+        elif tool == "urlscan":        _urlscan(pid, target)
+        elif tool == "intelx":         _intelx(pid, target)
+        elif tool == "intelx_domain":  _intelx(pid, f"@{target}")
+        elif tool == "harvester":      _harvester(pid, target)
+        elif tool == "variants":       _domain_variants(pid, target)
+        elif tool == "blackbird":      _blackbird(pid, target)
+        elif tool == "sherlock":       _sherlock(pid, target)
+        elif tool == "maigret":        _maigret(pid, target)
+        elif tool == "full_domain":
+            _whois(pid, target); _dns(pid, target)
+            _subfinder(pid, target); _crtsh(pid, target)
+            _shodan_domain(pid, target); _virustotal_domain(pid, target)
+            _urlscan(pid, target); _intelx(pid, target)
+            _intelx(pid, f"@{target}"); _domain_variants(pid, target)
+            _harvester(pid, target)
+        elif tool == "full_ip":
+            _nmap(pid, target); _shodan_host(pid, target)
+            _internetdb(pid, target); _virustotal_ip(pid, target)
+        else:
+            _err(pid, f"Módulo desconocido: {tool}")
+
+        _push(pid, {"type": "asset_done", "asset": target})
+    except Exception as e:
+        _err(pid, f"[{tool}] Error: {e}")
+    finally:
+        findings = get_findings(pid)
+        score    = calculate_score(findings)
+        lbl, _   = score_label(score)
+        _log(pid, f"\n✓ Completado — {len(findings)} hallazgos · Score {score}/100 ({lbl})")
+        _push(pid, {"type": "pipeline_complete", "score": score, "score_label": lbl})
+        with _lock:
+            if pid in _pipelines:
+                _pipelines[pid]["status"] = "done"
+                _pipelines[pid]["score"]  = score
 
 
 def get_pipeline_data(pid):
@@ -540,7 +639,9 @@ def _urlscan(pid, domain):
 
 def _intelx(pid, asset):
     if not INTELX_KEY: return
-    _log(pid, f"[IntelX] Buscando '{asset}' en filtraciones...")
+    is_domain_emails = asset.startswith("@")
+    label = f"emails '{asset}' (dominio)" if is_domain_emails else f"'{asset}'"
+    _log(pid, f"[IntelX] Buscando {label} en filtraciones...")
     try:
         r = SESSION.post("https://2.intelx.io/intelligent/search",
                          headers={"x-key": INTELX_KEY},
@@ -559,18 +660,34 @@ def _intelx(pid, asset):
                 bucket = rec.get("bucket", "desconocido")
                 buckets[bucket] = buckets.get(bucket, 0) + 1
             bucket_detail = ", ".join(f"{k}: {v}" for k, v in buckets.items())
-            _finding(pid, asset, "intelx", "high",
-                     f"{len(records)} registros de '{asset}' en filtraciones / dark web",
-                     f"IntelX encontró {len(records)} apariciones en bases de datos comprometidas.\n"
-                     f"Fuentes por tipo: {bucket_detail}\n"
-                     f"Esto indica que datos asociados a '{asset}' han sido expuestos en brechas de seguridad.",
-                     "Revisa qué credenciales o datos están expuestos. "
-                     "Cambia contraseñas afectadas y notifica a los usuarios si procede.")
+            if is_domain_emails:
+                _finding(pid, asset, "intelx", "high",
+                         f"{len(records)} credenciales/emails '{asset}' encontrados en filtraciones",
+                         f"IntelX encontró {len(records)} registros con emails de este dominio corporativo en bases de datos comprometidas.\n"
+                         f"Fuentes por tipo: {bucket_detail}\n"
+                         f"Empleados con credenciales expuestas son un vector crítico de acceso inicial "
+                         f"(credential stuffing, password spraying).",
+                         "Identifica qué empleados tienen credenciales expuestas. "
+                         "Forza cambio de contraseña y activa MFA para todas las cuentas corporativas.")
+            else:
+                _finding(pid, asset, "intelx", "high",
+                         f"{len(records)} registros de '{asset}' en filtraciones / dark web",
+                         f"IntelX encontró {len(records)} apariciones en bases de datos comprometidas.\n"
+                         f"Fuentes por tipo: {bucket_detail}\n"
+                         f"Esto indica que datos asociados a '{asset}' han sido expuestos en brechas de seguridad.",
+                         "Revisa qué credenciales o datos están expuestos. "
+                         "Cambia contraseñas afectadas y notifica a los usuarios si procede.")
         else:
-            _finding(pid, asset, "intelx", "info",
-                     f"Sin filtraciones de '{asset}' en IntelX",
-                     f"No se encontraron registros de '{asset}' en bases de datos de filtraciones conocidas.",
-                     "Continúa monitorizando periódicamente.")
+            if is_domain_emails:
+                _finding(pid, asset, "intelx", "info",
+                         f"Sin credenciales de '{asset}' en filtraciones (IntelX)",
+                         f"No se encontraron emails/credenciales del dominio '{asset}' en bases de datos de filtraciones conocidas.",
+                         "Continúa monitorizando periódicamente.")
+            else:
+                _finding(pid, asset, "intelx", "info",
+                         f"Sin filtraciones de '{asset}' en IntelX",
+                         f"No se encontraron registros de '{asset}' en bases de datos de filtraciones conocidas.",
+                         "Continúa monitorizando periódicamente.")
     except Exception as e:
         _err(pid, f"[IntelX] Error: {e}")
 
@@ -615,7 +732,7 @@ def _nmap(pid, ip):
     _log(pid, f"[Nmap] Escaneando {ip} — puertos, versiones y scripts...")
     try:
         proc = subprocess.run(
-            ["/usr/bin/nmap", "-sV", "--open", "-T4", "--top-ports", "1000",
+            ["/usr/bin/nmap", "-sV", "-O", "--osscan-guess", "--open", "-T4", "--top-ports", "1000",
              "--script", "banner,http-title,ssl-cert,smtp-commands,ftp-anon",
              "--script-timeout", "10s",
              "-oX", "-", ip],
@@ -627,6 +744,7 @@ def _nmap(pid, ip):
 
         root = ET.fromstring(proc.stdout)
 
+        tcpwrapped_ports = []
         for port_el in root.findall(".//port"):
             state_el = port_el.find("state")
             if state_el is None or state_el.get("state") != "open":
@@ -639,6 +757,16 @@ def _nmap(pid, ip):
             product  = svc.get("product", "") if svc is not None else ""
             version  = svc.get("version", "") if svc is not None else ""
             extra    = svc.get("extrainfo","") if svc is not None else ""
+
+            # tcpwrapped = port open but service refused identification; consolidate into one finding
+            if name == "tcpwrapped" and not product and not version:
+                has_script_output = any(
+                    s.get("output", "").strip() and "ERROR:" not in s.get("output", "")
+                    for s in port_el.findall("script")
+                )
+                if not has_script_output:
+                    tcpwrapped_ports.append(portid)
+                    continue
 
             pinfo = PORT_INFO.get(portid)
             sev   = pinfo[1] if pinfo else ("medium" if portid not in (80, 443) else "low")
@@ -671,12 +799,57 @@ def _nmap(pid, ip):
             if scripts_txt:
                 detail += "Scripts Nmap:\n" + "\n".join(scripts_txt[:5])
 
+            rec_str = (
+                f"{'VULNERABILIDAD CONFIRMADA — parchea de inmediato. ' if vuln_found else ''}{ctx}"
+            ).strip()
             _finding(pid, ip, "nmap", sev,
                      f"{'⚠ VULNERABLE — ' if vuln_found else ''}"
                      f"Puerto {portid}/{protocol} abierto: {name} {product} {version}".strip(),
                      detail,
-                     f"{'VULNERABILIDAD CONFIRMADA — parchea de inmediato.' if vuln_found else ''} "
-                     f"{ctx}")
+                     rec_str)
+
+        if tcpwrapped_ports:
+            ports_list = ", ".join(str(p) for p in sorted(tcpwrapped_ports))
+            _finding(pid, ip, "nmap", "info",
+                     f"{len(tcpwrapped_ports)} puertos tcpwrapped (servicio no identificado)",
+                     f"Nmap detectó {len(tcpwrapped_ports)} puertos abiertos sin identificar el servicio "
+                     f"(tcpwrapped — el servicio rechazó la identificación o está filtrado por TCP wrapper).\n"
+                     f"Puertos: {ports_list}\n\n"
+                     f"Esto puede indicar servicios detrás de un firewall o TCP wrapper, "
+                     f"o servicios que rechazan conexiones no autorizadas.",
+                     "Investiga manualmente estos puertos si son relevantes para el negocio. "
+                     "Si no son necesarios, ciérralos en el firewall.")
+
+        # OS detection
+        os_matches = []
+        for osmatch in root.findall('.//osmatch'):
+            name_os   = osmatch.get('name', '')
+            accuracy  = osmatch.get('accuracy', '')
+            os_class  = osmatch.find('osclass')
+            vendor    = os_class.get('vendor', '') if os_class is not None else ''
+            osfamily  = os_class.get('osfamily', '') if os_class is not None else ''
+            osgen     = os_class.get('osgen', '') if os_class is not None else ''
+            if name_os:
+                os_matches.append({
+                    "name": name_os,
+                    "accuracy": accuracy,
+                    "vendor": vendor,
+                    "family": osfamily,
+                    "gen": osgen,
+                })
+        if os_matches:
+            best = os_matches[0]
+            lines = [f"  • {m['name']} — {m['accuracy']}% certeza" for m in os_matches[:4]]
+            detail_os = (
+                f"Sistema operativo más probable: {best['name']} ({best['accuracy']}% certeza)\n"
+                f"Familia: {best['vendor']} {best['family']} {best['gen']}".strip() + "\n\n"
+                "Candidatos detectados por Nmap:\n" + "\n".join(lines)
+            )
+            _finding(pid, ip, "nmap", "info",
+                     f"OS detectado: {best['name']}",
+                     detail_os,
+                     "Verifica que el sistema operativo esté actualizado y parcheado. "
+                     "Sistemas sin soporte (EOL) son un riesgo crítico.")
 
     except subprocess.TimeoutExpired:
         _err(pid, f"[Nmap] Timeout en {ip}")
@@ -705,12 +878,40 @@ def _shodan_host(pid, ip):
         hostnames = d.get("hostnames", [])
         isp       = d.get("isp", "—")
         asn       = d.get("asn", "—")
+        tags      = d.get("tags", [])
+        cloud     = d.get("cloud", {})
+        ports_raw = d.get("data", [])
+
+        # Puertos indexados con producto y versión
+        port_lines = []
+        for item in ports_raw[:15]:
+            p         = item.get("port", "")
+            product   = item.get("product", "")
+            version   = item.get("version", "")
+            transport = item.get("transport", "tcp")
+            banner    = (item.get("data") or "").split("\n")[0][:80]
+            if p:
+                line = f"  • {p}/{transport}"
+                if product: line += f" — {product}"
+                if version: line += f" {version}"
+                if banner and not product: line += f" ({banner})"
+                port_lines.append(line)
+
+        cloud_str = ""
+        if cloud:
+            parts = [cloud.get("provider",""), cloud.get("region",""), cloud.get("service","")]
+            joined = " / ".join(p for p in parts if p)
+            if joined: cloud_str = f"\nCloud: {joined}"
+
+        tags_str  = f"\nEtiquetas: {', '.join(tags)}" if tags else ""
+        ports_str = ("\n\nPuertos indexados por Shodan:\n" + "\n".join(port_lines)) if port_lines else ""
 
         _finding(pid, ip, "shodan", "info",
                  f"Perfil de host {ip} en Shodan",
                  f"Organización: {org}\nISP: {isp}\nASN: {asn}\nPaís: {country}\n"
                  f"Sistema operativo: {os_}\nHostnames: {', '.join(hostnames[:5]) or '—'}\n"
-                 f"CVEs conocidos: {len(vulns)}",
+                 f"CVEs conocidos: {len(vulns)}"
+                 f"{cloud_str}{tags_str}{ports_str}",
                  "Verifica que esta IP pertenezca a la organización y que los datos sean correctos.")
 
         for cve, info in (vulns.items() if isinstance(vulns, dict) else {}.items()):
@@ -886,6 +1087,54 @@ def _maigret(pid, username):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# VARIANTES DE DOMINIO
+# ══════════════════════════════════════════════════════════════════════════════
+
+_COMMON_TLDS = ['.com', '.es', '.org', '.net', '.io', '.eu', '.biz', '.info', '.co', '.online', '.app', '.tech']
+
+def _domain_variants(pid, domain):
+    """Busca variantes del dominio con diferentes TLDs — typosquatting o infraestructura relacionada."""
+    parts = domain.split('.')
+    if len(parts) < 2:
+        return []
+
+    base        = parts[-2]   # empresa de empresa.com / sub.empresa.com
+    current_tld = '.' + parts[-1]
+
+    _log(pid, f"[Variantes] Buscando variantes de '{base}' con diferentes TLDs...")
+    found = []
+    for tld in _COMMON_TLDS:
+        if tld == current_tld:
+            continue
+        variant = base + tld
+        try:
+            infos   = socket.getaddrinfo(variant, None, socket.AF_INET)
+            resolved = list(set(info[4][0] for info in infos if _is_public(info[4][0])))
+            if resolved:
+                found.append((variant, resolved))
+        except Exception:
+            pass
+
+    if found:
+        lines = [f"  • {v} → {', '.join(ips)}" for v, ips in found]
+        _finding(pid, domain, "variants", "medium",
+                 f"{len(found)} variante{'s' if len(found) != 1 else ''} de dominio activa{'s' if len(found) != 1 else ''}: "
+                 f"{', '.join(v for v, _ in found)}",
+                 f"Variantes del dominio '{domain}' que resuelven a IPs activas:\n" +
+                 "\n".join(lines) +
+                 "\n\nPueden ser dominios legítimos adicionales de la organización "
+                 "o dominios de typosquatting/phishing que suplantan su identidad.",
+                 "Verifica si estas variantes pertenecen a la organización. "
+                 "Si no son tuyas, monitoriza si se usan para phishing. "
+                 "Considera registrar las variantes clave (.es, .com, .org) para proteger la marca.")
+        _log(pid, f"[Variantes] {len(found)} variantes activas: {', '.join(v for v, _ in found)}")
+    else:
+        _log(pid, f"[Variantes] Sin variantes activas para '{base}'")
+
+    return found
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ORCHESTRATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -921,6 +1170,8 @@ def _run(pid, seeds):
                 new_ips.update(_virustotal_domain(pid, seed) or [])
                 new_ips.update(_urlscan(pid, seed) or [])
                 _intelx(pid, seed)
+                _intelx(pid, f"@{seed}")   # credenciales/emails del dominio filtrados
+                _domain_variants(pid, seed)
 
                 for em in _harvester(pid, seed):
                     if em not in visited_emails:

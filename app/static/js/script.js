@@ -1458,6 +1458,235 @@ function _renderGroupsHtml(groups) {
   }).join('');
 }
 
+const _GRP_SEV = {
+  credential:'critical', leak:'critical',
+  email:'medium', 'port-open':'high',
+  host:'info', ip:'info', url:'info', generic:'info', 'port-filtered':'info',
+};
+const _GRP_SEV_COLOR = { critical:'#ef4444', high:'#f97316', medium:'#eab308', info:'#60a5fa' };
+const _GRP_SEV_BG    = { critical:'rgba(239,68,68,.1)', high:'rgba(249,115,22,.1)', medium:'rgba(234,179,8,.1)', info:'rgba(96,165,250,.1)' };
+const _GRP_SEV_LABEL = { critical:'CRÍTICO', high:'ALTO', medium:'MEDIO', info:'INFO' };
+const _GRP_ASSET_ICON = { email:'📧', host:'🌐', ip:'🖥️', url:'🔗', credential:'⚠️', leak:'⚠️', 'port-open':'🖥️', 'port-filtered':'🖥️' };
+
+function _groupItemTitle(type, item) {
+  switch(type) {
+    case 'email':         return `Email expuesto: ${item}`;
+    case 'host':          return `Subdominio encontrado: ${item}`;
+    case 'ip':            return `IP encontrada: ${item}`;
+    case 'url':           return `URL expuesta: ${item}`;
+    case 'port-open':     return `Puerto abierto: ${item}`;
+    case 'port-filtered': return `Puerto filtrado: ${item}`;
+    case 'credential':    return `Credencial expuesta: ${item}`;
+    case 'leak':          return `Fuga detectada: ${item}`;
+    default:              return item;
+  }
+}
+
+function _groupItemRec(type) {
+  switch(type) {
+    case 'credential':
+    case 'leak':      return 'Cambiar credenciales inmediatamente y revisar accesos no autorizados.';
+    case 'email':     return 'Monitorizar este email en servicios de brechas (HaveIBeenPwned) y limitar exposición.';
+    case 'port-open': return 'Revisar si este servicio es necesario externamente y aplicar control de acceso perimetral.';
+    default:          return '';
+  }
+}
+
+function _groupsAsFindingCards(groups, toolName, target) {
+  if (!groups.length) return '<p class="ps-empty">Sin resultados encontrados.</p>';
+  const toolColor = (TOOL_COLORS[toolName] || {}).color || '#9A6055';
+  // Light-theme severity colors (darker than dark-mode versions)
+  const _SEV_COLOR_LT = { critical:'#dc2626', high:'#ea580c', medium:'#ca8a04', info:'#2563eb' };
+  const _SEV_BG_LT    = { critical:'rgba(220,38,38,.12)', high:'rgba(234,88,12,.12)', medium:'rgba(202,138,4,.12)', info:'rgba(37,99,235,.1)' };
+
+  let html = '';
+  groups.forEach(group => {
+    const sev      = _GRP_SEV[group.type] || 'info';
+    const sevColor = _SEV_COLOR_LT[sev];
+    const sevBg    = _SEV_BG_LT[sev];
+    const sevLabel = _GRP_SEV_LABEL[sev];
+    const aIcon    = _GRP_ASSET_ICON[group.type] || '▶';
+    const isPort   = group.type === 'port-open' || group.type === 'port-filtered';
+
+    html += `<div style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin:1rem 0 .4rem;padding-bottom:.3rem;border-bottom:1px solid var(--ghost)">${group.icon} ${escHtml(group.title)}</div>`;
+
+    group.items.forEach(item => {
+      const asset      = isPort ? (target || toolName) : item;
+      const assetShort = asset.length > 32 ? asset.slice(0, 30) + '…' : asset;
+      const title      = _groupItemTitle(group.type, item);
+      const rec        = _groupItemRec(group.type);
+      const uid        = 'mc_' + Math.random().toString(36).slice(2);
+      const analyzeBtn = group.type === 'ip'
+        ? `<button onclick="event.stopPropagation();window._runIPPipeline&&window._runIPPipeline('${item}')"
+             title="Analizar IP en pipeline (nmap + shodan + virustotal)"
+             style="font-size:.6rem;font-weight:700;padding:.15rem .5rem;border-radius:.25rem;border:1px solid rgba(37,99,235,.35);background:rgba(37,99,235,.08);color:#2563eb;cursor:pointer;flex-shrink:0;white-space:nowrap;line-height:1.4">⚡ Analizar</button>`
+        : '';
+      html += `<div style="border-radius:.45rem;background:var(--bg-elev-3);border:1px solid var(--ghost);border-left:3px solid ${sevColor};margin-bottom:.4rem;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;cursor:pointer;user-select:none" onclick="const b=document.getElementById('${uid}');b.style.display=b.style.display==='block'?'none':'block'">
+    <span style="font-size:.64rem;font-weight:800;padding:.15rem .5rem;border-radius:.25rem;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;background:${sevBg};color:${sevColor}">${sevLabel}</span>
+    <span style="font-size:.64rem;font-weight:700;padding:.1rem .45rem;border-radius:.25rem;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;background:var(--bg-elev-4);color:${toolColor}">${escHtml(toolName)}</span>
+    <span style="font-family:monospace;font-size:.7rem;color:var(--text3);background:var(--bg-elev-4);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0">${aIcon} ${escHtml(assetShort)}</span>
+    <span style="font-weight:600;font-size:.83rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${escHtml(title)}</span>
+    ${analyzeBtn}
+    <span style="opacity:.35;font-size:.75rem;flex-shrink:0;color:var(--text)">▾</span>
+  </div>
+  <div id="${uid}" style="display:none;padding:.6rem .9rem .75rem;border-top:1px solid var(--ghost);font-size:.82rem">
+    <div style="white-space:pre-wrap;color:var(--text2);opacity:.8;line-height:1.55;margin-bottom:.5rem">${escHtml(item)}</div>
+    ${rec ? `<div style="font-size:.79rem;color:#15803d;background:rgba(21,128,61,.08);border-radius:.35rem;padding:.45rem .7rem">▶ ${escHtml(rec)}</div>` : ''}
+  </div>
+</div>`;
+    });
+  });
+  return html;
+}
+
+// ── Parallel panel: pipeline-style findings view ─────────────────────────────
+
+let _parallelFindings = [];
+let _pfFilter   = 'all';
+let _pfCurView  = 'asset';
+
+const _PF_SEV_C = { critical:'#ef4444', high:'#f97316', medium:'#eab308', info:'#60a5fa' };
+const _PF_SEV_L = { critical:'CRÍTICO',  high:'ALTO',    medium:'MEDIO',   info:'INFO' };
+const _PF_SEV_B = { critical:'rgba(239,68,68,.1)', high:'rgba(249,115,22,.1)', medium:'rgba(234,179,8,.1)', info:'rgba(96,165,250,.1)' };
+const _PF_SEV_O = { critical:0, high:1, medium:2, info:3 };
+const _PF_A_ICO = { domain:'🌐', ip:'🖥️', email:'📧', username:'👤' };
+
+function _pfAssetType(s) {
+  if (/^\d+\.\d+\.\d+\.\d+/.test(s)) return 'ip';
+  if (s.includes('@')) return 'email';
+  return 'domain';
+}
+
+function _groupsToFindings(groups, toolName, target) {
+  const findings = [];
+  groups.forEach(group => {
+    const sev    = _GRP_SEV[group.type] || 'info';
+    const isPort = group.type === 'port-open' || group.type === 'port-filtered';
+    group.items.forEach(item => {
+      findings.push({
+        severity: sev, tool: toolName,
+        asset: isPort ? (target || toolName) : item,
+        title: _groupItemTitle(group.type, item),
+        detail: item,
+        recommendation: _groupItemRec(group.type),
+      });
+    });
+  });
+  return findings;
+}
+
+function _makePFC(f) {
+  const color  = _PF_SEV_C[f.severity] || '#94a3b8';
+  const tc     = (TOOL_COLORS[f.tool] || {}).color || '#9A6055';
+  const uid    = 'pfc_' + Math.random().toString(36).slice(2);
+  const aShort = f.asset.length > 30 ? f.asset.slice(0,28)+'…' : f.asset;
+  const aIcon  = _PF_A_ICO[_pfAssetType(f.asset)] || '▶';
+  const imp    = {critical:5,high:4,medium:3,info:1}[f.severity]||1;
+  const impLbl = {critical:'Crítica',high:'Alta',medium:'Media',info:'Baja'}[f.severity]||'Baja';
+  const impBar = `<div style="display:inline-flex;align-items:center;gap:.3rem;flex-shrink:0">
+    <span style="font-size:.6rem;color:#94a3b8;white-space:nowrap">Importancia ${imp} - ${impLbl}</span>
+    <div style="display:flex;gap:2px">${Array.from({length:5},(_,i)=>
+      `<span style="display:inline-block;width:10px;height:5px;border-radius:1px;background:${i<imp?color:'rgba(0,0,0,.1)'}"></span>`
+    ).join('')}</div></div>`;
+  return `<div class="pl-finding-card" style="border:1px solid rgba(0,0,0,.08);border-left:3px solid ${color};background:var(--bg-elev-2)">
+  <div class="pl-finding-header" onclick="document.getElementById('${uid}').classList.toggle('open')">
+    <span class="pl-sev-badge" style="background:${_PF_SEV_B[f.severity]};color:${color}">${_PF_SEV_L[f.severity]||f.severity}</span>
+    <span class="pl-tool-badge" style="background:rgba(0,0,0,.05);color:${tc}">${escHtml(f.tool)}</span>
+    <span style="font-family:monospace;font-size:.7rem;color:#94a3b8;background:rgba(0,0,0,.04);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0">${aIcon} ${escHtml(aShort)}</span>
+    <span style="font-weight:600;font-size:.83rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(f.title)}</span>
+    ${impBar}
+    <span style="opacity:.35;font-size:.75rem;flex-shrink:0">▾</span>
+  </div>
+  <div class="pl-finding-body" id="${uid}" style="border-top:1px solid rgba(0,0,0,.07)">
+    <div class="pl-finding-detail">${escHtml(f.detail)}</div>
+    ${f.recommendation?`<div class="pl-finding-rec" style="color:#16a34a;background:rgba(22,163,74,.08)">▶ ${escHtml(f.recommendation)}</div>`:''}
+  </div>
+</div>`;
+}
+
+function _pfFiltered() {
+  const q = ($('pf-search')?.value||'').toLowerCase();
+  return _parallelFindings.filter(f =>
+    (_pfFilter==='all' || f.severity===_pfFilter) &&
+    (!q || f.title.toLowerCase().includes(q) || f.asset.toLowerCase().includes(q))
+  );
+}
+
+window._pfSetFilter = function(sev, btn) {
+  _pfFilter = sev;
+  document.querySelectorAll('#parallel-summary .pl-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _pfRebuildViews();
+};
+window._pfSwitchView = function(view) {
+  _pfCurView = view;
+  const a=$('pf-asset'), s=$('pf-sev');
+  if (a) a.style.display = view==='asset'    ? 'block':'none';
+  if (s) s.style.display = view==='severity' ? 'block':'none';
+  const ta=$('pf-tab-asset'), ts=$('pf-tab-sev');
+  if (ta) ta.classList.toggle('active', view==='asset');
+  if (ts) ts.classList.toggle('active', view==='severity');
+};
+window._pfRebuild = function() { _pfRebuildViews(); };
+
+function _pfRebuildViews() {
+  const filtered = _pfFiltered();
+  const countEl  = $('pf-count');
+  if (countEl) countEl.textContent = filtered.length===_parallelFindings.length
+    ? `${_parallelFindings.length} hallazgos`
+    : `${filtered.length} de ${_parallelFindings.length}`;
+
+  const assetEl = $('pf-asset');
+  if (assetEl) {
+    if (!filtered.length) {
+      assetEl.innerHTML = '<p class="ps-empty" style="padding:1rem 0">Sin hallazgos para el filtro.</p>';
+    } else {
+      const byAsset = {};
+      filtered.forEach(f => (byAsset[f.asset]=byAsset[f.asset]||[]).push(f));
+      const sorted = Object.entries(byAsset).sort(([,a],[,b]) => {
+        const wo = arr => Math.min(...arr.map(f => _PF_SEV_O[f.severity]??99));
+        return wo(a) - wo(b);
+      });
+      assetEl.innerHTML = sorted.map(([asset, items]) => {
+        items.sort((a,b) => (_PF_SEV_O[a.severity]??99)-(_PF_SEV_O[b.severity]??99));
+        const icon  = _PF_A_ICO[_pfAssetType(asset)] || '▶';
+        const crit  = items.filter(f=>f.severity==='critical').length;
+        const high  = items.filter(f=>f.severity==='high').length;
+        const uid   = 'pag_'+Math.random().toString(36).slice(2);
+        const badges = [
+          crit?`<span class="pl-sev-badge" style="background:${_PF_SEV_B.critical};color:${_PF_SEV_C.critical}">${crit} CRÍTICO</span>`:'',
+          high?`<span class="pl-sev-badge" style="background:${_PF_SEV_B.high};color:${_PF_SEV_C.high}">${high} ALTO</span>`:'',
+        ].filter(Boolean).join('');
+        return `<div class="pl-asset-group" style="border:1px solid rgba(0,0,0,.09)">
+          <div class="pl-asset-group-header" style="background:var(--bg-elev-3)" onclick="const b=document.getElementById('${uid}');b.style.display=b.style.display==='none'?'flex':'none'">
+            <span style="font-size:1rem">${icon}</span>
+            <span style="font-weight:700;font-size:.88rem;flex:1;font-family:monospace">${escHtml(asset)}</span>
+            ${badges}
+            <span style="opacity:.35;font-size:.75rem;margin-left:.25rem">${items.length} hallazgo${items.length!==1?'s':''}</span>
+            <span style="opacity:.3;font-size:.75rem">▾</span>
+          </div>
+          <div class="pl-asset-group-body" id="${uid}">${items.map(_makePFC).join('')}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  const sevEl = $('pf-sev');
+  if (sevEl) {
+    sevEl.innerHTML = ['critical','high','medium','info'].map(sev => {
+      const items = filtered.filter(f=>f.severity===sev).sort((a,b)=>a.asset.localeCompare(b.asset));
+      if (!items.length) return '';
+      const c = _PF_SEV_C[sev];
+      return `<div class="pl-sev-section">
+        <div class="pl-sev-section-header" style="background:${c}22;color:${c};border-left:3px solid ${c}">
+          ${_PF_SEV_L[sev]} <span style="opacity:.6;font-size:.75rem;margin-left:.4rem">${items.length}</span>
+        </div>${items.map(_makePFC).join('')}
+      </div>`;
+    }).join('');
+  }
+}
+
 function _renderParallelSummary() {
   const container = $('parallel-summary');
   if (!container) return;
@@ -1465,45 +1694,64 @@ function _renderParallelSummary() {
   const entries = Object.entries(_parallelState);
   if (!entries.length) { container.innerHTML = ''; return; }
 
-  container.innerHTML = entries.map(([key, state]) => {
-    const color = TOOL_COLORS[state.tool] || { bg: '#f3f4f6', color: '#374151', border: '#d1d5db' };
+  // Collect all findings from completed tools
+  _parallelFindings = [];
+  entries.forEach(([,state]) => {
+    if (!state.done) return;
+    _parallelFindings.push(..._groupsToFindings(_parallelGroups(state), state.tool, state.target));
+  });
 
-    const elapsed = state.done
-      ? `<span class="ps-time ps-time-done">${_fmtSecs(state.elapsed)}</span>`
-      : `<span class="ps-time ps-time-running"><span class="ps-spinner"></span><span id="psum-timer-${key}">0s</span></span>`;
-
-    const statusIcon = state.done ? '✓' : '…';
-    const statusCls  = state.done ? 'ps-status-done' : 'ps-status-running';
-
-    let bodyHtml = '';
-    if (state.done) {
-      const groups = _parallelGroups(state);
-      bodyHtml = `<div class="ps-body">${_renderGroupsHtml(groups)}</div>`;
-    } else {
-      bodyHtml = `<div class="ps-body ps-body-running">
-        <p class="ui-message" style="padding:12px 16px">
-          <span class="ps-spinner" style="display:inline-block;margin-right:6px"></span>
-          Ejecutando… ${state.lines} líneas recibidas
-        </p>
-      </div>`;
-    }
-
-    const cardId = `pscard-${key}`;
-    return `<div class="ps-card ${state.done ? 'ps-card-done' : 'ps-card-running'}" id="${cardId}">
-      <div class="ps-card-header" onclick="togglePsCard('${cardId}')" style="cursor:pointer">
-        <span class="ps-badge" style="background:${color.bg};color:${color.color};border:1px solid ${color.border}">
-          ${state.tool.toUpperCase()}
-        </span>
-        <span class="ps-name">${state.name}</span>
-        <span class="ps-status ${statusCls}">${statusIcon}</span>
-        ${elapsed}
-        <span class="ps-toggle-icon">▾</span>
-      </div>
-      <div class="ps-body-wrap">
-        ${bodyHtml}
-      </div>
-    </div>`;
+  // Status chips (running + done tools)
+  const chips = entries.map(([key,s]) => {
+    const c = TOOL_COLORS[s.tool] || {};
+    const dot = s.done
+      ? `<span style="color:#16a34a;font-weight:700">✓</span>`
+      : `<span class="ps-spinner" style="display:inline-block;width:8px;height:8px;margin-right:2px"></span>`;
+    const time = s.done ? _fmtSecs(s.elapsed) : `${s.lines}l`;
+    return `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.67rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;border:1px solid ${s.done?'rgba(22,163,74,.25)':'rgba(234,179,8,.3)'};background:${s.done?'rgba(22,163,74,.06)':'rgba(234,179,8,.06)'}">
+      ${dot} <span style="color:${c.color||'var(--text)'}">${escHtml(s.name)}</span><span style="opacity:.45">· ${time}</span>
+    </span>`;
   }).join('');
+
+  const chipsHtml = `<div id="pf-chips" style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.9rem">${chips}</div>`;
+
+  if (!_parallelFindings.length) {
+    container.innerHTML = `${chipsHtml}
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.75rem 0;opacity:.55;font-size:.85rem">
+        <span class="ps-spinner" style="display:inline-block"></span> Ejecutando…
+      </div>`;
+    return;
+  }
+
+  // Preserve search value across rebuilds
+  const prevSearch = $('pf-search')?.value || '';
+
+  // Build filter bar
+  const counts = {all:_parallelFindings.length};
+  _parallelFindings.forEach(f => { counts[f.severity]=(counts[f.severity]||0)+1; });
+  const filterBtns = ['all','critical','high','medium','info'].map(sev => {
+    const lbl = sev==='all'?'Todos':sev==='critical'?'🔴 Crítico':sev==='high'?'🟠 Alto':sev==='medium'?'🟡 Medio':'🔵 Info';
+    const cnt = sev==='all'?'':counts[sev]?`<span style="opacity:.5;margin-left:3px">${counts[sev]}</span>`:'';
+    return `<button class="pl-filter-btn${_pfFilter===sev?' active':''}" data-sev="${sev}"
+      onclick="_pfSetFilter('${sev}',this)" style="font-size:.72rem;padding:.2rem .6rem;border-color:rgba(0,0,0,.12);color:var(--text)">${lbl}${cnt}</button>`;
+  }).join('');
+
+  container.innerHTML = `
+    ${chipsHtml}
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;flex:1">${filterBtns}</div>
+      <input id="pf-search" placeholder="Buscar en hallazgos..." oninput="_pfRebuild()"
+        style="padding:.3rem .7rem;border-radius:.4rem;border:1px solid rgba(0,0,0,.12);background:transparent;font-size:.8rem;width:180px;outline:none;color:var(--text)" value="${escHtml(prevSearch)}">
+      <span id="pf-count" style="font-size:.75rem;opacity:.45;white-space:nowrap"></span>
+    </div>
+    <div style="display:flex;gap:.4rem;margin-bottom:.9rem">
+      <button id="pf-tab-asset" class="pl-view-tab${_pfCurView==='asset'?' active':''}"    onclick="_pfSwitchView('asset')"    style="font-size:.78rem;border-color:rgba(0,0,0,.12)">📦 Por activo</button>
+      <button id="pf-tab-sev"   class="pl-view-tab${_pfCurView==='severity'?' active':''}" onclick="_pfSwitchView('severity')" style="font-size:.78rem;border-color:rgba(0,0,0,.12)">🔴 Por severidad</button>
+    </div>
+    <div id="pf-asset" style="display:${_pfCurView==='asset'?'block':'none'}"></div>
+    <div id="pf-sev"   style="display:${_pfCurView==='severity'?'block':'none'}"></div>`;
+
+  _pfRebuildViews();
 }
 
 function _saveParallelRun(tool, subtool, state) {
@@ -1617,6 +1865,7 @@ function launchParallel() {
       idx,
       name: targets.length > 1 ? `${subtool.name} [${tgt}]` : subtool.name,
       cmd,
+      target: tgt,
       startTime: Date.now(),
       done: false,
       lines: 0,
@@ -1694,10 +1943,11 @@ function launchParallel() {
 }
 
 function switchParallelTab(tab, btn) {
-  document.querySelectorAll('.parallel-tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.output-section .out-tab').forEach(el => el.classList.remove('active'));
-  const el = $(`ptab-${tab}`);
-  if (el) el.classList.add('active');
+  ['summary', 'raw'].forEach(t => {
+    const el = $(`ptab-${t}`);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('#panel-parallel .out-tab').forEach(el => el.classList.remove('active'));
   if (btn) btn.classList.add('active');
 }
 
@@ -1734,6 +1984,9 @@ function clearParallel() {
   document.querySelectorAll('.pg-select-all').forEach(btn => { btn.textContent = 'Seleccionar todo'; });
   // Reset parallel state
   Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
+  _parallelFindings = [];
+  _pfFilter   = 'all';
+  _pfCurView  = 'asset';
   _parallelTotal = 0;
   _parallelDone  = 0;
   _stopParallelTimer();
@@ -1747,12 +2000,17 @@ function clearParallel() {
     </div>
   </div>
 `);
-
-setHtml('parallel-out', `
+  setHtml('parallel-out', `
   <div class="parallel-empty-terminal">
     <span class="empty-output-text">$ _</span>
   </div>
 `);
+  // Reset tabs: show Resumen, hide terminal
+  const tabSummary = $('ptab-summary');
+  const tabRaw     = $('ptab-raw');
+  if (tabSummary) tabSummary.style.display = 'block';
+  if (tabRaw)     tabRaw.style.display     = 'none';
+  document.querySelectorAll('#panel-parallel .out-tab').forEach((b, i) => b.classList.toggle('active', i === 0));
 }
 
 /* ── Scope management ────────────────────────────────────────────────────── */

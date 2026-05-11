@@ -171,8 +171,15 @@
     text-transform: uppercase;
     letter-spacing: .05em;
   }
-  .badge-tool { background: #f1f5f9; color: #475569; }
+  .badge-tool  { background: #f1f5f9; color: #475569; }
   .badge-asset { background: #f8fafc; color: #64748b; font-family: monospace; }
+  .badge-csf   { font-size: 6.5pt; font-weight: 800; padding: 2px 6px; border-radius: 3px; letter-spacing: .04em; }
+  .csf-GV { background: #f1f5f9; color: #475569; }
+  .csf-ID { background: #dbeafe; color: #1d4ed8; }
+  .csf-PR { background: #dcfce7; color: #15803d; }
+  .csf-DE { background: #ede9fe; color: #6d28d9; }
+  .csf-RS { background: #ffedd5; color: #c2410c; }
+  .csf-RC { background: #ccfbf1; color: #0f766e; }
   .finding-title { font-weight: 700; font-size: 10pt; color: #0f172a; margin-bottom: 6px; }
   .finding-detail {
     font-size: 8.5pt;
@@ -217,8 +224,69 @@
     color: #fff;
   }
   .rec-content { flex: 1; }
-  .rec-asset { font-size: 7.5pt; font-family: monospace; opacity: .6; margin-bottom: 2px; }
+  .rec-assets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+  .rec-asset-chip {
+    font-size: 7pt;
+    font-family: monospace;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+  }
   .rec-text { font-size: 9pt; line-height: 1.45; }
+
+  /* ── Aviso OT/ICS ── */
+  .ot-alert {
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 2px solid #dc2626;
+    overflow: hidden;
+    page-break-inside: avoid;
+  }
+  .ot-alert-header {
+    background: #dc2626;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 10pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ot-alert-body {
+    background: #fff5f5;
+    padding: 14px 16px;
+  }
+  .ot-alert-desc {
+    font-size: 9pt;
+    color: #7f1d1d;
+    line-height: 1.55;
+    margin-bottom: 12px;
+  }
+  .ot-item {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid #fecaca;
+    font-size: 8.5pt;
+  }
+  .ot-item:last-child { border-bottom: none; }
+  .ot-item-asset {
+    font-family: 'Courier New', monospace;
+    color: #991b1b;
+    font-weight: 700;
+    min-width: 140px;
+  }
+  .ot-item-title { color: #374151; flex: 1; }
 
   /* ── Pie de página ── */
   @page {
@@ -306,6 +374,33 @@
     {% endif %}
   </div>
 
+  <!-- ══ AVISO OT/ICS ══════════════════════════════════════════════════════ -->
+  {% if ot_findings %}
+  <div class="section">
+    <div class="ot-alert">
+      <div class="ot-alert-header">
+        &#9888; Infraestructura OT/ICS detectada expuesta a Internet — riesgo de impacto físico
+      </div>
+      <div class="ot-alert-body">
+        <div class="ot-alert-desc">
+          Se han detectado <strong>{{ ot_findings|length }} protocolo{{ 's' if ot_findings|length != 1 }} o sistema{{ 's' if ot_findings|length != 1 }} de control industrial</strong>
+          accesibles desde Internet. A diferencia de los sistemas TI, una brecha en infraestructura OT puede
+          tener <strong>consecuencias físicas directas</strong>: interrupción de servicios esenciales,
+          daños en equipos industriales, riesgos para la seguridad del personal y del entorno.
+          Estos sistemas deben aislarse <strong>de inmediato</strong> detrás de firewall, VPN o jump host
+          con autenticación multifactor.
+        </div>
+        {% for item in ot_findings %}
+        <div class="ot-item">
+          <span class="ot-item-asset">{{ item.asset }}</span>
+          <span class="ot-item-title">{{ item.title }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ══ HALLAZGOS ══════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">Hallazgos</div>
@@ -328,6 +423,9 @@
         <div class="finding-meta">
           <span class="badge badge-tool">{{ f.tool | upper }}</span>
           <span class="badge badge-asset">{{ f.asset }}</span>
+          {% set csf_labels = {'GV':'Gobernar','ID':'Identificar','PR':'Proteger','DE':'Detectar','RS':'Responder','RC':'Recuperar'} %}
+          {% set csf = f.csf if f.csf is defined else 'ID' %}
+          <span class="badge badge-csf csf-{{ csf }}">CSF · {{ csf }} {{ csf_labels.get(csf,'') }}</span>
         </div>
         <div class="finding-title">{{ f.title }}</div>
         <div class="finding-detail">{{ f.detail }}</div>
@@ -342,17 +440,22 @@
   </div>
 
   <!-- ══ RECOMENDACIONES ════════════════════════════════════════════════════ -->
-  {% set recs = findings | selectattr('recommendation') | list %}
-  {% if recs %}
+  {% if grouped_recs %}
   <div class="section" style="page-break-before:always">
     <div class="section-title">Plan de acción</div>
-    {% set colors = {'critical':'#ef4444','high':'#f97316','medium':'#eab308','info':'#60a5fa'} %}
-    {% for f in recs | sort(attribute='severity') %}
+    <p style="font-size:8.5pt;color:#64748b;margin-bottom:14px">
+      {{ grouped_recs|length }} acciones recomendadas, ordenadas por severidad.
+      Cada acción indica los activos afectados.
+    </p>
+    {% set colors = {'critical':'#ef4444','high':'#f97316','medium':'#eab308','info':'#60a5fa','low':'#94a3b8'} %}
+    {% for r in grouped_recs %}
     <div class="rec-item">
-      <div class="rec-num" style="background:{{ colors.get(f.severity,'#94a3b8') }}">{{ loop.index }}</div>
+      <div class="rec-num" style="background:{{ colors.get(r.severity,'#94a3b8') }}">{{ loop.index }}</div>
       <div class="rec-content">
-        <div class="rec-asset">{{ f.asset }} · {{ f.tool | upper }}</div>
-        <div class="rec-text">{{ f.recommendation }}</div>
+        <div class="rec-assets">
+          {% for asset in r.assets %}<span class="rec-asset-chip">{{ asset }}</span>{% endfor %}
+        </div>
+        <div class="rec-text">{{ r.recommendation }}</div>
       </div>
     </div>
     {% endfor %}

@@ -605,7 +605,7 @@
               <button class="out-tab" onclick="switchParallelTab('raw', this)">Output unificado</button>
             </div>
 
-            <div class="parallel-tab-content active" id="ptab-summary">
+            <div class="parallel-tab-content active" id="ptab-summary" style="display:block">
               <div class="parallel-summary-area" id="parallel-summary">
                 <div class="parallel-empty-state">
                   <div class="parallel-empty-icon">⚡</div>
@@ -617,7 +617,7 @@
               </div>
             </div>
 
-            <div class="parallel-tab-content" id="ptab-raw">
+            <div class="parallel-tab-content" id="ptab-raw" style="display:none">
               <div class="terminal-window">
                 <div class="terminal-titlebar">
                   <span class="terminal-dot terminal-dot-red"></span>
@@ -1215,6 +1215,7 @@
   const SEV_COLOR = { critical:'#ef4444', high:'#f97316', medium:'#eab308', info:'#60a5fa' };
   const SEV_LABEL = { critical:'CRÍTICO', high:'ALTO', medium:'MEDIO', info:'INFO' };
   const SEV_BG    = { critical:'rgba(239,68,68,.1)', high:'rgba(249,115,22,.1)', medium:'rgba(234,179,8,.1)', info:'rgba(96,165,250,.1)' };
+  const SEV_ORDER = { critical:0, high:1, medium:2, info:3 };
   const TOOL_COLOR = {
     whois:'#818cf8', dns:'#22d3ee', subfinder:'#a78bfa', 'crt.sh':'#a78bfa',
     shodan:'#fb923c', virustotal:'#60a5fa', urlscan:'#f472b6', intelx:'#f87171',
@@ -1410,6 +1411,32 @@
     return { ver, score, lbl, color, bg };
   }
 
+  function _sevImportance(sev) {
+    return {critical:[5,'Crítica'], high:[4,'Alta'], medium:[3,'Media'], info:[1,'Baja']}[sev] || [1,'Baja'];
+  }
+
+  const CSF_BY_TOOL = {
+    whois:'GV', dns:'ID', subfinder:'ID', 'crt.sh':'ID',
+    nmap:'PR', shodan:'PR', exposure:'PR',
+    virustotal:'DE', urlscan:'DE',
+    intelx:'ID', harvester:'ID', blackbird:'ID', sherlock:'ID', maigret:'ID', variants:'ID',
+  };
+  const CSF_LABEL = {GV:'Gobernar', ID:'Identificar', PR:'Proteger', DE:'Detectar', RS:'Responder', RC:'Recuperar'};
+  const CSF_STYLE = {
+    GV: 'background:rgba(100,116,139,.15);color:#94a3b8',
+    ID: 'background:rgba(59,130,246,.15);color:#60a5fa',
+    PR: 'background:rgba(34,197,94,.15);color:#4ade80',
+    DE: 'background:rgba(139,92,246,.15);color:#a78bfa',
+    RS: 'background:rgba(249,115,22,.15);color:#fb923c',
+    RC: 'background:rgba(20,184,166,.15);color:#2dd4bf',
+  };
+  function _csfTag(f) {
+    const t = (f.title || '').toLowerCase();
+    if (t.includes('cve-'))                             return 'PR';
+    if (t.includes('malicioso') || t.includes('malware')) return 'DE';
+    return CSF_BY_TOOL[f.tool] || 'ID';
+  }
+
   function _makeFindingCard(f) {
     const color      = SEV_COLOR[f.severity] || '#94a3b8';
     const label      = SEV_LABEL[f.severity] || f.severity;
@@ -1420,6 +1447,11 @@
     const assetShort = f.asset.length > 30 ? f.asset.slice(0, 28) + '…' : f.asset;
     const cvss       = _cvssInfo(f.title);
     const isKev      = f.title.includes('[KEV]');
+    const [imp, impLabel] = _sevImportance(f.severity);
+    const impBar = `<div style="display:inline-flex;align-items:center;gap:.3rem;flex-shrink:0">
+      <span style="font-size:.6rem;color:#94a3b8;white-space:nowrap">Importancia ${imp} - ${impLabel}</span>
+      <div style="display:flex;gap:2px;align-items:center">${Array.from({length:5},(_,i)=>`<span style="display:inline-block;width:10px;height:5px;border-radius:1px;background:${i<imp?color:'rgba(255,255,255,.1)'}"></span>`).join('')}</div>
+    </div>`;
 
     const cvssBadge = cvss ? `
       <span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;padding:.12rem .5rem;border-radius:.25rem;background:${cvss.bg};color:${cvss.color};white-space:nowrap;flex-shrink:0;border:1px solid ${cvss.color}44">
@@ -1431,6 +1463,9 @@
         ⚠ KEV
       </span>` : '';
 
+    const csf      = _csfTag(f);
+    const csfBadge = `<span style="font-size:.6rem;font-weight:700;padding:.1rem .45rem;border-radius:.25rem;${CSF_STYLE[csf]||CSF_STYLE.ID};white-space:nowrap;flex-shrink:0;letter-spacing:.03em">${csf} · ${CSF_LABEL[csf]||csf}</span>`;
+
     const div = document.createElement('div');
     div.className = 'pl-finding-card';
     div.style.borderLeft = `3px solid ${color}`;
@@ -1441,9 +1476,11 @@
         <span style="font-family:monospace;font-size:.7rem;color:#94a3b8;background:rgba(255,255,255,.05);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0" title="${_esc(f.asset)}">${assetIcon} ${_esc(assetShort)}</span>
         ${cvssBadge}${kevBadge}
         <span style="font-weight:600;font-size:.83rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(f.title)}</span>
+        ${impBar}
         <span style="opacity:.35;font-size:.75rem;flex-shrink:0">▾</span>
       </div>
       <div class="pl-finding-body" id="${uid}">
+        <div style="margin-bottom:.5rem">${csfBadge}</div>
         <div class="pl-finding-detail">${_esc(f.detail)}</div>
         ${f.recommendation ? `<div class="pl-finding-rec">▶ ${_esc(f.recommendation)}</div>` : ''}
       </div>`;
@@ -1470,7 +1507,14 @@
     filtered.forEach(f => {
       (byAsset[f.asset] = byAsset[f.asset] || []).push(f);
     });
-    Object.entries(byAsset).forEach(([asset, items]) => {
+    // Sort asset groups: group with most severe finding first
+    const sortedEntries = Object.entries(byAsset).sort(([,a],[,b]) => {
+      const wo = arr => Math.min(...arr.map(f => SEV_ORDER[f.severity] ?? 99));
+      return wo(a) - wo(b);
+    });
+    sortedEntries.forEach(([asset, items]) => {
+      // Sort findings within each asset group by severity
+      items.sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99));
       const type  = _assetType(asset);
       const icon  = ASSET_ICON[type] || '▶';
       const crit  = items.filter(f => f.severity === 'critical').length;
@@ -1507,7 +1551,8 @@
     container.innerHTML = '';
     const order = ['critical','high','medium','info'];
     order.forEach(sev => {
-      const items = filtered.filter(f => f.severity === sev);
+      const items = filtered.filter(f => f.severity === sev)
+                            .sort((a, b) => a.asset.localeCompare(b.asset));
       if (!items.length) return;
       const color = SEV_COLOR[sev];
       const label = SEV_LABEL[sev];
@@ -1746,6 +1791,78 @@
       .catch(() => {});
   }
 
+  // ── Análisis de IP desde modo manual ────────────────────────────────────────
+  window._runIPPipeline = function(ip) {
+    _findings = []; _assets = new Set(); _curPhase = null; _curView = 'asset';
+    _filterSev = 'all'; _filterText = '';
+    document.querySelectorAll('.pl-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sev === 'all'));
+    const srch = document.getElementById('pl-search'); if (srch) srch.value = '';
+    document.getElementById('pl-btn').disabled = true;
+    document.getElementById('pl-progress').style.display = 'block';
+    document.getElementById('pl-findings').style.display = 'none';
+    document.getElementById('pl-log').innerHTML = '';
+    document.getElementById('pl-view-asset').innerHTML = '';
+    document.getElementById('pl-view-severity').innerHTML = '';
+    document.getElementById('pl-sev-cards').innerHTML = '';
+    const assetsEl = document.getElementById('pl-assets-analyzed');
+    if (assetsEl) assetsEl.innerHTML = '';
+    document.getElementById('pl-status-txt').textContent = `🖥️ Analizando IP: ${ip}`;
+    document.getElementById('pl-finding-count').textContent = '';
+    document.getElementById('pl-spinner').style.display = '';
+    document.querySelectorAll('.pl-phase').forEach(el => el.classList.remove('active','done'));
+
+    show('pipeline', document.querySelector('.nav-btn[onclick*="pipeline"]'));
+    if (_plEs) _plEs.close();
+
+    fetch('/api/pipeline/run_tool', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tool: 'full_ip', target: ip})
+    })
+    .then(r => r.json())
+    .then(({pipeline_id, error}) => {
+      if (error) { alert(error); document.getElementById('pl-btn').disabled = false; return; }
+      _plId = pipeline_id;
+      _plSeeds = [ip];
+      _plEs = new EventSource(`/api/pipeline/stream/${pipeline_id}`);
+      _plEs.onmessage = e => {
+        const ev = JSON.parse(e.data);
+        const log = document.getElementById('pl-log');
+        if (ev.type === 'stage') {
+          const d = document.createElement('div');
+          d.innerHTML = '<span style="opacity:.4">›</span> ' + _esc(ev.msg);
+          log.appendChild(d); log.scrollTop = log.scrollHeight;
+        }
+        if (ev.type === 'error') {
+          const d = document.createElement('div');
+          d.style.color = '#f87171';
+          d.innerHTML = '✗ ' + _esc(ev.msg);
+          log.appendChild(d); log.scrollTop = log.scrollHeight;
+        }
+        if (ev.type === 'finding') {
+          _findings.push(ev);
+          document.getElementById('pl-findings').style.display = 'block';
+          document.getElementById('pl-finding-count').textContent = _findings.length + ' hallazgos';
+          _updateLiveSevBar();
+          _rebuildViews();
+        }
+        if (ev.type === 'pipeline_complete') {
+          _plEs.close();
+          document.getElementById('pl-spinner').style.display = 'none';
+          const score = ev.score ?? 0;
+          document.getElementById('pl-status-txt').textContent = `✓ IP ${ip} — ${_findings.length} hallazgos · Score ${score}/100`;
+          document.getElementById('pl-btn').disabled = false;
+          _renderSummary(score);
+        }
+      };
+      _plEs.onerror = () => {
+        _plEs.close();
+        document.getElementById('pl-btn').disabled = false;
+        document.getElementById('pl-status-txt').textContent = 'Conexión perdida';
+      };
+    })
+    .catch(err => { alert('Error: ' + err); document.getElementById('pl-btn').disabled = false; });
+  };
+
   function switchFindingsView(view) {
     _curView = view;
     document.getElementById('pl-view-asset').style.display    = view === 'asset'    ? 'block' : 'none';
@@ -1753,6 +1870,7 @@
     document.getElementById('pl-tab-asset').classList.toggle('active',    view === 'asset');
     document.getElementById('pl-tab-severity').classList.toggle('active', view === 'severity');
   }
+
   </script>
 
 </body>
