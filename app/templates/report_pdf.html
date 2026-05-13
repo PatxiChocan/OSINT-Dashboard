@@ -21,7 +21,61 @@
   --mono:'Courier New',Courier,monospace;
 }
 
-@page { size:A4 portrait; margin:0 }
+@page {
+  size: A4 portrait;
+  margin: 2.8cm 2.2cm 2.2cm 2.2cm;
+
+  @top-left {
+    content: "Aletheia OSINT";
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #1a1a18;
+    vertical-align: bottom;
+    padding-bottom: 5pt;
+    border-bottom: 2pt solid #1a1a18;
+  }
+  @top-right {
+    content: "CONFIDENCIAL — USO INTERNO";
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #888880;
+    text-align: right;
+    vertical-align: bottom;
+    padding-bottom: 5pt;
+    border-bottom: 2pt solid #1a1a18;
+  }
+  @bottom-left {
+    content: "Informe de Exposición Externa";
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #888880;
+    vertical-align: top;
+    padding-top: 5pt;
+    border-top: 1pt solid #d0d0c8;
+  }
+  @bottom-right {
+    content: "Pág. " counter(page) " / " counter(pages);
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #888880;
+    text-align: right;
+    vertical-align: top;
+    padding-top: 5pt;
+    border-top: 1pt solid #d0d0c8;
+  }
+}
+
+/* Portada: sin márgenes ni cabecera repetida */
+@page cover {
+  margin: 0;
+  @top-left    { content: none }
+  @top-right   { content: none }
+  @bottom-left { content: none }
+  @bottom-right{ content: none }
+}
+
+.cover-page-wrapper { page: cover }
 
 body {
   background:var(--page);
@@ -95,7 +149,7 @@ body {
 .assets-block strong { color:var(--text) }
 
 /* ── Página de contenido ──────────────────────────────────────────────────── */
-.page { padding:2.5rem 3.5rem }
+.page { padding:1.75rem 0 }
 
 /* ── Summary grid ─────────────────────────────────────────────────────────── */
 .summary-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:2rem }
@@ -301,18 +355,7 @@ body {
 }
 .rec-text { font-size:10pt; line-height:1.5; font-family:Arial,sans-serif; color:var(--text2) }
 
-/* ── Footer ───────────────────────────────────────────────────────────────── */
-.doc-footer {
-  background:var(--text); color:#888; font-family:Arial,sans-serif;
-  font-size:9.5px; padding:.875rem 3.5rem;
-  display:flex; justify-content:space-between; letter-spacing:.5px;
-}
-.doc-footer strong { color:#ccc }
-
-@media print {
-  .page { padding:2rem 3rem }
-  .doc-header, .cover, .doc-footer { padding-left:3rem; padding-right:3rem }
-}
+/* doc-footer eliminado: sustituido por número de página en @bottom-right */
 </style>
 </head>
 <body>
@@ -368,6 +411,9 @@ body {
 {% set total = counts.critical + counts.high + counts.medium + counts.info %}
 
 
+<!-- ══ PORTADA (página sin márgenes ni cabecera repetida) ══════════════════ -->
+<div class="cover-page-wrapper">
+
 <!-- ══ HEADER ════════════════════════════════════════════════════════════════ -->
 <div class="doc-header">
   <div class="header-logo">
@@ -413,6 +459,8 @@ body {
   </div>
   {% endif %}
 </div>
+
+</div>{# fin cover-page-wrapper #}
 
 
 <!-- ══ RESUMEN EJECUTIVO + ÍNDICE ════════════════════════════════════════════ -->
@@ -702,12 +750,7 @@ body {
 </div>
 
 
-<!-- ══ FOOTER ════════════════════════════════════════════════════════════════ -->
-<div class="doc-footer">
-  <span><strong>Aletheia OSINT Dashboard</strong> — Informe de exposición externa</span>
-  <span>{{ seeds | join(', ') }} · {{ date }}</span>
-  <span>CONFIDENCIAL — USO INTERNO</span>
-</div>
+<!-- Footer eliminado: número de página y clasificación ya aparecen en cada hoja vía @page -->
 
 </body>
 </html>

@@ -3071,20 +3071,24 @@ function downloadOut(tool) {
 <meta charset="UTF-8">
 <title>${title} — ${tgt}</title>
 <style>
+  @page{size:A4 portrait;margin:2.5cm 2cm 2.2cm 2cm}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#1C0500;background:#F9F5F4}
-  .cover{background:#1C0500;color:#fff;padding:44px 48px 36px;position:relative;overflow:hidden}
+  .print-hdr{display:none;position:fixed;top:0;left:0;right:0;padding:6px 2cm;background:#1C0500;color:#9A6055;font-size:8pt;font-family:Arial,sans-serif;justify-content:space-between;align-items:center}
+  .print-hdr strong{color:#F3EEEC}
+  .print-ftr{display:none;position:fixed;bottom:0;left:0;right:0;padding:5px 2cm;border-top:1px solid #d0d0c8;font-size:8pt;font-family:Arial,sans-serif;color:#9A6055;justify-content:space-between;background:#F9F5F4}
+  .cover{background:#1C0500;color:#fff;padding:44px 48px 36px;position:relative;overflow:hidden;break-after:page}
   .cover-accent{position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,#BD1D00,#E84020)}
   .cover-brand{font-size:9px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#9A6055;margin-bottom:20px}
   .cover-badge{display:inline-block;background:#BD1D00;color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:999px;margin-bottom:14px}
   .cover-title{font-size:22px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:4px}
   .cover-meta{display:flex;gap:24px;font-size:9.5px;color:#9A6055;margin-top:16px;padding-top:16px;border-top:1px solid rgba(189,29,0,.25)}
   .cover-meta b{color:#F3EEEC}
-  .rpt-body{padding:32px 44px;background:#F9F5F4;min-height:100vh}
+  .rpt-body{padding:32px 0;background:#F9F5F4}
   .section-hdr{position:relative;padding-left:14px;margin:28px 0 14px;font-size:0.58rem;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#9A6055;display:flex;align-items:center;gap:10px}
   .section-hdr::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:13px;background:linear-gradient(180deg,#BD1D00,#E84020);border-radius:2px}
   .section-hdr-label{font-size:10.5px;font-weight:800;color:#1C0500;letter-spacing:0}
-  .card{background:#fff;border:1px solid rgba(189,29,0,.09);border-radius:14px;padding:20px 22px;margin-bottom:12px;box-shadow:0 6px 18px rgba(189,29,0,.06)}
+  .card{background:#fff;border:1px solid rgba(189,29,0,.09);border-radius:14px;padding:20px 22px;margin-bottom:12px;box-shadow:0 6px 18px rgba(189,29,0,.06);break-inside:avoid}
   .parsed-section table{width:100%;border-collapse:collapse;font-size:10px;border-radius:8px;overflow:hidden}
   .parsed-section td,.parsed-section th{border:1px solid rgba(189,29,0,.10);padding:6px 10px}
   .parsed-section th{background:#FBF2F0;font-weight:700;color:#3D1510;font-size:9px;text-transform:uppercase;letter-spacing:.04em}
@@ -3092,10 +3096,15 @@ function downloadOut(tool) {
   .parsed-section .ui-message{color:#9A6055;font-style:italic}
   .raw-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#F3EEEC;background:#3D1510;padding:7px 14px;border-radius:8px 8px 0 0;margin-top:0}
   pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;font-size:8.5px;background:#130400;color:#f0e8e5;border-radius:0 0 8px 8px;padding:14px;line-height:1.7;margin-top:0}
-  @media print{body{background:#F9F5F4}}
+  @media print{
+    body{background:#F9F5F4;padding-top:1.1cm;padding-bottom:0.9cm}
+    .print-hdr,.print-ftr{display:flex}
+  }
 </style>
 </head>
 <body>
+  <div class="print-hdr"><strong>Aletheia OSINT Platform</strong><span>CONFIDENCIAL — USO INTERNO</span></div>
+  <div class="print-ftr"><span>Informe de herramienta — ${tgt}</span><span>${date}</span></div>
   <div class="cover">
     <div class="cover-accent"></div>
     <div class="cover-brand">Aletheia OSINT Platform</div>
@@ -3348,15 +3357,21 @@ function generateExecutiveReport() {
 <meta charset="UTF-8">
 <title>Informe OSINT — ${esc(scope.caseName || 'Análisis')}</title>
 <style>
+@page{size:A4 portrait;margin:2.5cm 2cm 2.2cm 2cm}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#1C0500;background:#F9F5F4}
 a{color:#BD1D00}
 
+/* Cabecera y pie repetidos en cada hoja (sólo en impresión) */
+.print-hdr{display:none;position:fixed;top:0;left:0;right:0;padding:6px 2cm;background:#1C0500;color:#9A6055;font-size:8pt;font-family:Arial,sans-serif;justify-content:space-between;align-items:center}
+.print-hdr strong{color:#F3EEEC}
+.print-ftr{display:none;position:fixed;bottom:0;left:0;right:0;padding:5px 2cm;border-top:1px solid #d0d0c8;font-size:8pt;font-family:Arial,sans-serif;color:#9A6055;justify-content:space-between;background:#F9F5F4}
+
 /* Cover */
 .cover{
   background:#1C0500;color:#fff;
-  min-height:100vh;padding:64px 52px;
-  page-break-after:always;
+  padding:64px 52px;
+  break-after:page;page-break-after:always;
   display:flex;flex-direction:column;justify-content:space-between;
   position:relative;overflow:hidden;
 }
@@ -3377,7 +3392,7 @@ a{color:#BD1D00}
 .cover-meta-item b{display:block;color:#F3EEEC;font-size:10.5px;margin-bottom:2px}
 
 /* Body */
-.rpt-body{padding:36px 48px;background:#F9F5F4;min-height:100vh}
+.rpt-body{padding:36px 0;background:#F9F5F4}
 
 /* Section title — matches .section-title from web */
 .rpt-h1{
@@ -3474,14 +3489,18 @@ pre{white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospac
 .dim{color:#9A6055;font-style:italic;font-size:10px}
 
 @media print{
-  body{background:#F9F5F4}
-  .cover{page-break-after:always;min-height:100vh}
-  .card,.rpt-section{page-break-inside:avoid}
+  body{background:#F9F5F4;padding-top:1.1cm;padding-bottom:0.9cm}
+  .print-hdr,.print-ftr{display:flex}
+  .cover{page-break-after:always}
+  .card,.rpt-section{page-break-inside:avoid;break-inside:avoid}
   pre{max-height:none}
 }
 </style>
 </head>
 <body>
+
+<div class="print-hdr"><strong>Aletheia OSINT Platform</strong><span>CONFIDENCIAL — USO INTERNO</span></div>
+<div class="print-ftr"><span>Informe de reconocimiento externo — ${esc(scope.client || '')}</span><span>${date}</span></div>
 
 <!-- COVER -->
 <div class="cover">
