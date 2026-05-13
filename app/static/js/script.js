@@ -54,7 +54,6 @@ const TOOL_COLORS = {
   discover:   { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
   amass:      { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
   katana:     { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
-  gitleaks:   { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
   wayback:    { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
   identidad:  { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
   subfinder:  { bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' },
@@ -107,11 +106,6 @@ const SUBTOOLS = {
     { name: 'robots + sitemap', func: 'Lee robots.txt y sitemap.xml', alert: 'low', cmd: t => `katana -u https://${t} -kf robotstxt,sitemapxml -rl 20 -silent` },
     { name: 'Deep crawl', func: 'Crawling profundo depth 5', alert: 'med', cmd: t => `katana -u https://${t} -jc -kf robotstxt,sitemapxml -rl 10 -depth 5 -silent` },
     { name: 'Con sesión', func: 'Crawling autenticado con cookie', alert: 'med', cmd: t => `katana -u https://${t} -H "Cookie: session=PEGAR_AQUI" -headless -rl 10` }
-  ],
-  gitleaks: [
-    { name: 'Detectar secretos (dir actual)', func: 'Busca credenciales y tokens en el directorio de trabajo', alert: 'none', cmd: _t => `gitleaks detect --source . --no-git -v` },
-    { name: 'Detectar secretos (repo git)', func: 'Escanea historial completo del repositorio git local', alert: 'none', cmd: _t => `gitleaks git --source . -v` },
-    { name: 'Directorio /tmp/aletheia', func: 'Escanea ficheros descargados en sesión actual', alert: 'none', cmd: _t => `gitleaks detect --source /tmp/aletheia --no-git -v` }
   ],
   wayback: [
     { name: 'Listar snapshots', func: 'Muestra todas las versiones archivadas del sitio (sin descargar)', alert: 'none', cmd: t => `wayback_machine_downloader https://${t} -d /home/kali/aletheia-downloads/websites/${t} -p 1` },
@@ -166,7 +160,7 @@ const SUBTOOLS = {
   ],
 };
 
-const toolList = ['discover', 'amass', 'katana', 'gitleaks', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli', 'nuclei', 'urls'];
+const toolList = ['discover', 'amass', 'katana', 'wayback', 'identidad', 'subfinder', 'webrecon', 'shodancli', 'nuclei', 'urls'];
 
 const toolMeta = {
   discover: {
@@ -182,11 +176,6 @@ const toolMeta = {
   katana: {
     title: '🕷 Katana',
     desc: 'Crawling web estático, JS y headless.',
-    tags: '<span class="tag tag-mit">MIT</span>'
-  },
-  gitleaks: {
-    title: '🔑 Gitleaks',
-    desc: 'Detecta credenciales, tokens y secretos filtrados en repositorios y directorios.',
     tags: '<span class="tag tag-mit">MIT</span>'
   },
   wayback: {
@@ -322,6 +311,9 @@ function show(id, btn) {
       }
     }
     if (typeof loadHistory === 'function') loadHistory();
+  }
+  if (id === 'parallel') {
+    if (typeof loadManualHistory === 'function') loadManualHistory();
   }
 }
 
@@ -1366,9 +1358,13 @@ function runTool(tool) {
 
 // ── Parallel mode state ──────────────────────────────────────────────────────
 const _parallelState = {}; // key: "tool-idx" → { startTime, done, lines, structured }
-let _parallelTotal = 0;
-let _parallelDone  = 0;
-let _parallelTimer = null;
+let _parallelTotal     = 0;
+let _parallelDone      = 0;
+let _parallelTimer     = null;
+let _queuedIPs            = new Set();
+let _ipAnalysisPending    = 0;
+let _ipFindings           = [];
+let _lastManualAnalysisId = null;
 
 function _parallelKey(tool, idx) { return `${tool}-${idx}`; }
 
@@ -1577,30 +1573,42 @@ function _groupsToFindings(groups, toolName, target) {
 }
 
 function _makePFC(f) {
-  const color  = _PF_SEV_C[f.severity] || '#94a3b8';
-  const tc     = (TOOL_COLORS[f.tool] || {}).color || '#9A6055';
-  const uid    = 'pfc_' + Math.random().toString(36).slice(2);
-  const aShort = f.asset.length > 30 ? f.asset.slice(0,28)+'…' : f.asset;
-  const aIcon  = _PF_A_ICO[_pfAssetType(f.asset)] || '▶';
-  const imp    = {critical:5,high:4,medium:3,info:1}[f.severity]||1;
-  const impLbl = {critical:'Crítica',high:'Alta',medium:'Media',info:'Baja'}[f.severity]||'Baja';
+  const color      = _PF_SEV_C[f.severity] || '#94a3b8';
+  const tc         = (TOOL_COLORS[f.tool] || {}).color || '#9A6055';
+  const uid        = 'pfc_' + Math.random().toString(36).slice(2);
+  const aShort     = f.asset.length > 30 ? f.asset.slice(0,28)+'…' : f.asset;
+  const aIcon      = _PF_A_ICO[_pfAssetType(f.asset)] || '▶';
+  const isKev      = f.title.includes('[KEV]');
+  const cvss       = typeof _cvssInfo === 'function' ? _cvssInfo(f.title) : null;
+  const csf        = typeof _csfTag   === 'function' ? _csfTag(f) : 'ID';
+  const csfStyle   = typeof CSF_STYLE !== 'undefined' ? (CSF_STYLE[csf] || CSF_STYLE.ID) : '';
+  const csfLbl     = typeof CSF_LABEL !== 'undefined' ? (CSF_LABEL[csf] || csf) : csf;
+  const [imp, impLbl] = typeof _sevImportance === 'function' ? _sevImportance(f.severity) : [{critical:5,high:4,medium:3,info:1}[f.severity]||1, {critical:'Crítica',high:'Alta',medium:'Media',info:'Baja'}[f.severity]||'Baja'];
+
   const impBar = `<div style="display:inline-flex;align-items:center;gap:.3rem;flex-shrink:0">
     <span style="font-size:.6rem;color:#94a3b8;white-space:nowrap">Importancia ${imp} - ${impLbl}</span>
-    <div style="display:flex;gap:2px">${Array.from({length:5},(_,i)=>
-      `<span style="display:inline-block;width:10px;height:5px;border-radius:1px;background:${i<imp?color:'rgba(0,0,0,.1)'}"></span>`
+    <div style="display:flex;gap:2px;align-items:center">${Array.from({length:5},(_,i)=>
+      `<span style="display:inline-block;width:10px;height:5px;border-radius:1px;background:${i<imp?color:'rgba(255,255,255,.1)'}"></span>`
     ).join('')}</div></div>`;
-  return `<div class="pl-finding-card" style="border:1px solid rgba(0,0,0,.08);border-left:3px solid ${color};background:var(--bg-elev-2)">
+
+  const cvssBadge = cvss ? `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;padding:.12rem .5rem;border-radius:.25rem;background:${cvss.bg};color:${cvss.color};white-space:nowrap;flex-shrink:0;border:1px solid ${cvss.color}44">CVSS ${cvss.ver} ${cvss.score} · ${cvss.lbl}</span>` : '';
+  const kevBadge  = isKev ? `<span style="font-size:.63rem;font-weight:800;padding:.1rem .45rem;border-radius:.25rem;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid rgba(239,68,68,.4);white-space:nowrap;flex-shrink:0">⚠ KEV</span>` : '';
+  const csfBadge  = `<span style="font-size:.6rem;font-weight:700;padding:.1rem .45rem;border-radius:.25rem;${csfStyle};white-space:nowrap;flex-shrink:0;letter-spacing:.03em">${csf} · ${csfLbl}</span>`;
+
+  return `<div class="pl-finding-card" style="border-left:3px solid ${color}">
   <div class="pl-finding-header" onclick="document.getElementById('${uid}').classList.toggle('open')">
     <span class="pl-sev-badge" style="background:${_PF_SEV_B[f.severity]};color:${color}">${_PF_SEV_L[f.severity]||f.severity}</span>
-    <span class="pl-tool-badge" style="background:rgba(0,0,0,.05);color:${tc}">${escHtml(f.tool)}</span>
-    <span style="font-family:monospace;font-size:.7rem;color:#94a3b8;background:rgba(0,0,0,.04);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0">${aIcon} ${escHtml(aShort)}</span>
+    <span class="pl-tool-badge" style="background:rgba(255,255,255,.07);color:${tc}">${escHtml(f.tool)}</span>
+    <span style="font-family:monospace;font-size:.7rem;color:#94a3b8;background:rgba(255,255,255,.05);padding:.1rem .45rem;border-radius:.25rem;white-space:nowrap;flex-shrink:0" title="${escHtml(f.asset)}">${aIcon} ${escHtml(aShort)}</span>
+    ${cvssBadge}${kevBadge}
     <span style="font-weight:600;font-size:.83rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(f.title)}</span>
     ${impBar}
     <span style="opacity:.35;font-size:.75rem;flex-shrink:0">▾</span>
   </div>
-  <div class="pl-finding-body" id="${uid}" style="border-top:1px solid rgba(0,0,0,.07)">
+  <div class="pl-finding-body" id="${uid}">
+    <div style="margin-bottom:.5rem">${csfBadge}</div>
     <div class="pl-finding-detail">${escHtml(f.detail)}</div>
-    ${f.recommendation?`<div class="pl-finding-rec" style="color:#16a34a;background:rgba(22,163,74,.08)">▶ ${escHtml(f.recommendation)}</div>`:''}
+    ${f.recommendation?`<div class="pl-finding-rec">▶ ${escHtml(f.recommendation)}</div>`:''}
   </div>
 </div>`;
 }
@@ -1658,8 +1666,8 @@ function _pfRebuildViews() {
           crit?`<span class="pl-sev-badge" style="background:${_PF_SEV_B.critical};color:${_PF_SEV_C.critical}">${crit} CRÍTICO</span>`:'',
           high?`<span class="pl-sev-badge" style="background:${_PF_SEV_B.high};color:${_PF_SEV_C.high}">${high} ALTO</span>`:'',
         ].filter(Boolean).join('');
-        return `<div class="pl-asset-group" style="border:1px solid rgba(0,0,0,.09)">
-          <div class="pl-asset-group-header" style="background:var(--bg-elev-3)" onclick="const b=document.getElementById('${uid}');b.style.display=b.style.display==='none'?'flex':'none'">
+        return `<div class="pl-asset-group">
+          <div class="pl-asset-group-header" onclick="const b=document.getElementById('${uid}');b.style.display=b.style.display==='none'?'flex':'none'">
             <span style="font-size:1rem">${icon}</span>
             <span style="font-weight:700;font-size:.88rem;flex:1;font-family:monospace">${escHtml(asset)}</span>
             ${badges}
@@ -1679,8 +1687,8 @@ function _pfRebuildViews() {
       if (!items.length) return '';
       const c = _PF_SEV_C[sev];
       return `<div class="pl-sev-section">
-        <div class="pl-sev-section-header" style="background:${c}22;color:${c};border-left:3px solid ${c}">
-          ${_PF_SEV_L[sev]} <span style="opacity:.6;font-size:.75rem;margin-left:.4rem">${items.length}</span>
+        <div class="pl-sev-section-header" style="background:${_PF_SEV_B[sev]||'rgba(255,255,255,.04)'};color:${c}">
+          <span style="font-weight:800">${_PF_SEV_L[sev]}</span><span style="opacity:.6;font-size:.75rem;font-weight:400">${items.length} hallazgo${items.length!==1?'s':''}</span>
         </div>${items.map(_makePFC).join('')}
       </div>`;
     }).join('');
@@ -1692,28 +1700,34 @@ function _renderParallelSummary() {
   if (!container) return;
 
   const entries = Object.entries(_parallelState);
-  if (!entries.length) { container.innerHTML = ''; return; }
 
-  // Collect all findings from completed tools
-  _parallelFindings = [];
-  entries.forEach(([,state]) => {
-    if (!state.done) return;
-    _parallelFindings.push(..._groupsToFindings(_parallelGroups(state), state.tool, state.target));
-  });
+  // Only rebuild findings from state when there is active/completed state.
+  // When loading a saved analysis (empty state, findings pre-loaded), keep them as-is.
+  if (entries.length) {
+    _parallelFindings = [];
+    entries.forEach(([,state]) => {
+      if (!state.done || state._isIPScan) return;
+      _parallelFindings.push(..._groupsToFindings(_parallelGroups(state), state.tool, state.target));
+    });
+    _parallelFindings.push(..._ipFindings);
+  }
 
-  // Status chips (running + done tools)
-  const chips = entries.map(([key,s]) => {
-    const c = TOOL_COLORS[s.tool] || {};
-    const dot = s.done
-      ? `<span style="color:#16a34a;font-weight:700">✓</span>`
-      : `<span class="ps-spinner" style="display:inline-block;width:8px;height:8px;margin-right:2px"></span>`;
-    const time = s.done ? _fmtSecs(s.elapsed) : `${s.lines}l`;
-    return `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.67rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;border:1px solid ${s.done?'rgba(22,163,74,.25)':'rgba(234,179,8,.3)'};background:${s.done?'rgba(22,163,74,.06)':'rgba(234,179,8,.06)'}">
-      ${dot} <span style="color:${c.color||'var(--text)'}">${escHtml(s.name)}</span><span style="opacity:.45">· ${time}</span>
-    </span>`;
-  }).join('');
+  if (!entries.length && !_parallelFindings.length) { container.innerHTML = ''; return; }
 
-  const chipsHtml = `<div id="pf-chips" style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.9rem">${chips}</div>`;
+  // Status chips (running + done tools) — only when there is active state
+  const chipsHtml = entries.length ? (() => {
+    const chips = entries.map(([,s]) => {
+      const c = TOOL_COLORS[s.tool] || {};
+      const dot = s.done
+        ? `<span style="color:#16a34a;font-weight:700">✓</span>`
+        : `<span class="ps-spinner" style="display:inline-block;width:8px;height:8px;margin-right:2px"></span>`;
+      const time = s.done ? _fmtSecs(s.elapsed) : `${s.lines}l`;
+      return `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.67rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;border:1px solid ${s.done?'rgba(22,163,74,.25)':'rgba(234,179,8,.3)'};background:${s.done?'rgba(22,163,74,.06)':'rgba(234,179,8,.06)'}">
+        ${dot} <span style="color:${c.color||'var(--text)'}">${escHtml(s.name)}</span><span style="opacity:.45">· ${time}</span>
+      </span>`;
+    }).join('');
+    return `<div id="pf-chips" style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.9rem">${chips}</div>`;
+  })() : '';
 
   if (!_parallelFindings.length) {
     container.innerHTML = `${chipsHtml}
@@ -1744,9 +1758,10 @@ function _renderParallelSummary() {
         style="padding:.3rem .7rem;border-radius:.4rem;border:1px solid rgba(0,0,0,.12);background:transparent;font-size:.8rem;width:180px;outline:none;color:var(--text)" value="${escHtml(prevSearch)}">
       <span id="pf-count" style="font-size:.75rem;opacity:.45;white-space:nowrap"></span>
     </div>
-    <div style="display:flex;gap:.4rem;margin-bottom:.9rem">
+    <div style="display:flex;gap:.4rem;margin-bottom:.9rem;align-items:center">
       <button id="pf-tab-asset" class="pl-view-tab${_pfCurView==='asset'?' active':''}"    onclick="_pfSwitchView('asset')"    style="font-size:.78rem;border-color:rgba(0,0,0,.12)">📦 Por activo</button>
       <button id="pf-tab-sev"   class="pl-view-tab${_pfCurView==='severity'?' active':''}" onclick="_pfSwitchView('severity')" style="font-size:.78rem;border-color:rgba(0,0,0,.12)">🔴 Por severidad</button>
+      ${_lastManualAnalysisId ? `<button class="secondary-btn" style="margin-left:auto;font-size:.78rem;padding:.3rem .85rem;display:inline-flex;align-items:center;gap:.4rem" onclick="window.location.href='/api/manual_analyses/${_lastManualAnalysisId}/export/pdf'">⬇ Exportar PDF</button>` : ''}
     </div>
     <div id="pf-asset" style="display:${_pfCurView==='asset'?'block':'none'}"></div>
     <div id="pf-sev"   style="display:${_pfCurView==='severity'?'block':'none'}"></div>`;
@@ -1775,6 +1790,153 @@ function _saveParallelRun(tool, subtool, state) {
     arr.push(entry);
     sessionStorage.setItem('aletheia_parallel_runs', JSON.stringify(arr));
   } catch(_) {}
+}
+
+function _isPrivateIP(ip) {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.)/.test(ip);
+}
+
+function _extractIPsFromOutput(tool, lines) {
+  const groups = parseOutput(tool, lines);
+  const ips = [];
+  groups.filter(g => g.type === 'ip').forEach(g => {
+    g.items.forEach(item => {
+      const m = item.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+      if (m) ips.push(m[1]);
+    });
+  });
+  return [...new Set(ips)].filter(ip => !_isPrivateIP(ip));
+}
+
+function _calcManualScore(findings) {
+  const c = findings.filter(f => f.severity === 'critical').length;
+  const h = findings.filter(f => f.severity === 'high').length;
+  const m = findings.filter(f => f.severity === 'medium').length;
+  const i = findings.filter(f => f.severity === 'info').length;
+  let pts = Math.min(c * 25, 50);
+  pts += Math.min(h * 10, 30);
+  pts += Math.min(m * 3, 15);
+  pts += Math.min(i * 1, 5);
+  return Math.min(100, pts);
+}
+
+function _checkParallelAllDone() {
+  if (_parallelDone < _parallelTotal || _ipAnalysisPending > 0) return;
+  _stopParallelTimer();
+  _notifyParallelDone();
+  const ipMsg = _ipFindings.length ? ` · ${_ipFindings.length} hallazgos de IPs` : '';
+  showToast(`Modo paralelo completado — ${_parallelTotal} herramienta${_parallelTotal === 1 ? '' : 's'} finalizadas${ipMsg}`, 'success', 5000);
+  const btn = $('launch-parallel-btn');
+  if (btn) btn.disabled = false;
+
+  // Persist to database
+  const manualTargets = [...new Set(
+    Object.values(_parallelState)
+      .filter(s => !s._isIPScan && s.target)
+      .map(s => s.target)
+  )];
+  const manualTools = [...new Set(
+    Object.values(_parallelState)
+      .filter(s => !s._isIPScan && s.tool)
+      .map(s => s.tool)
+  )];
+  const manualScore = _calcManualScore(_parallelFindings);
+  fetch('/api/manual_analyses/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      targets:  manualTargets,
+      tools:    manualTools,
+      findings: _parallelFindings,
+      score:    manualScore,
+    }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      _lastManualAnalysisId = d.id;
+      showToast('💾 Análisis guardado', 'success', 3000);
+      _renderParallelSummary();
+      if (typeof loadManualHistory === 'function') loadManualHistory();
+    }
+  })
+  .catch(() => {});
+}
+
+function _analyzeIPFromManual(ip) {
+  _queuedIPs.add(ip);
+  _ipAnalysisPending++;
+  const key      = `_ip_${ip.replace(/\./g, '_')}`;
+  const ipColor  = { color: '#fb923c', bg: 'rgba(251,146,60,.08)' };
+
+  _parallelState[key] = {
+    _isIPScan: true,
+    tool: 'nmap',
+    name: `IP: ${ip}`,
+    target: ip,
+    startTime: Date.now(),
+    done: false,
+    lines: 0,
+    elapsed: 0,
+    hadError: false,
+  };
+  _renderParallelSummary();
+  appendParallelLine('nmap', `▶ IP descubierta — iniciando análisis completo de ${ip}`, ipColor, true);
+
+  fetch('/api/pipeline/run_tool', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool: 'full_ip', target: ip }),
+  })
+  .then(r => r.json())
+  .then(({ pipeline_id, error }) => {
+    if (error) {
+      appendParallelLine('nmap', `✖ Error al analizar ${ip}: ${error}`, ipColor, false);
+      _parallelState[key].done = true;
+      _parallelState[key].hadError = true;
+      _ipAnalysisPending--;
+      _renderParallelSummary();
+      _checkParallelAllDone();
+      return;
+    }
+    const es = new EventSource(`/api/pipeline/stream/${pipeline_id}`);
+    es.onmessage = ev => {
+      const d = JSON.parse(ev.data);
+      if (d.type === 'stage') {
+        _parallelState[key].lines++;
+        appendParallelLine('nmap', d.msg, ipColor, false);
+      } else if (d.type === 'error') {
+        appendParallelLine('nmap', `✖ ${d.msg}`, ipColor, false);
+      } else if (d.type === 'finding') {
+        _ipFindings.push(d);
+        _renderParallelSummary();
+      } else if (d.type === 'pipeline_complete') {
+        es.close();
+        _parallelState[key].done = true;
+        _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
+        _ipAnalysisPending--;
+        appendParallelLine('nmap', `✓ ${ip} — análisis completo · score ${d.score ?? 0}/100`, ipColor, true);
+        _renderParallelSummary();
+        _checkParallelAllDone();
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      _parallelState[key].done = true;
+      _parallelState[key].hadError = true;
+      _ipAnalysisPending--;
+      _renderParallelSummary();
+      _checkParallelAllDone();
+    };
+  })
+  .catch(err => {
+    appendParallelLine('nmap', `✖ Error: ${err}`, ipColor, false);
+    _parallelState[key].done = true;
+    _parallelState[key].hadError = true;
+    _ipAnalysisPending--;
+    _renderParallelSummary();
+    _checkParallelAllDone();
+  });
 }
 
 function launchParallel() {
@@ -1826,8 +1988,14 @@ function launchParallel() {
   });
 
   Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
-  _parallelTotal = jobs.length;
-  _parallelDone  = 0;
+  _parallelTotal     = jobs.length;
+  _parallelDone         = 0;
+  _queuedIPs            = new Set();
+  _ipAnalysisPending    = 0;
+  _ipFindings           = [];
+  _lastManualAnalysisId = null;
+  // Pre-seed queuedIPs with explicit IP targets to avoid re-analyzing them
+  targets.forEach(t => { if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(t)) _queuedIPs.add(t); });
 
   // Clear previous parallel run history for this session
   try { sessionStorage.setItem('aletheia_parallel_runs', '[]'); } catch(_) {}
@@ -1903,6 +2071,13 @@ function launchParallel() {
           _parallelState[key].allLines = allLines;
           _parallelDone++;
 
+          // Analyze any new public IPs — use _parallelGroups (same source as findings, handles structured + raw)
+          _parallelGroups(_parallelState[key])
+            .filter(g => g.type === 'ip')
+            .flatMap(g => g.items.map(item => { const m = item.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/); return m ? m[1] : null; }))
+            .filter((ip, i, a) => ip && !_isPrivateIP(ip) && a.indexOf(ip) === i)
+            .forEach(ip => { if (!_queuedIPs.has(ip)) _analyzeIPFromManual(ip); });
+
           // Persist to sessionStorage for report generation
           _saveParallelRun(tool, subtool, _parallelState[key]);
 
@@ -1913,13 +2088,7 @@ function launchParallel() {
           }
 
           _renderParallelSummary();
-
-          if (_parallelDone >= _parallelTotal) {
-            _stopParallelTimer();
-            _notifyParallelDone();
-            showToast(`Modo paralelo completado — ${_parallelTotal} herramienta${_parallelTotal === 1 ? '' : 's'} finalizadas`, 'success', 5000);
-            if (launchBtn) launchBtn.disabled = false;
-          }
+          _checkParallelAllDone();
         }
       },
       (err) => {
@@ -1932,11 +2101,7 @@ function launchParallel() {
         _saveParallelRun(tool, subtool, _parallelState[key]);
         appendParallelLine(tool, `[ERROR] ${err}`, color, false);
         _renderParallelSummary();
-
-        if (_parallelDone >= _parallelTotal) {
-          _stopParallelTimer();
-          if (launchBtn) launchBtn.disabled = false;
-        }
+        _checkParallelAllDone();
       }
     );
   });
@@ -1987,8 +2152,12 @@ function clearParallel() {
   _parallelFindings = [];
   _pfFilter   = 'all';
   _pfCurView  = 'asset';
-  _parallelTotal = 0;
-  _parallelDone  = 0;
+  _parallelTotal     = 0;
+  _parallelDone      = 0;
+  _queuedIPs            = new Set();
+  _ipAnalysisPending    = 0;
+  _ipFindings           = [];
+  _lastManualAnalysisId = null;
   _stopParallelTimer();
   updateParallelCount();
   setHtml('parallel-summary', `

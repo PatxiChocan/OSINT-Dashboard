@@ -264,10 +264,6 @@
             <div class="scope-reports-title">📊 Exportar análisis completo</div>
             <div class="scope-reports-desc">Genera reportes con todos los hallazgos recopilados en la sesión actual. Se incluyen datos de Shodan, VirusTotal y todas las herramientas ejecutadas.</div>
             <div class="scope-reports-btns">
-              <button class="run-btn scope-report-btn" onclick="generateExecutiveReport()">
-                📄 Reporte ejecutivo PDF
-                <span class="btn-sub">Para el cliente · Formato profesional</span>
-              </button>
               <button class="secondary-btn scope-report-btn" onclick="generateSTIX()">
                 🔗 STIX 2.1 JSON
                 <span class="btn-sub">Para MISP / SIEM · Formato estándar</span>
@@ -592,6 +588,17 @@
             <span id="parallel-count" class="parallel-count-label">0 seleccionadas</span>
             <button class="launch-btn" id="launch-parallel-btn" onclick="launchParallel()" disabled>⚡ Lanzar seleccionadas</button>
             <button class="cancel-parallel-btn" onclick="clearParallel()">Limpiar</button>
+          </div>
+
+          <!-- Historial análisis manuales -->
+          <div class="scope-card" id="pm-history-card" style="margin-bottom:1.5rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+              <div class="scope-card-title" style="margin:0">Análisis anteriores</div>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="loadManualHistory()">↻ Actualizar</button>
+            </div>
+            <div id="pm-history-list">
+              <div style="font-size:.8rem;opacity:.4;text-align:center;padding:.5rem">Cargando historial...</div>
+            </div>
           </div>
 
           <div class="output-section">
@@ -1788,6 +1795,66 @@
     fetch(`/api/analyses/${id}`, {method:'DELETE'})
       .then(r => r.json())
       .then(d => { if (d.ok) loadHistory(); })
+      .catch(() => {});
+  }
+
+  // ── Historial análisis manuales ─────────────────────────────────────────────
+
+  function loadManualHistory() {
+    fetch('/api/manual_analyses')
+      .then(r => r.json())
+      .then(rows => {
+        const el = document.getElementById('pm-history-list');
+        if (!rows.length) {
+          el.innerHTML = '<div style="font-size:.8rem;opacity:.35;text-align:center;padding:.5rem">Sin análisis guardados</div>';
+          return;
+        }
+        el.innerHTML = '';
+        rows.forEach(a => {
+          const color   = _scoreColor(a.score);
+          const targets = (a.targets || []).join(', ');
+          const date    = new Date(a.created_at).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          const item    = document.createElement('div');
+          item.className = 'pl-history-item';
+          item.innerHTML = `
+            <div class="pl-history-score" style="color:${color};border-color:${color}40;background:${color}12">${a.score}</div>
+            <div class="pl-history-meta">
+              <div class="pl-history-seeds" title="${_esc(targets)}">${_esc(targets)}</div>
+              <div class="pl-history-sub">${date} · ${a.finding_count} hallazgos · ${a.critical} críticos · ${a.high} altos</div>
+            </div>
+            <div class="pl-history-actions">
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="loadManualAnalysis(${a.id})">Cargar</button>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem;color:#f87171;border-color:#f8717133" onclick="deleteManualAnalysis(${a.id},this)">✕</button>
+            </div>`;
+          el.appendChild(item);
+        });
+      })
+      .catch(() => {});
+  }
+
+  function loadManualAnalysis(id) {
+    fetch(`/api/manual_analyses/${id}`)
+      .then(r => r.json())
+      .then(a => {
+        if (typeof _parallelFindings !== 'undefined') _parallelFindings = a.findings || [];
+        if (typeof _ipFindings       !== 'undefined') _ipFindings = [];
+        if (typeof _pfFilter         !== 'undefined') _pfFilter = 'all';
+        if (typeof _pfCurView        !== 'undefined') _pfCurView = 'asset';
+        if (typeof _lastManualAnalysisId !== 'undefined') _lastManualAnalysisId = id;
+        if (typeof _renderParallelSummary === 'function') _renderParallelSummary();
+        if (typeof switchParallelTab === 'function') {
+          const btn = document.querySelector('#panel-parallel .out-tab');
+          switchParallelTab('summary', btn);
+        }
+      })
+      .catch(e => alert('Error cargando análisis: ' + e));
+  }
+
+  function deleteManualAnalysis(id, btn) {
+    if (!confirm('¿Eliminar este análisis?')) return;
+    fetch(`/api/manual_analyses/${id}`, {method:'DELETE'})
+      .then(r => r.json())
+      .then(d => { if (d.ok) loadManualHistory(); })
       .catch(() => {});
   }
 

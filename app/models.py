@@ -117,6 +117,23 @@ class PipelineAnalysis(db.Model):
         return f"<PipelineAnalysis #{self.id} score={self.score}>"
 
 
+class ManualAnalysis(db.Model):
+    __tablename__ = "manual_analyses"
+
+    id         = db.Column(db.Integer,  primary_key=True)
+    user_id    = db.Column(db.Integer,  db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    targets    = db.Column(db.JSON,     nullable=False)
+    tools      = db.Column(db.JSON,     nullable=False, default=list)
+    findings   = db.Column(db.JSON,     nullable=False, default=list)
+    score      = db.Column(db.Integer,  nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f"<ManualAnalysis #{self.id} score={self.score}>"
+
+
 class ToolExecution(db.Model):
     __tablename__ = "tool_executions"
 
