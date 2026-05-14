@@ -105,28 +105,6 @@
       <div class="content">
         <div class="panel active" id="panel-home">
 
-          <!-- Scope context bar -->
-          <div class="scope-home-card" id="scope-home-card">
-            <div class="scope-home-empty" id="scope-home-empty">
-              <span class="scope-home-empty-icon">📁</span>
-              <span class="scope-home-empty-text">No hay alcance definido — define los dominios y rangos IP autorizados antes de analizar</span>
-              <button class="secondary-btn" onclick="show('scope',null)" style="margin-left:auto;white-space:nowrap">Definir alcance →</button>
-            </div>
-            <div class="scope-home-active" id="scope-home-active" style="display:none">
-              <div class="scope-home-info">
-                <div class="scope-home-eyebrow">Encargo activo</div>
-                <div class="scope-home-casename" id="scope-home-casename">—</div>
-                <div class="scope-home-client" id="scope-home-client"></div>
-              </div>
-              <div class="scope-home-chips" id="scope-home-chips"></div>
-              <div class="scope-home-actions">
-                <button class="secondary-btn" onclick="show('scope',null)">Editar →</button>
-                <button class="run-btn" onclick="generateExecutiveReport()">📄 Reporte PDF</button>
-                <button class="secondary-btn" onclick="generateSTIX()">🔗 STIX JSON</button>
-              </div>
-            </div>
-          </div>
-
           <!-- CyberNews mini -->
           <div class="home-feed-header">
             <span class="home-feed-title">CyberNews</span>
@@ -1824,12 +1802,17 @@
             </div>
             <div class="pl-history-actions">
               <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="loadManualAnalysis(${a.id})">Cargar</button>
+              <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem" onclick="exportManualPdf(${a.id})">⬇ PDF</button>
               <button class="secondary-btn" style="font-size:.72rem;padding:.2rem .6rem;color:#f87171;border-color:#f8717133" onclick="deleteManualAnalysis(${a.id},this)">✕</button>
             </div>`;
           el.appendChild(item);
         });
       })
       .catch(() => {});
+  }
+
+  function exportManualPdf(id) {
+    window.location.href = `/api/manual_analyses/${id}/export/pdf`;
   }
 
   function loadManualAnalysis(id) {

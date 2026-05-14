@@ -9,6 +9,15 @@ from app.services.pipeline_service import create_pipeline, create_pipeline_singl
 pipeline_bp = Blueprint("pipeline", __name__)
 
 
+def _owns_or_admin(record):
+    """Returns a 403 response if the current user doesn't own the record, None otherwise."""
+    if session.get("user_role") == ROLE_ADMIN:
+        return None
+    if record.user_id is not None and record.user_id != session.get("user_id"):
+        return jsonify({"error": "Acceso denegado"}), 403
+    return None
+
+
 @pipeline_bp.route("/api/pipeline/start", methods=["POST"])
 @role_required(ROLE_ADMIN, ROLE_ANALYST)
 def start():
@@ -119,6 +128,9 @@ def load_analysis(aid):
     a = db.session.get(PipelineAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
     return jsonify({
         "id":         a.id,
         "seeds":      a.seeds,
@@ -135,6 +147,9 @@ def delete_analysis(aid):
     a = db.session.get(PipelineAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
     db.session.delete(a)
     db.session.commit()
     return jsonify({"ok": True})
@@ -151,6 +166,9 @@ def export_pdf(aid):
     a = db.session.get(PipelineAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
 
     findings = a.findings or []
     _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "info": 3, "low": 4}
@@ -324,6 +342,9 @@ def load_manual_analysis(aid):
     a = db.session.get(ManualAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
     return jsonify({
         "id":         a.id,
         "targets":    a.targets,
@@ -340,6 +361,9 @@ def delete_manual_analysis(aid):
     a = db.session.get(ManualAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
     db.session.delete(a)
     db.session.commit()
     return jsonify({"ok": True})
@@ -356,6 +380,9 @@ def export_manual_pdf(aid):
     a = db.session.get(ManualAnalysis, aid)
     if not a:
         return jsonify({"error": "No encontrado"}), 404
+    denied = _owns_or_admin(a)
+    if denied:
+        return denied
 
     findings = a.findings or []
     _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "info": 3, "low": 4}

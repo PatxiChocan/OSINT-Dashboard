@@ -3,6 +3,7 @@ from authlib.integrations.flask_client import OAuth
 from datetime import datetime, timezone
 from app.extensions import db, oauth
 from app.models import User, ROLE_ADMIN, ROLE_ANALYST, ROLE_CLIENT
+from app import KEYCLOAK_REDIRECT
 import base64
 import json
 
@@ -31,8 +32,7 @@ def _role_from_token(access_token: str) -> str:
 
 @auth_bp.route("/login")
 def login():
-    redirect_uri = url_for("auth.callback", _external=True)
-    return oauth.keycloak.authorize_redirect(redirect_uri)
+    return oauth.keycloak.authorize_redirect(KEYCLOAK_REDIRECT)
 
 
 @auth_bp.route("/callback")

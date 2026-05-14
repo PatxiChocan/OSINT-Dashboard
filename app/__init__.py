@@ -1,4 +1,5 @@
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import urllib3
 import requests
@@ -11,10 +12,11 @@ def _patched_request(self, method, url, **kwargs):
     return _orig_request(self, method, url, **kwargs)
 requests.Session.request = _patched_request
 
-KEYCLOAK_URL    = "http://localhost:8080"
-KEYCLOAK_REALM  = "aletheia"
-KEYCLOAK_CLIENT = "aletheia-app"
-KEYCLOAK_SECRET = "2Xvg8UMSzxZGI3Hs9GZP2niOEjKZvvj6"
+KEYCLOAK_URL      = "http://localhost:8080"
+KEYCLOAK_REALM    = "aletheia"
+KEYCLOAK_CLIENT   = "aletheia-app"
+KEYCLOAK_SECRET   = "2Xvg8UMSzxZGI3Hs9GZP2niOEjKZvvj6"
+KEYCLOAK_REDIRECT = "https://localhost/auth/callback"
 
 def create_app():
     app = Flask(__name__)
@@ -27,17 +29,9 @@ def create_app():
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"]   = False
+    app.config["SESSION_COOKIE_SECURE"]   = False  # nginx termina SSL; gunicorn ve HTTP
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_PERMANENT"]       = False
-    app.config["SESSION_TYPE"]            = "filesystem"
-    app.config["SESSION_FILE_DIR"]        = "/tmp/aletheia-sessions"
-
-    import os as _os
-    _os.makedirs("/tmp/aletheia-sessions", exist_ok=True)
-
-    from flask_session import Session
-    Session(app)
 
     # ── Extensiones ────────────────────────────────────────────────────────────
     from .extensions import db, migrate, oauth
@@ -107,5 +101,7 @@ def create_app():
     app.register_blueprint(urlscan_bp)
     app.register_blueprint(nmap_discover_bp)
     app.register_blueprint(pipeline_bp)
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     return app
