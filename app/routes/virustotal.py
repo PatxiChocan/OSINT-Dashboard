@@ -55,7 +55,8 @@ def _parse(data):
     date_str = ""
     if ts:
         from datetime import datetime, timezone
-        date_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        from app.utils import LOCAL_TZ
+        date_str = datetime.fromtimestamp(ts, tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
 
     return {
         "stats": stats,

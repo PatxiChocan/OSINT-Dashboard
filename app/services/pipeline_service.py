@@ -12,9 +12,11 @@ from datetime import datetime, timezone, timedelta
 _pipelines: dict = {}
 _lock = threading.Lock()
 
-SHODAN_KEY = os.environ.get("SHODAN_API_KEY", "")
-INTELX_KEY = os.environ.get("INTELX_API_KEY", "")
-VT_KEY     = os.environ.get("VIRUSTOTAL_API_KEY", "")
+SHODAN_KEY    = os.environ.get("SHODAN_API_KEY", "")
+INTELX_KEY    = os.environ.get("INTELX_API_KEY", "")
+VT_KEY        = os.environ.get("VIRUSTOTAL_API_KEY", "")
+ABUSEIPDB_KEY = os.environ.get("ABUSEIPDB_KEY", "")
+GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")
 
 _IP_RE      = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
 _PRIVATE_RE = re.compile(r'^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.)')
@@ -316,16 +318,20 @@ def _run_single(pid, tool, target):
         elif tool == "blackbird":      _blackbird(pid, target)
         elif tool == "sherlock":       _sherlock(pid, target)
         elif tool == "maigret":        _maigret(pid, target)
+        elif tool == "github_osint":   _github_osint(pid, target)
+        elif tool == "github_user":    _github_user(pid, target)
+        elif tool == "abuseipdb":      _abuseipdb(pid, target)
         elif tool == "full_domain":
             _whois(pid, target); _dns(pid, target)
             _subfinder(pid, target); _crtsh(pid, target)
             _shodan_domain(pid, target); _virustotal_domain(pid, target)
             _urlscan(pid, target); _intelx(pid, target)
             _intelx(pid, f"@{target}"); _domain_variants(pid, target)
-            _harvester(pid, target)
+            _harvester(pid, target); _github_osint(pid, target)
         elif tool == "full_ip":
             _nmap(pid, target); _shodan_host(pid, target)
             _internetdb(pid, target); _virustotal_ip(pid, target)
+            _abuseipdb(pid, target)
         else:
             _err(pid, f"Módulo desconocido: {tool}")
 
@@ -1297,6 +1303,266 @@ def _maigret(pid, username):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# GITHUB OSINT
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _github_osint(pid, domain):
+    _log(pid, f"[GitHub] Buscando exposición de {domain} en repositorios públicos...")
+
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+    base_name = domain.split(".")[0]
+
+    try:
+        # 1. Búsqueda de repositorios que mencionan el dominio
+        r = SESSION.get(
+            "https://api.github.com/search/repositories",
+            headers=headers,
+            params={"q": domain, "sort": "updated", "per_page": 10},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            total_repos = data.get("total_count", 0)
+            repos = data.get("items", [])
+            if repos:
+                lines = []
+                for repo in repos[:10]:
+                    desc = (repo.get("description") or "")[:80]
+                    lines.append(
+                        f"  • {repo['full_name']} — {desc or 'Sin descripción'} "
+                        f"(⭐{repo.get('stargazers_count', 0)})"
+                    )
+                _finding(pid, domain, "github", "medium",
+                    f"{total_repos} repositorios en GitHub mencionan '{domain}'",
+                    f"GitHub indexa {total_repos} repositorios públicos que referencian {domain}.\n\n"
+                    f"Más recientes:\n" + "\n".join(lines) +
+                    "\n\nLos repositorios públicos pueden contener código fuente interno, "
+                    "credenciales hardcodeadas, configuraciones o detalles de infraestructura.",
+                    "Revisa los repositorios encontrados en busca de credenciales, claves API "
+                    "o configuraciones internas expuestas accidentalmente.")
+        elif r.status_code == 403:
+            _log(pid, "[GitHub] Rate limit en búsqueda de repositorios")
+
+        time.sleep(1)
+
+        # 2. Code search — archivos sensibles que referencian el dominio
+        if GITHUB_TOKEN:
+            sensitive_patterns = [
+                (f'"{domain}" filename:.env',           "archivos .env"),
+                (f'"{domain}" password OR secret OR key filename:config', "configs con credenciales"),
+                (f'"{domain}" BEGIN PRIVATE KEY OR BEGIN RSA', "claves privadas"),
+            ]
+            hits = []
+            for query, label in sensitive_patterns:
+                try:
+                    rc = SESSION.get(
+                        "https://api.github.com/search/code",
+                        headers=headers,
+                        params={"q": query, "per_page": 5},
+                        timeout=15,
+                    )
+                    if rc.status_code == 200:
+                        count = rc.json().get("total_count", 0)
+                        items = rc.json().get("items", [])
+                        if count > 0:
+                            hits.append((label, count, items))
+                    elif rc.status_code == 403:
+                        _log(pid, "[GitHub] Rate limit en code search")
+                        break
+                    time.sleep(1)
+                except Exception:
+                    pass
+
+            if hits:
+                detail_parts = [
+                    "La búsqueda de código en GitHub encontró archivos que pueden contener "
+                    f"información sensible de {domain}:\n"
+                ]
+                for label, count, items in hits:
+                    detail_parts.append(f"\n{label.upper()}: {count} resultados")
+                    for item in items[:3]:
+                        repo_name = item.get("repository", {}).get("full_name", "—")
+                        path = item.get("path", "—")
+                        url = item.get("html_url", "")
+                        detail_parts.append(f"  • {repo_name} → {path}\n    {url}")
+                _finding(pid, domain, "github", "critical",
+                    f"Posibles credenciales/secretos de {domain} expuestos en código público",
+                    "\n".join(detail_parts),
+                    "URGENTE: Revisa los archivos encontrados. Si contienen credenciales reales, "
+                    "rótalas inmediatamente. Usa trufflehog o git-secrets para auditar el historial. "
+                    "Añade pre-commit hooks para evitar futuros leaks.")
+        else:
+            _log(pid, "[GitHub] Sin GITHUB_TOKEN — code search omitido (requiere auth)")
+
+        time.sleep(1)
+
+        # 3. Búsqueda de usuarios/organizaciones vinculados al dominio
+        r3 = SESSION.get(
+            "https://api.github.com/search/users",
+            headers=headers,
+            params={"q": f"{base_name} in:login OR {domain} in:email", "per_page": 10},
+            timeout=15,
+        )
+        if r3.status_code == 200:
+            udata = r3.json()
+            total_users = udata.get("total_count", 0)
+            users = udata.get("items", [])
+            if users:
+                user_lines = [
+                    f"  • {u['login']} ({u.get('type','User')}) — {u.get('html_url','')}"
+                    for u in users[:10]
+                ]
+                _finding(pid, domain, "github", "medium",
+                    f"{total_users} usuarios/organizaciones de GitHub vinculados a '{domain}'",
+                    f"Perfiles de GitHub con login o email relacionado con {domain}:\n" +
+                    "\n".join(user_lines) +
+                    "\n\nEstos perfiles pueden revelar empleados, proyectos internos y stack tecnológico.",
+                    "Revisa los repositorios públicos de estos usuarios en busca de código "
+                    "o información sensible de la organización.")
+
+    except Exception as e:
+        _err(pid, f"[GitHub] Error: {e}")
+
+
+def _github_user(pid, username):
+    _log(pid, f"[GitHub] Buscando usuario '{username}'...")
+
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+    try:
+        r = SESSION.get(
+            "https://api.github.com/search/users",
+            headers=headers,
+            params={"q": username, "per_page": 3},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return
+
+        data  = r.json()
+        total = data.get("total_count", 0)
+        users = data.get("items", [])
+        if not users:
+            _log(pid, f"[GitHub] Sin resultados para '{username}'")
+            return
+
+        # Detalles del primer resultado más relevante
+        login = users[0].get("login", "")
+        r2 = SESSION.get(f"https://api.github.com/users/{login}", headers=headers, timeout=10)
+        if r2.status_code != 200:
+            return
+
+        u = r2.json()
+        pub_repos = u.get("public_repos", 0)
+        detail = (
+            f"Perfil: {u.get('html_url', '')}\n"
+            f"Nombre real: {u.get('name') or '—'}\n"
+            f"Empresa: {u.get('company') or '—'}\n"
+            f"Localización: {u.get('location') or '—'}\n"
+            f"Bio: {(u.get('bio') or '—')[:120]}\n"
+            f"Repositorios públicos: {pub_repos}\n"
+            f"Seguidores: {u.get('followers', 0)}"
+        )
+        if total > 1:
+            detail += f"\n\n{total - 1} usuarios adicionales con nombre similar encontrados."
+
+        _finding(pid, username, "github", "medium" if pub_repos > 0 else "info",
+            f"Perfil GitHub encontrado: '{login}' (busqueda: '{username}')",
+            detail + "\n\nLos repositorios públicos de empleados pueden contener "
+            "código, secretos o información de la organización.",
+            "Revisa los repositorios públicos en busca de código o datos sensibles de la empresa.")
+
+    except Exception as e:
+        _err(pid, f"[GitHub] Error usuario: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABUSEIPDB
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _abuseipdb(pid, ip):
+    if not ABUSEIPDB_KEY:
+        return
+    _log(pid, f"[AbuseIPDB] Verificando reputación de {ip}...")
+    try:
+        r = SESSION.get(
+            "https://api.abuseipdb.com/api/v2/check",
+            headers={"Key": ABUSEIPDB_KEY, "Accept": "application/json"},
+            params={"ipAddress": ip, "maxAgeInDays": 90, "verbose": True},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            _log(pid, f"[AbuseIPDB] HTTP {r.status_code} para {ip}")
+            return
+
+        d                 = r.json().get("data", {})
+        score             = d.get("abuseConfidenceScore", 0)
+        total_reports     = d.get("totalReports", 0)
+        distinct_users    = d.get("numDistinctUsers", 0)
+        last_reported     = (d.get("lastReportedAt") or "—")[:10]
+        isp               = d.get("isp", "—")
+        domain_assoc      = d.get("domain", "—")
+        usage_type        = d.get("usageType", "—")
+        country           = d.get("countryCode", "—")
+        is_tor            = d.get("isTor", False)
+        is_whitelist      = d.get("isWhitelisted", False)
+
+        if is_whitelist:
+            _finding(pid, ip, "abuseipdb", "info",
+                f"AbuseIPDB: {ip} en whitelist (ISP/CDN conocido)",
+                f"La IP {ip} está en la whitelist de AbuseIPDB — pertenece a infraestructura "
+                f"legítima conocida (CDN, servicios de nube, etc.).\nISP: {isp}\nPaís: {country}",
+                "Sin acción requerida.")
+            return
+
+        tor_note = "\n⚠ Esta IP es un nodo de salida de la red Tor." if is_tor else ""
+
+        if score >= 75:
+            sev     = "critical"
+            verdict = f"ALTAMENTE MALICIOSA — confianza {score}%"
+        elif score >= 50:
+            sev     = "high"
+            verdict = f"maliciosa — confianza {score}%"
+        elif score >= 10:
+            sev     = "medium"
+            verdict = f"sospechosa — confianza {score}%"
+        elif score > 0:
+            sev     = "medium"
+            verdict = f"con historial de abuso menor — confianza {score}%"
+        else:
+            sev     = "info"
+            verdict = "sin reportes de abuso"
+
+        if score > 0:
+            _finding(pid, ip, "abuseipdb", sev,
+                f"AbuseIPDB: {ip} {verdict}",
+                f"Índice de confianza de abuso: {score}%{tor_note}\n\n"
+                f"Reportes (últimos 90 días): {total_reports} de {distinct_users} usuarios distintos\n"
+                f"Último reporte: {last_reported}\n"
+                f"ISP: {isp}\nDominio asociado: {domain_assoc}\n"
+                f"Tipo de uso: {usage_type}\nPaís: {country}\n\n"
+                f"Una puntuación elevada indica que esta IP ha sido reportada por actividades "
+                f"como escaneos masivos, fuerza bruta, spam, C2 o participación en botnets.",
+                "Investiga el origen de los reportes. Si la IP pertenece a la organización, "
+                "comprueba si ha sido comprometida. Si es una IP atacante, bloquéala en "
+                "firewall e IPS/IDS.")
+        else:
+            _finding(pid, ip, "abuseipdb", "info",
+                f"AbuseIPDB: {ip} sin reportes de abuso",
+                f"Sin reportes de abuso en los últimos 90 días.\n"
+                f"ISP: {isp}\nDominio: {domain_assoc}\nTipo: {usage_type}\nPaís: {country}",
+                "Sin acción requerida. Monitoriza periódicamente.")
+
+    except Exception as e:
+        _err(pid, f"[AbuseIPDB] Error: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # VARIANTES DE DOMINIO
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1387,6 +1653,8 @@ def _run(pid, seeds):
                     if em not in visited_emails:
                         email_queue.append(em)
 
+                _github_osint(pid, seed)
+
                 for ip in new_ips:
                     if _is_public(ip) and ip not in visited_ips:
                         ip_queue.append(ip)
@@ -1410,6 +1678,7 @@ def _run(pid, seeds):
             _shodan_host(pid, ip)
             _internetdb(pid, ip)
             _virustotal_ip(pid, ip)
+            _abuseipdb(pid, ip)
             _push(pid, {"type": "asset_done", "asset": ip})
 
         # Fase 3: Emails
@@ -1434,6 +1703,7 @@ def _run(pid, seeds):
             _push(pid, {"type": "asset_start", "asset": uname, "asset_type": "username"})
             _sherlock(pid, uname)
             _maigret(pid, uname)
+            _github_user(pid, uname)
             _push(pid, {"type": "asset_done", "asset": uname})
 
     except Exception as e:

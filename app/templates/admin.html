@@ -98,7 +98,7 @@
             </span>
           </td>
           <td style="opacity:.6;font-size:.8rem">
-            {{ u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else '—' }}
+            {{ u.last_login | localtime if u.last_login else '—' }}
           </td>
           <td>
             <button class="btn-sm btn-danger" onclick="toggleUser({{ u.id }})">

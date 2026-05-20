@@ -51,6 +51,14 @@ def create_app():
         client_kwargs={"scope": "openid email profile"},
     )
 
+    # ── Timezone filter ───────────────────────────────────────────────────────
+    from .utils import to_local
+
+    @app.template_filter("localtime")
+    def localtime_filter(dt, fmt="%d/%m/%Y %H:%M"):
+        local = to_local(dt)
+        return local.strftime(fmt) if local else "—"
+
     # ── Context processor ─────────────────────────────────────────────────────
     from flask import session as _session
 

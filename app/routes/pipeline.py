@@ -5,6 +5,7 @@ from app.routes.auth import role_required
 from app.models import ROLE_ADMIN, ROLE_ANALYST, PipelineAnalysis, ManualAnalysis, User
 from app.extensions import db
 from app.services.pipeline_service import create_pipeline, create_pipeline_single, get_events, get_findings, get_pipeline_data, score_label
+from app.utils import to_local
 
 pipeline_bp = Blueprint("pipeline", __name__)
 
@@ -118,7 +119,7 @@ def list_analyses():
         "finding_count": len(a.findings),
         "critical":      sum(1 for f in a.findings if f.get("severity") == "critical"),
         "high":          sum(1 for f in a.findings if f.get("severity") == "high"),
-        "created_at":    a.created_at.isoformat(),
+        "created_at":    to_local(a.created_at).isoformat(),
     } for a in rows])
 
 
@@ -137,7 +138,7 @@ def load_analysis(aid):
         "assets":     a.assets,
         "score":      a.score,
         "findings":   a.findings,
-        "created_at": a.created_at.isoformat(),
+        "created_at": to_local(a.created_at).isoformat(),
     })
 
 
@@ -266,7 +267,7 @@ def export_pdf(aid):
         score        = score,
         score_color  = score_color,
         score_label  = lbl,
-        date         = a.created_at.strftime("%d/%m/%Y %H:%M"),
+        date         = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
         finding_count= len(findings),
         critical_count= counts["critical"],
         high_count   = counts["high"],
@@ -279,7 +280,7 @@ def export_pdf(aid):
 
     pdf_bytes  = WeasyHTML(string=html_str).write_pdf()
     seeds_slug = "_".join((a.seeds or ["report"])[:2]).replace(".", "_").replace("@", "_")
-    filename   = f"aletheia_{seeds_slug}_{a.created_at.strftime('%Y%m%d')}.pdf"
+    filename   = f"aletheia_{seeds_slug}_{to_local(a.created_at).strftime('%Y%m%d')}.pdf"
 
     resp = make_response(pdf_bytes)
     resp.headers["Content-Type"]        = "application/pdf"
@@ -332,7 +333,7 @@ def list_manual_analyses():
         "finding_count": len(a.findings),
         "critical":      sum(1 for f in a.findings if f.get("severity") == "critical"),
         "high":          sum(1 for f in a.findings if f.get("severity") == "high"),
-        "created_at":    a.created_at.isoformat(),
+        "created_at":    to_local(a.created_at).isoformat(),
     } for a in rows])
 
 
@@ -351,7 +352,7 @@ def load_manual_analysis(aid):
         "tools":      a.tools,
         "findings":   a.findings,
         "score":      a.score,
-        "created_at": a.created_at.isoformat(),
+        "created_at": to_local(a.created_at).isoformat(),
     })
 
 
@@ -480,7 +481,7 @@ def export_manual_pdf(aid):
         score         = score,
         score_color   = score_color,
         score_label   = lbl,
-        date          = a.created_at.strftime("%d/%m/%Y %H:%M"),
+        date          = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
         finding_count = len(findings),
         critical_count= counts["critical"],
         high_count    = counts["high"],
@@ -493,7 +494,7 @@ def export_manual_pdf(aid):
 
     pdf_bytes   = WeasyHTML(string=html_str).write_pdf()
     seeds_slug  = "_".join((targets or ["manual"])[:2]).replace(".", "_").replace("@", "_")
-    filename    = f"aletheia_manual_{seeds_slug}_{a.created_at.strftime('%Y%m%d')}.pdf"
+    filename    = f"aletheia_manual_{seeds_slug}_{to_local(a.created_at).strftime('%Y%m%d')}.pdf"
 
     resp = make_response(pdf_bytes)
     resp.headers["Content-Type"]        = "application/pdf"

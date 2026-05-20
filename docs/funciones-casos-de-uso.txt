@@ -1,0 +1,332 @@
+# Aletheia Dashboard — Funciones Principales y Casos de Uso
+
+**Versión:** 1.0  
+**Fecha:** 2026-05-18  
+**Clasificación:** Interno
+
+---
+
+## 1. Resumen de Capacidades
+
+Aletheia Dashboard cubre cinco dominios funcionales de OSINT y ciberinteligencia:
+
+| Dominio | Módulos |
+|---------|---------|
+| Reconocimiento de activos | Pipeline automatizado, Exposure, Shodan Full, Nmap Discover |
+| Análisis de reputación | VirusTotal, URLScan, IntelX, AbuseIPDB (vía pipeline) |
+| Filtración de credenciales | Breaches (h8mail), Harvest+Breaches |
+| Inteligencia de amenazas | Threat Dashboard, News, Sources, MISP |
+| Gestión y reporting | Admin, Pipeline History, STIX Validate, Informes PDF |
+
+---
+
+## 2. Módulos Funcionales
+
+### 2.1 Pipeline OSINT Automatizado
+
+**Ruta:** `/api/pipeline/start` (POST) + `/api/pipeline/events/<pid>` (SSE)  
+**Roles:** Admin, Analyst
+
+**Descripción:** Orquesta un análisis de reconocimiento completo a partir de uno o varios seeds (dominio, IP o email). Ejecuta cuatro fases secuenciales de forma automática.
+
+**Fases de ejecución:**
+
+| Fase | Input | Herramientas ejecutadas |
+|------|-------|------------------------|
+| 1 — Dominios | dominio | WHOIS, DNS (A/MX/TXT/NS), subfinder, crt.sh, Shodan domain, VirusTotal, URLScan, IntelX, theHarvester, GitHub OSINT, detección de variantes |
+| 2 — IPs | IPs descubiertas | nmap (-sV), Shodan host, Shodan InternetDB, VirusTotal, AbuseIPDB |
+| 3 — Emails | emails descubiertos | IntelX, Blackbird (OSINT redes sociales) |
+| 4 — Usernames | usernames extraídos | Sherlock, Maigret, GitHub user OSINT |
+
+**Salida:** Lista de hallazgos clasificados por severidad (`critical / high / medium / low / info`) con descripción y recomendación accionable. Score de exposición 0–100.
+
+**Casos de uso:**
+- Auditoría de huella digital de una organización antes de un red team
+- Evaluación de superficie de ataque expuesta en Internet
+- Detección de typosquatting y dominios impostores
+- Identificación de credenciales filtradas asociadas al dominio
+
+---
+
+### 2.2 Análisis de Exposición Rápida
+
+**Ruta:** `/api/exposure`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Consulta rápida de exposición de un dominio o IP usando la API pública de Shodan InternetDB (sin clave). Resuelve el dominio a IPs y para cada una devuelve puertos abiertos, vulnerabilidades (CVEs), hostnames y etiquetas de Shodan.
+
+**Casos de uso:**
+- Comprobación rápida del perímetro de un cliente sin consumir créditos de API
+- Primera evaluación de exposición antes de un análisis más profundo
+
+---
+
+### 2.3 Shodan Full
+
+**Ruta:** `/api/shodan/host`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Análisis completo de un host o dominio usando la API de Shodan. Devuelve servicios detectados, banners, certificados TLS, CVEs, puertos, ASN e información geográfica por cada puerto.
+
+**Casos de uso:**
+- Inventario de servicios expuestos de un activo específico
+- Detección de versiones de software vulnerables
+- Análisis de certificados TLS (caducidad, issuer, CN)
+
+---
+
+### 2.4 Descubrimiento de Red (Nmap)
+
+**Ruta:** `/api/nmap/discover` (POST)  
+**Roles:** Admin, Analyst
+
+**Descripción:** Ejecuta nmap en rangos CIDR proporcionados para descubrir hosts activos y servicios. Soporta múltiples rangos simultáneos, ejecución en background y estado en tiempo real.
+
+**Casos de uso:**
+- Inventario de hosts en una red corporativa interna
+- Descubrimiento de activos no documentados en un segmento de red
+
+---
+
+### 2.5 VirusTotal
+
+**Ruta:** `/api/virustotal`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Consulta la reputación de un indicador en VirusTotal. Detecta automáticamente el tipo de indicador.
+
+| Tipo detectado | Ejemplos |
+|---------------|---------|
+| IP | `1.2.3.4` |
+| Hash | MD5, SHA-1, SHA-256 |
+| URL | `https://malicio.us/payload` |
+| Dominio | `evil.com` |
+
+Devuelve veredicto consolidado (`malicious / suspicious / clean`), estadísticas de detección y categorías de motores AV.
+
+**Casos de uso:**
+- Verificación rápida de un IOC recibido en un alerta
+- Análisis de ficheros sospechosos (por hash)
+- Comprobación de reputación de dominios en investigación
+
+---
+
+### 2.6 URLScan.io
+
+**Ruta:** `/api/urlscan/search`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Busca análisis previos de un dominio en URLScan.io. Muestra URLs escaneadas, capturas de pantalla disponibles y metadatos de cada análisis.
+
+**Casos de uso:**
+- Investigación de phishing activo (obtener capturas de la página maliciosa)
+- Historial de contenido servido desde un dominio sospechoso
+
+---
+
+### 2.7 Intelligence X (IntelX)
+
+**Ruta:** `/api/intelx`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Búsqueda en el motor de inteligencia Intelligence X para cualquier selector: dominio, email, IP, teléfono, Bitcoin address, IBAN, URL. Devuelve resultados categorizados con tipo de fuente y fecha.
+
+**Casos de uso:**
+- Búsqueda de credenciales o datos filtrados en leaks/pastes
+- Investigación de presencia en bases de datos comprometidas
+- Trazado de indicadores en múltiples fuentes de inteligencia
+
+---
+
+### 2.8 Filtración de Credenciales — Breaches (h8mail)
+
+**Ruta:** `/api/breaches`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Consulta si un email aparece en bases de datos de credenciales filtradas usando h8mail. Muestra las fuentes de filtración, contraseñas hasheadas o en texto claro (si están disponibles) y la fecha de la filtración.
+
+**Casos de uso:**
+- Comprobación de si las cuentas de empleados aparecen en filtraciones públicas
+- Evaluación del riesgo de credential stuffing para una organización
+
+---
+
+### 2.9 Harvest + Breaches
+
+**Ruta:** `/api/harvest-breaches`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Combina theHarvester (descubrimiento de emails de un dominio vía crt.sh, CertSpotter, HackerTarget, DuckDuckGo) con h8mail (verificación de filtraciones). Recibe un dominio y devuelve un informe combinado de emails descubiertos y su estado de compromiso.
+
+**Casos de uso:**
+- Auditoría masiva de exposición de cuentas corporativas de un dominio
+- Identificación de cuentas comprometidas sin conocer el email de antemano
+
+---
+
+### 2.10 Panel de Amenazas
+
+**Ruta:** `/threat`  
+**Roles:** Todos los roles
+
+**Descripción:** Dashboard en tiempo real con:
+- CVEs críticos recientes de la NVD API
+- Vulnerabilidades del catálogo CISA KEV (Known Exploited Vulnerabilities)
+- Marcado de KEVs en los CVEs para priorización
+- Información sobre ransomware asociado
+
+**Casos de uso:**
+- Seguimiento diario de nuevas vulnerabilidades críticas y explotadas
+- Priorización de parcheo basada en explotación real confirmada (KEV)
+
+---
+
+### 2.11 Noticias de Ciberseguridad
+
+**Ruta:** `/news`  
+**Roles:** Todos los roles
+
+**Descripción:** Agregador de 12 feeds RSS de ciberseguridad en español, europeo e internacional. Las noticias se categorizan automáticamente mediante expresiones regulares en: vulnerability, malware, phishing, breach, apt, compliance, tools, ics.
+
+**Fuentes incluidas:**
+- España: INCIBE-AVISOS, INCIBE-SCI, HackPlayers, Hispasec, CyberSecurity News ES
+- Europa: The Register, Graham Cluley, Infosecurity Magazine
+- Mundial: The Hacker News, BleepingComputer, Krebs on Security, Dark Reading
+
+**Casos de uso:**
+- Seguimiento de alertas tempranas de INCIBE relevantes para el mercado español
+- Monitorización de amenazas de ransomware y APTs activos
+- Concienciación situacional diaria del equipo de seguridad
+
+---
+
+### 2.12 Monitor de Fuentes Externas
+
+**Ruta:** `/sources`  
+**Roles:** Todos los roles
+
+**Descripción:** Comprueba en tiempo real la disponibilidad y estado de todas las fuentes de inteligencia integradas (CISA KEV, NVD, URLhaus, Feodo Tracker, Abuse.ch, OTX, etc.). Muestra latencia y estado HTTP de cada fuente.
+
+**Casos de uso:**
+- Diagnóstico de por qué un módulo no devuelve datos
+- Verificación de la conectividad de la plataforma con fuentes externas
+
+---
+
+### 2.13 Integración MISP
+
+**Ruta:** `/api/misp/*`  
+**Roles:** Admin, Analyst
+
+**Descripción:** Integración bidireccional con una instancia MISP corporativa:
+- **Push:** envía IOCs en formato STIX 2.1 a MISP, con mapeo automático de tipos STIX a atributos MISP
+- **Pull:** consulta eventos MISP recientes por organización y fecha
+
+Tipos STIX soportados para push: `ipv4-addr`, `ipv6-addr`, `domain-name`, `url`, `email-addr`, hashes (MD5/SHA-1/SHA-256).
+
+**Casos de uso:**
+- Compartición de IOCs descubiertos en el pipeline con la plataforma CTI corporativa
+- Enriquecimiento de alertas del SIEM con contexto de MISP
+
+---
+
+### 2.14 Validador STIX 2.1
+
+**Ruta:** `/api/validate-stix` (POST)  
+**Roles:** Admin, Analyst
+
+**Descripción:** Valida un bundle STIX 2.1 JSON usando la librería `stix2validator`. Devuelve errores, advertencias y el conteo de objetos del bundle.
+
+**Casos de uso:**
+- Validación de bundles antes de enviarlos a MISP u otras plataformas CTI
+- Verificación de integridad de feeds de IOCs en formato STIX
+
+---
+
+### 2.15 Runner de Herramientas CLI
+
+**Ruta:** `/run` (POST, SSE)  
+**Roles:** Admin, Analyst
+
+**Descripción:** Permite ejecutar desde la interfaz web cualquier herramienta de la lista blanca aprobada con streaming de la salida en tiempo real vía Server-Sent Events.
+
+**Herramientas disponibles (selección):** `nmap`, `theHarvester`, `amass`, `subfinder`, `nikto`, `sslscan`, `sslyze`, `whois`, `dnsrecon`, `sherlock`, `maigret`, `nuclei`, `katana`, `gau`, `shodan`, `recon-ng`, `enum4linux`, `wafw00f`, `whatweb`, `gitleaks`, `spiderfoot`.
+
+**Casos de uso:**
+- Ejecución interactiva de herramientas de reconocimiento sin acceso SSH al servidor
+- Exploración manual complementaria al pipeline automático
+
+---
+
+### 2.16 Panel de Administración
+
+**Ruta:** `/admin`  
+**Roles:** Admin únicamente
+
+**Descripción:**
+- Gestión completa de usuarios: activar/desactivar, cambiar rol, ver último acceso
+- Gestión de organizaciones: crear, editar, asignar usuarios
+
+**Casos de uso:**
+- Onboarding de nuevos analistas o clientes
+- Auditoría de acceso y actividad de la plataforma
+- Gestión multi-tenant para MSS / consultoras
+
+---
+
+## 3. Matriz de Roles vs Funciones
+
+| Función | Admin | Analyst | Client |
+|---------|:-----:|:-------:|:------:|
+| Pipeline OSINT | ✓ | ✓ | — |
+| Exposure / Shodan | ✓ | ✓ | — |
+| VirusTotal / URLScan | ✓ | ✓ | — |
+| IntelX | ✓ | ✓ | — |
+| Breaches | ✓ | ✓ | — |
+| Threat / News | ✓ | ✓ | ✓ |
+| Sources | ✓ | ✓ | ✓ |
+| MISP | ✓ | ✓ | — |
+| STIX Validate | ✓ | ✓ | — |
+| Runner CLI | ✓ | ✓ | — |
+| Nmap Discover | ✓ | ✓ | — |
+| Panel Admin | ✓ | — | — |
+| Ver informes asignados | ✓ | ✓ | ✓ |
+
+---
+
+## 4. Escenarios de Uso Completos
+
+### Escenario A: Auditoría de Huella Digital Corporativa
+
+1. El analista introduce el dominio del cliente en el **Pipeline**
+2. El sistema descubre automáticamente subdominios, IPs, emails y usernames
+3. Se detectan puertos peligrosos abiertos (RDP, FTP, Telnet) con descripción de riesgo
+4. Se identifican credenciales del dominio en filtraciones vía IntelX y h8mail
+5. Se detectan dominios de typosquatting activos
+6. El analista descarga el informe PDF con todos los hallazgos
+
+### Escenario B: Investigación de un Indicador Sospechoso
+
+1. El analista recibe una IP o hash sospechoso de una alerta del SIEM
+2. Consulta **VirusTotal** para obtener veredicto y detecciones de AV
+3. Si es una IP, consulta **Shodan Full** para ver servicios expuestos
+4. Consulta **AbuseIPDB** (a través del pipeline) para historial de reportes
+5. Si hay confirmación de malicia, exporta el IOC como STIX y lo envía a **MISP**
+
+### Escenario C: Monitorización Diaria de Amenazas
+
+1. El analista revisa el panel **Threat** para nuevos CVEs críticos y KEVs
+2. Filtra las **Noticias** por categoría (malware, APT) para contexto
+3. Verifica el estado de las **Fuentes** si algún dato parece desactualizado
+
+### Escenario D: Onboarding de un Nuevo Cliente
+
+1. El administrador crea la organización en el **Panel Admin**
+2. Crea el usuario cliente y le asigna el rol `client`
+3. El analista ejecuta el pipeline para el dominio del cliente
+4. Genera el informe y lo marca como visible para el cliente
+5. El cliente accede a Aletheia y visualiza únicamente sus informes asignados
+
+---
+
+*Documento generado el 2026-05-18 para el proyecto Aletheia Dashboard.*

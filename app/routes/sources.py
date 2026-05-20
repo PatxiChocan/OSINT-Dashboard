@@ -4,6 +4,7 @@ import requests
 import time
 import concurrent.futures
 from datetime import datetime, timezone
+from app.utils import to_local, LOCAL_TZ
 
 sources_bp = Blueprint("sources", __name__)
 
@@ -194,7 +195,7 @@ def _check_source(source):
         "status_code": status_code,
         "response_ms": elapsed_ms,
         "error": error,
-        "checked_at": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+        "checked_at": datetime.now(LOCAL_TZ).strftime("%H:%M:%S"),
     }
 
 
@@ -216,5 +217,5 @@ def get_sources():
             "offline": len(results) - online,
             "avg_response_ms": avg_ms,
         },
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(LOCAL_TZ).isoformat(),
     })
