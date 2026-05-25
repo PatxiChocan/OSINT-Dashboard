@@ -1365,6 +1365,8 @@ let _queuedIPs            = new Set();
 let _ipAnalysisPending    = 0;
 let _ipFindings           = [];
 let _lastManualAnalysisId = null;
+const _parallelRequestIds  = new Set(); // request_ids activos del modo paralelo
+const _parallelControllers = new Map(); // requestId → AbortController
 
 function _parallelKey(tool, idx) { return `${tool}-${idx}`; }
 
@@ -1988,6 +1990,8 @@ function launchParallel() {
   });
 
   Object.keys(_parallelState).forEach(k => delete _parallelState[k]);
+  _parallelRequestIds.clear();
+  _parallelControllers.clear();
   _parallelTotal     = jobs.length;
   _parallelDone         = 0;
   _queuedIPs            = new Set();
@@ -2044,9 +2048,11 @@ function launchParallel() {
     _renderParallelSummary();
 
     const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    _parallelRequestIds.add(requestId);
+    _setParallelStopBtn(true);
     const allLines = [];
 
-    streamCmd(
+    const _ctrl = streamCmd(
       cmd,
       requestId,
       (msg) => {
@@ -2070,6 +2076,9 @@ function launchParallel() {
           _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
           _parallelState[key].allLines = allLines;
           _parallelDone++;
+          _parallelRequestIds.delete(requestId);
+          _parallelControllers.delete(requestId);
+          if (_parallelRequestIds.size === 0) _setParallelStopBtn(false);
 
           // Analyze any new public IPs — use _parallelGroups (same source as findings, handles structured + raw)
           _parallelGroups(_parallelState[key])
@@ -2097,6 +2106,9 @@ function launchParallel() {
         _parallelState[key].elapsed = Math.floor((Date.now() - _parallelState[key].startTime) / 1000);
         _parallelState[key].allLines = allLines;
         _parallelDone++;
+        _parallelRequestIds.delete(requestId);
+        _parallelControllers.delete(requestId);
+        if (_parallelRequestIds.size === 0) _setParallelStopBtn(false);
 
         _saveParallelRun(tool, subtool, _parallelState[key]);
         appendParallelLine(tool, `[ERROR] ${err}`, color, false);
@@ -2104,7 +2116,53 @@ function launchParallel() {
         _checkParallelAllDone();
       }
     );
+    _parallelControllers.set(requestId, _ctrl);
   });
+}
+
+function _setParallelStopBtn(visible) {
+  const btn = document.getElementById('parallel-stop-btn');
+  if (btn) btn.style.display = visible ? 'inline-flex' : 'none';
+}
+
+async function stopParallelAnalysis() {
+  const btn = document.getElementById('parallel-stop-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Parando...'; }
+
+  const ids = [..._parallelRequestIds];
+  _parallelRequestIds.clear();
+
+  // Abort frontend SSE streams immediately
+  ids.forEach(id => {
+    const ctrl = _parallelControllers.get(id);
+    if (ctrl) { try { ctrl.abort(); } catch (_) {} }
+    _parallelControllers.delete(id);
+  });
+
+  // Also kill backend subprocesses
+  await Promise.allSettled(ids.map(id =>
+    fetch('/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: id }),
+    })
+  ));
+
+  _stopParallelTimer();
+  _setParallelStopBtn(false);
+  const launchBtn = document.getElementById('launch-parallel-btn');
+  if (launchBtn) launchBtn.disabled = false;
+
+  // Marcar como terminados los procesos aún en vuelo
+  Object.keys(_parallelState).forEach(k => {
+    if (!_parallelState[k].done) {
+      _parallelState[k].done = true;
+      _parallelState[k].hadError = true;
+      _parallelDone++;
+    }
+  });
+  _renderParallelSummary();
+  if (typeof showToast === 'function') showToast('Análisis detenido', 'warning', 3000);
 }
 
 function switchParallelTab(tab, btn) {
@@ -2194,7 +2252,8 @@ function saveScope() {
   const scanEl = document.querySelector('input[name="scope-scan"]:checked');
   const scope = {
     caseName:    ($('scope-case')    || {}).value?.trim() || '',
-    client:      ($('scope-client')  || {}).value?.trim() || '',
+    org_id:      ($('scope-org') || {}).value || '',
+    client:      ($('scope-org') ? ($('scope-org').options[$('scope-org').selectedIndex] || {}).text || '' : ''),
     responsable: ($('scope-resp')    || {}).value?.trim() || '',
     domains:     ($('scope-domains') || {}).value?.split(',').map(d => d.trim()).filter(Boolean) || [],
     ipRanges:    ($('scope-ips')     || {}).value?.split(',').map(ip => ip.trim()).filter(Boolean) || [],
@@ -2358,9 +2417,10 @@ function addDiscoveredToScope(hosts) {
 
 function clearScope() {
   localStorage.removeItem(SCOPE_KEY);
-  ['scope-case','scope-client','scope-resp','scope-domains','scope-ips','scope-expiry'].forEach(id => {
+  ['scope-case','scope-resp','scope-domains','scope-ips','scope-expiry'].forEach(id => {
     const el = $(id); if (el) el.value = '';
   });
+  const orgSel = $('scope-org'); if (orgSel) orgSel.value = '';
   const scanEl = document.querySelector('input[name="scope-scan"][value="active"]');
   if (scanEl) scanEl.checked = true;
   renderScopeStatus();
@@ -2373,7 +2433,8 @@ function renderScopeStatus() {
   if (scope) {
     const set = (id, val) => { const el = $(id); if (el) el.value = val || ''; };
     set('scope-case',    scope.caseName);
-    set('scope-client',  scope.client);
+    const orgSel = $('scope-org');
+    if (orgSel && scope.org_id) orgSel.value = scope.org_id;
     set('scope-resp',    scope.responsable);
     set('scope-domains', (scope.domains  || []).join(', '));
     set('scope-ips',     (scope.ipRanges || []).join(', '));
@@ -2877,6 +2938,8 @@ function streamCmd(cmd, requestId, onData, onError) {
         onError(err.message || 'Error de red');
       }
     });
+
+  return controller;
 }
 
 
@@ -4183,6 +4246,28 @@ function onNewsCat(val) {
   renderNewsCards();
 }
 
+let _orgsLoaded = false;
+function _loadScopeOrgs() {
+  if (_orgsLoaded) return;
+  const sel = document.getElementById('scope-org');
+  if (!sel) return;
+  fetch('/admin/orgs/list')
+    .then(r => r.json())
+    .then(orgs => {
+      if (!Array.isArray(orgs)) return;
+      const saved = (getScope() || {}).org_id || '';
+      orgs.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.nombre;
+        if (String(o.id) === String(saved)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      _orgsLoaded = true;
+    })
+    .catch(() => {});
+}
+
 const _origShow = show;
 window.show = function (panel, btn) {
   _origShow(panel, btn);
@@ -4192,6 +4277,7 @@ window.show = function (panel, btn) {
   if (panel === 'cves' && !_cves.loaded) loadCVEs();
   if (panel === 'iocs' && !_iocs.loaded) loadIOCs();
   if (panel === 'sources' && !_sources.loaded) loadSources();
+  if (panel === 'scope') _loadScopeOrgs();
   if (panel === 'exposure') {
     const topTarget = (document.getElementById('targetInput') || {}).value || '';
     const inp = document.getElementById('exp-target-input');

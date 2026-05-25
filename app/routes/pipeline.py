@@ -9,6 +9,116 @@ from app.utils import to_local
 
 pipeline_bp = Blueprint("pipeline", __name__)
 
+_SEV_ORDER   = {"critical": 0, "high": 1, "medium": 2, "info": 3, "low": 4}
+_OT_PORTS    = {102, 502, 789, 1911, 1962, 2404, 4000, 4840, 9600, 18245, 20000, 44818, 47808}
+_OT_KEYWORDS = {
+    "modbus", "siemens s7", "iso-tsap", "ethernet/ip", "enip", "bacnet", "dnp3",
+    "omron fins", "ge srtp", "opc ua", "opc da", "niagara", "tridium", "ignition",
+    "wonderware", "scada", "hmi expuesta", "plc expuesto", "sistema de control industrial",
+    "dcs", "rtu expuesto", "ems ", "bms expuesto", "historian industrial",
+}
+_CSF_BY_TOOL = {
+    "whois": "GV", "dns": "ID", "subfinder": "ID", "crt.sh": "ID",
+    "nmap": "PR", "shodan": "PR", "exposure": "PR", "virustotal": "DE",
+    "urlscan": "DE", "intelx": "ID", "harvester": "ID", "blackbird": "ID",
+    "sherlock": "ID", "maigret": "ID", "variants": "ID",
+}
+_SKIP_RECS = {
+    "Sin alertas. Monitoriza periódicamente.",
+    "Continúa monitorizando periódicamente.",
+    "Mantén la privacy protection activa.",
+}
+
+
+def build_report_pdf_bytes(seeds, assets, findings, score, date_str, analysis_type="pipeline"):
+    """Generate PDF bytes from analysis data. Shared by pipeline, manual and published reports."""
+    from weasyprint import HTML as WeasyHTML
+
+    findings = sorted(findings, key=lambda f: (
+        _SEV_ORDER.get(f.get("severity", "info"), 99),
+        (f.get("asset") or "").lower(),
+    ))
+
+    ot_findings = []
+    for f in findings:
+        title_lower = (f.get("title") or "").lower()
+        is_ot = any(kw in title_lower for kw in _OT_KEYWORDS)
+        if not is_ot:
+            for p in _OT_PORTS:
+                if f"puerto {p}/" in title_lower or f":{p} " in title_lower:
+                    is_ot = True
+                    break
+        if is_ot:
+            ot_findings.append({"asset": f.get("asset", ""), "title": f.get("title", ""), "severity": f.get("severity", "")})
+
+    def _csf(f):
+        t = (f.get("title") or "").lower()
+        if "cve-" in t:
+            return "PR"
+        if any(x in t for x in ["malicioso", "malware"]):
+            return "DE"
+        return _CSF_BY_TOOL.get(f.get("tool", ""), "ID")
+
+    findings = [{**f, "csf": _csf(f)} for f in findings]
+
+    counts = {
+        "critical": sum(1 for f in findings if f.get("severity") == "critical"),
+        "high":     sum(1 for f in findings if f.get("severity") == "high"),
+        "medium":   sum(1 for f in findings if f.get("severity") == "medium"),
+        "info":     sum(1 for f in findings if f.get("severity") == "info"),
+    }
+
+    if score >= 90:   score_color = "#ef4444"
+    elif score >= 76: score_color = "#f97316"
+    elif score >= 61: score_color = "#eab308"
+    elif score >= 41: score_color = "#60a5fa"
+    else:             score_color = "#4ade80"
+
+    lbl, _ = score_label(score)
+    seeds_str = ", ".join(seeds)
+    n = len(seeds)
+    kind = "manual " if analysis_type == "manual" else ""
+    exec_summary = (
+        f"Se ha realizado un análisis {kind}de superficie de ataque sobre {n} objetivo{'s' if n != 1 else ''}: {seeds_str}. "
+        f"El análisis identificó un total de {len(findings)} hallazgos de seguridad, "
+        f"de los cuales {counts['critical']} son críticos, {counts['high']} de alta severidad, "
+        f"{counts['medium']} de severidad media y {counts['info']} informativos. "
+        f"El score de exposición calculado es {score}/100 — {lbl}."
+    )
+
+    rec_groups: dict = {}
+    for f in findings:
+        rec = (f.get("recommendation") or "").strip()
+        if not rec or rec in _SKIP_RECS:
+            continue
+        if rec not in rec_groups:
+            rec_groups[rec] = {"recommendation": rec, "severity": f["severity"], "assets": []}
+        entry = f"{f['asset']} · {f['tool'].upper()}"
+        if entry not in rec_groups[rec]["assets"]:
+            rec_groups[rec]["assets"].append(entry)
+        if _SEV_ORDER.get(f["severity"], 99) < _SEV_ORDER.get(rec_groups[rec]["severity"], 99):
+            rec_groups[rec]["severity"] = f["severity"]
+    grouped_recs = sorted(rec_groups.values(), key=lambda x: _SEV_ORDER.get(x["severity"], 99))
+
+    html_str = render_template(
+        "report_pdf.html",
+        seeds         = seeds,
+        assets        = assets,
+        score         = score,
+        score_color   = score_color,
+        score_label   = lbl,
+        date          = date_str,
+        finding_count = len(findings),
+        critical_count= counts["critical"],
+        high_count    = counts["high"],
+        counts        = counts,
+        exec_summary  = exec_summary,
+        findings      = findings,
+        grouped_recs  = grouped_recs,
+        ot_findings   = ot_findings,
+    )
+    return WeasyHTML(string=html_str).write_pdf()
+
 
 def _owns_or_admin(record):
     """Returns a 403 response if the current user doesn't own the record, None otherwise."""
@@ -109,9 +219,10 @@ def save_analysis():
 @pipeline_bp.route("/api/analyses")
 @role_required(ROLE_ADMIN, ROLE_ANALYST)
 def list_analyses():
-    rows = (PipelineAnalysis.query
-            .order_by(PipelineAnalysis.created_at.desc())
-            .limit(30).all())
+    q = PipelineAnalysis.query
+    if session.get("user_role") != ROLE_ADMIN:
+        q = q.filter_by(user_id=session.get("user_id"))
+    rows = q.order_by(PipelineAnalysis.created_at.desc()).limit(30).all()
     return jsonify([{
         "id":            a.id,
         "seeds":         a.seeds,
@@ -160,7 +271,7 @@ def delete_analysis(aid):
 @role_required(ROLE_ADMIN, ROLE_ANALYST)
 def export_pdf(aid):
     try:
-        from weasyprint import HTML as WeasyHTML
+        import weasyprint  # noqa: F401
     except ImportError:
         return jsonify({"error": "WeasyPrint no instalado. Ejecuta: pip install weasyprint"}), 500
 
@@ -171,114 +282,14 @@ def export_pdf(aid):
     if denied:
         return denied
 
-    findings = a.findings or []
-    _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "info": 3, "low": 4}
-    findings = sorted(findings, key=lambda f: (
-        _SEV_ORDER.get(f.get("severity", "info"), 99),
-        (f.get("asset") or "").lower(),
-    ))
-
-    # Detectar hallazgos OT/ICS para aviso especial en el informe
-    _OT_PORTS = {102, 502, 789, 1911, 1962, 2404, 4000, 4840, 9600, 18245, 20000, 44818, 47808}
-    _OT_KEYWORDS = {
-        "modbus", "siemens s7", "iso-tsap", "ethernet/ip", "enip", "bacnet", "dnp3",
-        "omron fins", "ge srtp", "opc ua", "opc da", "niagara", "tridium", "ignition",
-        "wonderware", "scada", "hmi expuesta", "plc expuesto", "sistema de control industrial",
-        "dcs", "rtu expuesto", "ems ", "bms expuesto", "historian industrial",
-    }
-    ot_findings = []
-    for f in findings:
-        title_lower = (f.get("title") or "").lower()
-        is_ot = any(kw in title_lower for kw in _OT_KEYWORDS)
-        if not is_ot:
-            for p in _OT_PORTS:
-                if f"puerto {p}/" in title_lower or f":{p} " in title_lower:
-                    is_ot = True
-                    break
-        if is_ot:
-            ot_findings.append({"asset": f.get("asset",""), "title": f.get("title",""), "severity": f.get("severity","")})
-
-    # Enriquecer hallazgos con etiqueta NIST CSF 2.0
-    _CSF_BY_TOOL = {
-        "whois":      "GV", "dns":        "ID", "subfinder":  "ID",
-        "crt.sh":     "ID", "nmap":       "PR", "shodan":     "PR",
-        "exposure":   "PR", "virustotal": "DE", "urlscan":    "DE",
-        "intelx":     "ID", "harvester":  "ID", "blackbird":  "ID",
-        "sherlock":   "ID", "maigret":    "ID", "variants":   "ID",
-    }
-    def _csf(f):
-        t = (f.get("title") or "").lower()
-        if "cve-" in t:                                    return "PR"
-        if any(x in t for x in ["malicioso", "malware"]): return "DE"
-        return _CSF_BY_TOOL.get(f.get("tool", ""), "ID")
-
-    findings = [{**f, "csf": _csf(f)} for f in findings]
-
-    counts = {
-        "critical": sum(1 for f in findings if f.get("severity") == "critical"),
-        "high":     sum(1 for f in findings if f.get("severity") == "high"),
-        "medium":   sum(1 for f in findings if f.get("severity") == "medium"),
-        "info":     sum(1 for f in findings if f.get("severity") == "info"),
-    }
-    score = a.score or 0
-
-    if score >= 90:   score_color = "#ef4444"
-    elif score >= 76: score_color = "#f97316"
-    elif score >= 61: score_color = "#eab308"
-    elif score >= 41: score_color = "#60a5fa"
-    else:             score_color = "#4ade80"
-
-    lbl, _ = score_label(score)
-
-    seeds_str   = ", ".join(a.seeds or [])
-    n_seeds     = len(a.seeds or [])
-    exec_summary = (
-        f"Se ha realizado un análisis de superficie de ataque sobre {n_seeds} objetivo{'s' if n_seeds != 1 else ''}: {seeds_str}. "
-        f"El análisis identificó un total de {len(findings)} hallazgos de seguridad, "
-        f"de los cuales {counts['critical']} son críticos, {counts['high']} de alta severidad, "
-        f"{counts['medium']} de severidad media y {counts['info']} informativos. "
-        f"El score de exposición calculado es {score}/100 — {lbl}."
+    pdf_bytes  = build_report_pdf_bytes(
+        seeds      = a.seeds or [],
+        assets     = a.assets or [],
+        findings   = a.findings or [],
+        score      = a.score or 0,
+        date_str   = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
+        analysis_type = "pipeline",
     )
-
-    # Deduplicar recomendaciones: agrupar por texto, consolidar activos afectados
-    _SKIP_RECS = {
-        "Sin alertas. Monitoriza periódicamente.",
-        "Continúa monitorizando periódicamente.",
-        "Mantén la privacy protection activa.",
-    }
-    rec_groups: dict = {}
-    for f in findings:
-        rec = (f.get("recommendation") or "").strip()
-        if not rec or rec in _SKIP_RECS:
-            continue
-        if rec not in rec_groups:
-            rec_groups[rec] = {"recommendation": rec, "severity": f["severity"], "assets": []}
-        entry = f"{f['asset']} · {f['tool'].upper()}"
-        if entry not in rec_groups[rec]["assets"]:
-            rec_groups[rec]["assets"].append(entry)
-        if _SEV_ORDER.get(f["severity"], 99) < _SEV_ORDER.get(rec_groups[rec]["severity"], 99):
-            rec_groups[rec]["severity"] = f["severity"]
-    grouped_recs = sorted(rec_groups.values(), key=lambda x: _SEV_ORDER.get(x["severity"], 99))
-
-    html_str = render_template(
-        "report_pdf.html",
-        seeds        = a.seeds or [],
-        assets       = a.assets or [],
-        score        = score,
-        score_color  = score_color,
-        score_label  = lbl,
-        date         = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
-        finding_count= len(findings),
-        critical_count= counts["critical"],
-        high_count   = counts["high"],
-        counts       = counts,
-        exec_summary = exec_summary,
-        findings     = findings,
-        grouped_recs = grouped_recs,
-        ot_findings  = ot_findings,
-    )
-
-    pdf_bytes  = WeasyHTML(string=html_str).write_pdf()
     seeds_slug = "_".join((a.seeds or ["report"])[:2]).replace(".", "_").replace("@", "_")
     filename   = f"aletheia_{seeds_slug}_{to_local(a.created_at).strftime('%Y%m%d')}.pdf"
 
@@ -322,9 +333,10 @@ def save_manual_analysis():
 @pipeline_bp.route("/api/manual_analyses")
 @role_required(ROLE_ADMIN, ROLE_ANALYST)
 def list_manual_analyses():
-    rows = (ManualAnalysis.query
-            .order_by(ManualAnalysis.created_at.desc())
-            .limit(30).all())
+    q = ManualAnalysis.query
+    if session.get("user_role") != ROLE_ADMIN:
+        q = q.filter_by(user_id=session.get("user_id"))
+    rows = q.order_by(ManualAnalysis.created_at.desc()).limit(30).all()
     return jsonify([{
         "id":            a.id,
         "targets":       a.targets,
@@ -374,7 +386,7 @@ def delete_manual_analysis(aid):
 @role_required(ROLE_ADMIN, ROLE_ANALYST)
 def export_manual_pdf(aid):
     try:
-        from weasyprint import HTML as WeasyHTML
+        import weasyprint  # noqa: F401
     except ImportError:
         return jsonify({"error": "WeasyPrint no instalado. Ejecuta: pip install weasyprint"}), 500
 
@@ -385,116 +397,18 @@ def export_manual_pdf(aid):
     if denied:
         return denied
 
-    findings = a.findings or []
-    _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "info": 3, "low": 4}
-    findings = sorted(findings, key=lambda f: (
-        _SEV_ORDER.get(f.get("severity", "info"), 99),
-        (f.get("asset") or "").lower(),
-    ))
-
-    _OT_PORTS = {102, 502, 789, 1911, 1962, 2404, 4000, 4840, 9600, 18245, 20000, 44818, 47808}
-    _OT_KEYWORDS = {
-        "modbus", "siemens s7", "iso-tsap", "ethernet/ip", "enip", "bacnet", "dnp3",
-        "omron fins", "ge srtp", "opc ua", "opc da", "niagara", "tridium", "ignition",
-        "wonderware", "scada", "hmi expuesta", "plc expuesto", "sistema de control industrial",
-        "dcs", "rtu expuesto", "ems ", "bms expuesto", "historian industrial",
-    }
-    ot_findings = []
-    for f in findings:
-        title_lower = (f.get("title") or "").lower()
-        is_ot = any(kw in title_lower for kw in _OT_KEYWORDS)
-        if not is_ot:
-            for p in _OT_PORTS:
-                if f"puerto {p}/" in title_lower or f":{p} " in title_lower:
-                    is_ot = True
-                    break
-        if is_ot:
-            ot_findings.append({"asset": f.get("asset",""), "title": f.get("title",""), "severity": f.get("severity","")})
-
-    _CSF_BY_TOOL = {
-        "whois":      "GV", "dns":        "ID", "subfinder":  "ID",
-        "crt.sh":     "ID", "nmap":       "PR", "shodan":     "PR",
-        "exposure":   "PR", "virustotal": "DE", "urlscan":    "DE",
-        "intelx":     "ID", "harvester":  "ID", "blackbird":  "ID",
-        "sherlock":   "ID", "maigret":    "ID", "variants":   "ID",
-    }
-    def _csf(f):
-        t = (f.get("title") or "").lower()
-        if "cve-" in t:                                    return "PR"
-        if any(x in t for x in ["malicioso", "malware"]): return "DE"
-        return _CSF_BY_TOOL.get(f.get("tool", ""), "ID")
-
-    findings = [{**f, "csf": _csf(f)} for f in findings]
-
-    counts = {
-        "critical": sum(1 for f in findings if f.get("severity") == "critical"),
-        "high":     sum(1 for f in findings if f.get("severity") == "high"),
-        "medium":   sum(1 for f in findings if f.get("severity") == "medium"),
-        "info":     sum(1 for f in findings if f.get("severity") == "info"),
-    }
-    score = a.score or 0
-
-    if score >= 90:   score_color = "#ef4444"
-    elif score >= 76: score_color = "#f97316"
-    elif score >= 61: score_color = "#eab308"
-    elif score >= 41: score_color = "#60a5fa"
-    else:             score_color = "#4ade80"
-
-    lbl, _ = score_label(score)
-
-    targets      = a.targets or []
-    seeds_str    = ", ".join(targets)
-    n_seeds      = len(targets)
-    exec_summary = (
-        f"Se ha realizado un análisis manual de superficie de ataque sobre {n_seeds} objetivo{'s' if n_seeds != 1 else ''}: {seeds_str}. "
-        f"El análisis identificó un total de {len(findings)} hallazgos de seguridad, "
-        f"de los cuales {counts['critical']} son críticos, {counts['high']} de alta severidad, "
-        f"{counts['medium']} de severidad media y {counts['info']} informativos. "
-        f"El score de exposición calculado es {score}/100 — {lbl}."
-    )
-
-    _SKIP_RECS = {
-        "Sin alertas. Monitoriza periódicamente.",
-        "Continúa monitorizando periódicamente.",
-        "Mantén la privacy protection activa.",
-    }
-    rec_groups: dict = {}
-    for f in findings:
-        rec = (f.get("recommendation") or "").strip()
-        if not rec or rec in _SKIP_RECS:
-            continue
-        if rec not in rec_groups:
-            rec_groups[rec] = {"recommendation": rec, "severity": f["severity"], "assets": []}
-        entry = f"{f['asset']} · {f['tool'].upper()}"
-        if entry not in rec_groups[rec]["assets"]:
-            rec_groups[rec]["assets"].append(entry)
-        if _SEV_ORDER.get(f["severity"], 99) < _SEV_ORDER.get(rec_groups[rec]["severity"], 99):
-            rec_groups[rec]["severity"] = f["severity"]
-    grouped_recs = sorted(rec_groups.values(), key=lambda x: _SEV_ORDER.get(x["severity"], 99))
-
-    assets = list({f.get("asset","") for f in findings if f.get("asset")})
-
-    html_str = render_template(
-        "report_pdf.html",
+    targets    = a.targets or []
+    assets     = list({f.get("asset", "") for f in (a.findings or []) if f.get("asset")})
+    pdf_bytes  = build_report_pdf_bytes(
         seeds         = targets,
         assets        = assets,
-        score         = score,
-        score_color   = score_color,
-        score_label   = lbl,
-        date          = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
-        finding_count = len(findings),
-        critical_count= counts["critical"],
-        high_count    = counts["high"],
-        counts        = counts,
-        exec_summary  = exec_summary,
-        findings      = findings,
-        grouped_recs  = grouped_recs,
-        ot_findings   = ot_findings,
+        findings      = a.findings or [],
+        score         = a.score or 0,
+        date_str      = to_local(a.created_at).strftime("%d/%m/%Y %H:%M"),
+        analysis_type = "manual",
     )
-
-    pdf_bytes   = WeasyHTML(string=html_str).write_pdf()
-    seeds_slug  = "_".join((targets or ["manual"])[:2]).replace(".", "_").replace("@", "_")
-    filename    = f"aletheia_manual_{seeds_slug}_{to_local(a.created_at).strftime('%Y%m%d')}.pdf"
+    seeds_slug = "_".join((targets or ["manual"])[:2]).replace(".", "_").replace("@", "_")
+    filename   = f"aletheia_manual_{seeds_slug}_{to_local(a.created_at).strftime('%Y%m%d')}.pdf"
 
     resp = make_response(pdf_bytes)
     resp.headers["Content-Type"]        = "application/pdf"

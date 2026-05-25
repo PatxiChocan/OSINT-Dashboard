@@ -18,9 +18,11 @@ VT_KEY        = os.environ.get("VIRUSTOTAL_API_KEY", "")
 ABUSEIPDB_KEY = os.environ.get("ABUSEIPDB_KEY", "")
 GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")
 
-_IP_RE      = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
-_PRIVATE_RE = re.compile(r'^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.)')
-_EMAIL_RE   = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+_IP_RE           = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+_PRIVATE_RE      = re.compile(r'^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.)')
+_EMAIL_RE        = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+_WEAK_PROTO_RE   = re.compile(r'\b(SSLv2|SSLv3|TLSv1\.0|TLSv1\.1)\b', re.IGNORECASE)
+_WEAK_CIPHER_RE  = re.compile(r'\b(RC4|ARCFOUR|3DES|EDE|(?<!\w)DES(?!\w)|NULL|EXPORT|ANON|ADH|AECDH)\b', re.IGNORECASE)
 
 # Puertos con descripción y riesgo
 PORT_INFO = {
@@ -188,6 +190,17 @@ PORT_INFO = {
             "(financieros, RRHH, supply chain). Una exposición sin control puede permitir "
             "acceso no autorizado a datos corporativos sensibles o explotación de "
             "vulnerabilidades conocidas de SAP con exploits públicos disponibles."),
+    3299:  ("SAProuter", "critical",
+            "SAP Router expuesto — enrutador de red SAP accesible desde Internet. "
+            "Permite tunelizar y redirigir conexiones hacia sistemas SAP internos (ERP, BW, CRM, HR). "
+            "Versiones antiguas (< 40.5) tienen vulnerabilidades de autenticación con exploits públicos. "
+            "SAProuter nunca debe ser accesible directamente desde Internet sin VPN y controles estrictos."),
+    8020:  ("FortiGuard Block Override", "high",
+            "Interfaz de administración FortiGuard Block Override expuesta en el puerto 8020. "
+            "Permite a usuarios anular las políticas de filtrado web del Fortigate. "
+            "Expuesta a Internet puede ser explotada para eludir controles de seguridad o como "
+            "vector de acceso inicial si presenta vulnerabilidades no parcheadas. "
+            "Debe restringirse exclusivamente a acceso interno o VPN."),
 
     # ── Protocolos OT/ICS/SCADA ──────────────────────────────────────────────
     102:   ("Siemens S7 (ISO-TSAP)",  "critical","PLC Siemens expuesto. Permite leer/escribir variables de proceso y reprogramar el autómata sin autenticación."),
@@ -518,6 +531,7 @@ def _dns(pid, domain):
         pass
 
     # MX — infraestructura de correo
+    mx_hosts = []
     try:
         mx_out = subprocess.run(["dig", "+short", "MX", domain],
                                 capture_output=True, text=True, timeout=8).stdout.strip()
@@ -527,6 +541,12 @@ def _dns(pid, domain):
                      f"Servidores de correo: {mx_out[:300]}\n"
                      f"Estos servidores gestionan el correo entrante de la organización.",
                      "Verifica SPF, DKIM y DMARC para proteger el correo de suplantación.")
+            for line in mx_out.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    host = parts[-1].rstrip(".")
+                    if host and "." in host and host != domain:
+                        mx_hosts.append(host)
     except Exception:
         pass
 
@@ -579,7 +599,7 @@ def _dns(pid, domain):
     except Exception:
         pass
 
-    return list(ips)
+    return list(ips), mx_hosts
 
 
 def _subfinder(pid, domain):
@@ -900,7 +920,7 @@ def _nmap(pid, ip):
     try:
         proc = subprocess.run(
             ["/usr/bin/nmap", "-sV", "-O", "--osscan-guess", "--open", "-T4", "--top-ports", "1000",
-             "--script", "banner,http-title,ssl-cert,smtp-commands,ftp-anon",
+             "--script", "banner,http-title,ssl-cert,ssl-enum-ciphers,ssl-dh-params,smtp-commands,ftp-anon",
              "--script-timeout", "10s",
              "-oX", "-", ip],
             capture_output=True, text=True, timeout=120
@@ -947,13 +967,41 @@ def _nmap(pid, ip):
                 sout   = script.get("output", "").strip()
                 if not sout:
                     continue
-                # Ignorar scripts que fallaron (no son hallazgos reales)
                 if "ERROR:" in sout and "Script execution failed" in sout:
                     continue
                 scripts_txt.append(f"[{sid}]: {sout[:300]}")
                 sout_upper = sout.upper()
                 if "VULNERABLE" in sout_upper and "NOT VULNERABLE" not in sout_upper:
                     vuln_found = True
+
+                # Expiración de certificado SSL
+                if sid == "ssl-cert":
+                    exp_m = re.search(r'Not valid after:\s*(\d{4}-\d{2}-\d{2})', sout)
+                    if exp_m:
+                        try:
+                            exp_dt    = datetime.strptime(exp_m.group(1), "%Y-%m-%d")
+                            days_left = (exp_dt - datetime.utcnow()).days
+                            if days_left < 0:
+                                _finding(pid, ip, "nmap", "high",
+                                         f"Certificado SSL caducado hace {abs(days_left)} días en {ip}:{portid}",
+                                         f"El certificado SSL del puerto {portid} en {ip} expiró hace "
+                                         f"{abs(days_left)} días ({exp_m.group(1)}).\n"
+                                         "Un certificado caducado genera errores en navegadores, "
+                                         "rompe conexiones TLS y elimina la garantía de autenticidad.",
+                                         "Renueva el certificado SSL de inmediato. "
+                                         "Considera automatizar la renovación con certbot (Let's Encrypt).")
+                            elif days_left < 30:
+                                _finding(pid, ip, "nmap", "medium",
+                                         f"Certificado SSL próximo a caducar en {days_left} días — {ip}:{portid}",
+                                         f"El certificado SSL del puerto {portid} en {ip} expirará el "
+                                         f"{exp_m.group(1)} ({days_left} días restantes).",
+                                         "Renueva el certificado SSL antes de que caduque para evitar interrupciones del servicio.")
+                        except Exception:
+                            pass
+
+                # Protocolos TLS débiles y cipher suites inseguros
+                if sid in ("ssl-enum-ciphers", "ssl-dh-params"):
+                    _parse_tls_weaknesses(pid, ip, portid, sout)
 
             if vuln_found:
                 sev = "critical"

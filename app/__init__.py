@@ -65,8 +65,9 @@ def create_app():
     @app.context_processor
     def inject_user():
         return {
-            "current_role": _session.get("user_role", ""),
-            "current_name": _session.get("user_name", ""),
+            "current_role":   _session.get("user_role", ""),
+            "current_name":   _session.get("user_name", ""),
+            "current_org_id": _session.get("org_id"),
         }
 
     # ── Blueprints ─────────────────────────────────────────────────────────────
@@ -89,9 +90,11 @@ def create_app():
     from .routes.urlscan import urlscan_bp
     from .routes.nmap_discover import nmap_discover_bp
     from .routes.pipeline import pipeline_bp
+    from .routes.reports import reports_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(reports_bp)
     app.register_blueprint(main)
     app.register_blueprint(runner)
     app.register_blueprint(news_bp)

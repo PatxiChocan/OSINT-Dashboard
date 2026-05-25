@@ -37,10 +37,12 @@
         <span>Inicio</span>
       </button>
       {% if current_role in ('admin', 'analyst') %}
+      {% if current_role == 'admin' %}
       <button class="nav-btn" onclick="show('scope',this)">
         <span class="icon">📁</span>
         <span>Alcance</span>
       </button>
+      {% endif %}
       <button class="nav-btn" onclick="show('pipeline',this)">
         <span class="icon">⚡</span>
         <span>Análisis automático</span>
@@ -69,6 +71,10 @@
       <button class="nav-btn" onclick="show('sources',this)">
         <span class="icon">📡</span>
         <span>Fuentes</span>
+      </button>
+      <button class="nav-btn" onclick="show('reports',this); loadReports()">
+        <span class="icon">📄</span>
+        <span>Mis informes</span>
       </button>
 
       {% if current_role in ('admin', 'analyst') %}
@@ -198,8 +204,10 @@
                 <input class="scope-inp" id="scope-case" type="text" placeholder="Client X External Recon" autocomplete="off">
               </div>
               <div class="scope-field">
-                <label class="scope-lbl" for="scope-client">Cliente</label>
-                <input class="scope-inp" id="scope-client" type="text" placeholder="Client Corp S.L." autocomplete="off">
+                <label class="scope-lbl" for="scope-org">Organización</label>
+                <select class="scope-inp" id="scope-org">
+                  <option value="">— Seleccionar organización —</option>
+                </select>
               </div>
               <div class="scope-field scope-full">
                 <label class="scope-lbl" for="scope-resp">Responsable</label>
@@ -432,12 +440,17 @@
             <div class="scope-card-title">Activos a analizar</div>
             <div style="display:flex;gap:.75rem;align-items:flex-start">
               <textarea id="pl-seeds" rows="3" class="scope-inp" style="flex:1;resize:vertical;font-family:monospace;font-size:.85rem"
-                placeholder="empresa.com&#10;mail.empresa.com&#10;admin@empresa.com"></textarea>
+                placeholder="empresa.com&#10;mail.empresa.com&#10;admin@empresa.com"
+                {% if current_role == 'analyst' %}readonly style="flex:1;resize:none;font-family:monospace;font-size:.85rem;opacity:.7;cursor:default"{% endif %}></textarea>
               <button class="run-btn" onclick="startPipeline()" id="pl-btn" style="white-space:nowrap">
                 Iniciar análisis
               </button>
             </div>
+            {% if current_role == 'analyst' %}
+            <div style="font-size:.75rem;color:#f97316;margin-top:.5rem">🔒 Los objetivos los define el administrador mediante el alcance del encargo.</div>
+            {% else %}
             <div style="font-size:.75rem;opacity:.5;margin-top:.5rem">Un activo por línea. Dominios, IPs y emails son soportados.</div>
+            {% endif %}
           </div>
 
           <!-- Historial -->
@@ -576,6 +589,7 @@
           <div class="parallel-actions">
             <span id="parallel-count" class="parallel-count-label">0 seleccionadas</span>
             <button class="launch-btn" id="launch-parallel-btn" onclick="launchParallel()" disabled>⚡ Lanzar seleccionadas</button>
+            <button id="parallel-stop-btn" onclick="stopParallelAnalysis()" style="display:none;align-items:center;gap:.4rem;background:#ef4444;color:#fff;border:none;border-radius:.4rem;padding:.45rem 1rem;font-size:.85rem;font-weight:600;cursor:pointer">⬛ Parar análisis</button>
             <button class="cancel-parallel-btn" onclick="clearParallel()">Limpiar</button>
           </div>
 
@@ -890,6 +904,27 @@
           <div class="src-grid" id="src-grid"></div>
         </div>
 
+        <!-- ── Mis informes ────────────────────────────── -->
+        <div class="panel" id="panel-reports">
+          <div class="page-header">
+            <div>
+              <div class="page-title">📄 Mis informes</div>
+              <div class="page-desc">Informes publicados por el equipo Aletheia para tu organización.</div>
+            </div>
+            <button class="run-btn" onclick="loadReports()">⟳ Actualizar</button>
+          </div>
+
+          <div id="reports-loading" class="news-loading-state" style="display:none">
+            <div class="news-spinner"></div>
+            <span>Cargando informes...</span>
+          </div>
+
+          <div id="reports-empty" style="display:none;text-align:center;padding:3rem;opacity:.5">
+            No hay informes publicados para tu organización.
+          </div>
+
+          <div id="reports-list" style="display:flex;flex-direction:column;gap:.75rem"></div>
+        </div>
 
         <!-- ── Shodan Full Panel ────────────────────────── -->
         <div class="panel" id="panel-shodan">
@@ -1207,6 +1242,34 @@
 
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
   <script>
+  const USER_ROLE   = '{{ current_role }}';
+  const USER_ORG_ID = {{ current_org_id | tojson }};
+
+  // ── Restricciones de rol analyst ──────────────────────────────────────────
+  if (USER_ROLE === 'analyst') {
+    // Pre-poblar seeds del pipeline desde el scope guardado (localStorage)
+    // Se hace tanto al cargar la página como al mostrar el panel
+    function _fillPipelineSeedsFromScope() {
+      const seedsEl = document.getElementById('pl-seeds');
+      if (!seedsEl || seedsEl.value.trim()) return;
+      try {
+        const scope = JSON.parse(localStorage.getItem('aletheia_scope') || 'null');
+        if (scope && Array.isArray(scope.domains) && scope.domains.length) {
+          seedsEl.value = scope.domains.join('\n');
+        }
+      } catch(_) {}
+    }
+
+    // Interceptar show() para auto-rellenar cuando el analyst abre el pipeline
+    const _analystOrigShow = window.show;
+    window.show = function(panel, btn) {
+      _analystOrigShow(panel, btn);
+      if (panel === 'pipeline') _fillPipelineSeedsFromScope();
+    };
+
+    // También al cargar si el panel pipeline ya está visible
+    document.addEventListener('DOMContentLoaded', _fillPipelineSeedsFromScope);
+  }
   // ── Pipeline ────────────────────────────────────────────────────────────────
   const SEV_COLOR = { critical:'#ef4444', high:'#f97316', medium:'#eab308', info:'#60a5fa' };
   const SEV_LABEL = { critical:'CRÍTICO', high:'ALTO', medium:'MEDIO', info:'INFO' };
@@ -1966,7 +2029,345 @@
       });
     });
   })();
+
+  // ── Mis informes ──────────────────────────────────────────────
+  async function loadReports() {
+    const loading = document.getElementById('reports-loading');
+    const empty   = document.getElementById('reports-empty');
+    const list    = document.getElementById('reports-list');
+    loading.style.display = 'flex';
+    empty.style.display   = 'none';
+    list.innerHTML        = '';
+    try {
+      const isAnalyst = USER_ROLE === 'admin' || USER_ROLE === 'analyst';
+      const fetches = [fetch('/reports/')];
+      if (isAnalyst) {
+        fetches.push(fetch('/api/manual_analyses'));
+        fetches.push(fetch('/api/analyses'));
+      }
+
+      const responses = await Promise.all(fetches);
+      const jsons = await Promise.all(responses.map(r => r.json()));
+      const [reportsData, manualData, pipelineData] = jsons;
+
+      loading.style.display = 'none';
+
+      const items = [];
+
+      // Published reports
+      (reportsData || []).forEach(rep => {
+        items.push({ _type: 'report', _ts: rep.created_at, ...rep });
+      });
+
+      // Manual analyses (analyst/admin only)
+      if (isAnalyst && Array.isArray(manualData)) {
+        manualData.forEach(a => {
+          items.push({ _type: 'manual', _ts: a.created_at, ...a });
+        });
+      }
+
+      // Pipeline OSINT analyses (analyst/admin only)
+      if (isAnalyst && Array.isArray(pipelineData)) {
+        pipelineData.forEach(a => {
+          items.push({ _type: 'pipeline', _ts: a.created_at, ...a });
+        });
+      }
+
+      if (!items.length) { empty.style.display = 'block'; return; }
+
+      // Sort newest first
+      items.sort((a, b) => new Date(b._ts) - new Date(a._ts));
+
+      items.forEach(item => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:.5rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;';
+
+        if (item._type === 'report') {
+          const dt = new Date(item.created_at);
+          const dateStr = isNaN(dt) ? item.created_at : dt.toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          card.innerHTML = `
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem">
+                <span style="font-size:.65rem;background:rgba(99,102,241,.25);color:#a5b4fc;border-radius:.25rem;padding:.1rem .4rem;font-weight:600;letter-spacing:.03em">INFORME</span>
+                <span style="font-weight:600;font-size:.95rem">${item.titulo}</span>
+              </div>
+              ${item.descripcion ? `<div style="font-size:.8rem;opacity:.6;margin-bottom:.25rem">${item.descripcion}</div>` : ''}
+              <div style="font-size:.75rem;opacity:.45">${dateStr}</div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-shrink:0">
+              <button class="secondary-btn" style="font-size:.8rem;padding:.35rem .9rem;white-space:nowrap" onclick="viewReport(${item.id})">Ver informe</button>
+              ${item.has_pdf ? `<a href="/reports/${item.id}/pdf" class="run-btn" style="text-decoration:none;font-size:.8rem;padding:.35rem .9rem;white-space:nowrap">⬇ PDF</a>` : ''}
+            </div>
+          `;
+        } else if (item._type === 'manual') {
+          const dt = new Date(item.created_at);
+          const dateStr = isNaN(dt) ? item.created_at : dt.toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          const targets = Array.isArray(item.targets) ? item.targets.join(', ') : (item.targets || '—');
+          const sevBadges = [
+            item.critical ? `<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:.25rem;padding:.1rem .4rem;font-size:.7rem;font-weight:600">${item.critical} crítico${item.critical !== 1 ? 's' : ''}</span>` : '',
+            item.high     ? `<span style="background:rgba(249,115,22,.15);color:#fb923c;border-radius:.25rem;padding:.1rem .4rem;font-size:.7rem;font-weight:600">${item.high} alto${item.high !== 1 ? 's' : ''}</span>` : '',
+          ].filter(Boolean).join(' ');
+          card.innerHTML = `
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem">
+                <span style="font-size:.65rem;background:rgba(34,211,238,.15);color:#67e8f9;border-radius:.25rem;padding:.1rem .4rem;font-weight:600;letter-spacing:.03em">ANÁLISIS MANUAL</span>
+                <span style="font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${targets}</span>
+              </div>
+              <div style="font-size:.8rem;opacity:.6;margin-bottom:.25rem">${item.finding_count} hallazgo${item.finding_count !== 1 ? 's' : ''} · Score ${item.score} ${sevBadges}</div>
+              <div style="font-size:.75rem;opacity:.45">${dateStr}</div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-shrink:0">
+              <a href="/api/manual_analyses/${item.id}/export/pdf" class="run-btn" style="text-decoration:none;font-size:.8rem;padding:.35rem .9rem;white-space:nowrap">⬇ PDF</a>
+              <button class="secondary-btn" style="font-size:.8rem;padding:.35rem .9rem;white-space:nowrap" onclick="loadManualAnalysis(${item.id}); show('parallel', document.querySelector('.nav-btn[onclick*=parallel]'))">Abrir</button>
+              <button class="secondary-btn" style="font-size:.8rem;padding:.35rem .9rem;white-space:nowrap;border-color:rgba(99,102,241,.4);color:#a5b4fc" onclick="openPublishModal('manual', ${item.id}, '${targets.replace(/'/g,'')}')">Publicar</button>
+            </div>
+          `;
+        } else if (item._type === 'pipeline') {
+          const dt = new Date(item.created_at);
+          const dateStr = isNaN(dt) ? item.created_at : dt.toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          const seeds = Array.isArray(item.seeds) ? item.seeds.join(', ') : (item.seeds || '—');
+          const sevBadges = [
+            item.critical ? `<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:.25rem;padding:.1rem .4rem;font-size:.7rem;font-weight:600">${item.critical} crítico${item.critical !== 1 ? 's' : ''}</span>` : '',
+            item.high     ? `<span style="background:rgba(249,115,22,.15);color:#fb923c;border-radius:.25rem;padding:.1rem .4rem;font-size:.7rem;font-weight:600">${item.high} alto${item.high !== 1 ? 's' : ''}</span>` : '',
+          ].filter(Boolean).join(' ');
+          card.innerHTML = `
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem">
+                <span style="font-size:.65rem;background:rgba(168,85,247,.2);color:#c084fc;border-radius:.25rem;padding:.1rem .4rem;font-weight:600;letter-spacing:.03em">PIPELINE OSINT</span>
+                <span style="font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${seeds}</span>
+              </div>
+              <div style="font-size:.8rem;opacity:.6;margin-bottom:.25rem">${item.finding_count} hallazgo${item.finding_count !== 1 ? 's' : ''} · Score ${item.score} ${sevBadges}</div>
+              <div style="font-size:.75rem;opacity:.45">${dateStr}</div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-shrink:0">
+              <a href="/api/analyses/${item.id}/export/pdf" class="run-btn" style="text-decoration:none;font-size:.8rem;padding:.35rem .9rem;white-space:nowrap">⬇ PDF</a>
+              <button class="secondary-btn" style="font-size:.8rem;padding:.35rem .9rem;white-space:nowrap" onclick="loadAnalysis(${item.id}); show('pipeline', document.querySelector('.nav-btn[onclick*=pipeline]'))">Abrir</button>
+              <button class="secondary-btn" style="font-size:.8rem;padding:.35rem .9rem;white-space:nowrap;border-color:rgba(99,102,241,.4);color:#a5b4fc" onclick="openPublishModal('pipeline', ${item.id}, '${seeds.replace(/'/g,'')}')">Publicar</button>
+            </div>
+          `;
+        }
+
+        list.appendChild(card);
+      });
+    } catch(e) {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+    }
+  }
+
+  // ── Visor de informe web ──────────────────────────────────────────────────
+  async function viewReport(reportId) {
+    const overlay = document.getElementById('report-viewer-overlay');
+    const body    = document.getElementById('report-viewer-body');
+    overlay.style.display = 'flex';
+    body.innerHTML = '<div style="text-align:center;padding:4rem;color:#94a3b8">Cargando informe...</div>';
+
+    try {
+      const r = await fetch(`/reports/${reportId}/data`);
+      if (!r.ok) { body.innerHTML = '<div style="padding:2rem;color:#f87171">Error cargando el informe.</div>'; return; }
+      const d = await r.json();
+      renderReportViewer(d);
+    } catch(e) {
+      body.innerHTML = '<div style="padding:2rem;color:#f87171">Error de red.</div>';
+    }
+  }
+
+  function closeReportViewer() {
+    document.getElementById('report-viewer-overlay').style.display = 'none';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeReportViewer();
+      closePublishModal();
+    }
+  });
+
+  function renderReportViewer(d) {
+    const SEV_COLOR = { critical:'#dc2626', high:'#ea580c', medium:'#ca8a04', info:'#2563eb', low:'#64748b' };
+    const SEV_BG    = { critical:'#fef2f2', high:'#fff7ed', medium:'#fefce8', info:'#eff6ff', low:'#f8fafc' };
+    const SEV_BORDER= { critical:'#fca5a5', high:'#fdba74', medium:'#fde047', info:'#93c5fd', low:'#cbd5e1' };
+    const SEV_LABEL = { critical:'CRÍTICO', high:'ALTO', medium:'MEDIO', info:'INFO', low:'BAJO' };
+
+    const score = d.score || 0;
+    let scoreColor;
+    if      (score >= 90) scoreColor = '#dc2626';
+    else if (score >= 76) scoreColor = '#ea580c';
+    else if (score >= 61) scoreColor = '#ca8a04';
+    else if (score >= 41) scoreColor = '#2563eb';
+    else                  scoreColor = '#16a34a';
+
+    const countBadges = ['critical','high','medium','info'].map(s =>
+      d.counts[s] ? `<span style="background:${SEV_BG[s]};color:${SEV_COLOR[s]};border:1px solid ${SEV_BORDER[s]};border-radius:.3rem;padding:.2rem .65rem;font-size:.75rem;font-weight:700">${d.counts[s]} ${SEV_LABEL[s]}</span>` : ''
+    ).filter(Boolean).join(' ');
+
+    const seedsHtml = (d.seeds || []).map(s =>
+      `<span style="background:#f1f5f9;color:#334155;border-radius:.3rem;padding:.15rem .55rem;font-size:.8rem;font-family:monospace">${s}</span>`
+    ).join(' ');
+
+    const _SKIP_RECS = new Set([
+      'Sin alertas. Monitoriza periódicamente.',
+      'Continúa monitorizando periódicamente.',
+      'Mantén la privacy protection activa.',
+    ]);
+
+    const findingsHtml = (d.findings || []).map(f => {
+      const sev = f.severity || 'info';
+      const rec = (f.recommendation || '').trim();
+      const showRec = rec && !_SKIP_RECS.has(rec);
+      return `
+        <div style="border:1px solid ${SEV_BORDER[sev]};border-left:3px solid ${SEV_COLOR[sev]};border-radius:.4rem;padding:.85rem 1rem;margin-bottom:.6rem;background:${SEV_BG[sev]}">
+          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem;flex-wrap:wrap">
+            <span style="background:${SEV_COLOR[sev]};color:#fff;border-radius:.25rem;padding:.1rem .45rem;font-size:.68rem;font-weight:700;flex-shrink:0">${SEV_LABEL[sev]}</span>
+            <span style="font-weight:600;font-size:.88rem;color:#1e293b">${f.title || ''}</span>
+          </div>
+          <div style="display:flex;gap:1rem;font-size:.75rem;color:#64748b;flex-wrap:wrap">
+            ${f.asset ? `<span>🎯 ${f.asset}</span>` : ''}
+            ${f.tool  ? `<span>🔧 ${f.tool.toUpperCase()}</span>` : ''}
+            ${f.csf   ? `<span>NIST CSF: ${f.csf}</span>` : ''}
+          </div>
+          ${f.description ? `<div style="font-size:.8rem;color:#475569;margin-top:.4rem;line-height:1.5">${f.description}</div>` : ''}
+          ${showRec ? `
+          <div style="margin-top:.65rem;padding:.6rem .75rem;background:#fff;border:1px solid #e2e8f0;border-radius:.35rem;display:flex;gap:.6rem;align-items:flex-start">
+            <span style="font-size:.7rem;font-weight:700;color:#0f172a;letter-spacing:.04em;white-space:nowrap;padding-top:.1rem">RECOMENDACIÓN</span>
+            <span style="font-size:.8rem;color:#334155;line-height:1.5">${rec}</span>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    document.getElementById('report-viewer-body').innerHTML = `
+      <!-- Cabecera -->
+      <div style="display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <button onclick="closeReportViewer()" style="background:none;border:1px solid #e2e8f0;border-radius:.4rem;color:#475569;font-size:.82rem;padding:.35rem .85rem;cursor:pointer;white-space:nowrap">← Volver</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:1rem;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.titulo}</div>
+          <div style="font-size:.75rem;color:#94a3b8">${d.created_at}</div>
+        </div>
+        ${d.has_pdf ? `<a href="/reports/${d.id}/pdf" style="text-decoration:none;background:#0f172a;color:#fff;border-radius:.4rem;font-size:.8rem;padding:.4rem 1rem;white-space:nowrap;font-weight:600">⬇ Descargar PDF</a>` : ''}
+      </div>
+
+      <div style="padding:2rem 1.5rem;max-width:860px;margin:0 auto">
+
+        <!-- Score + resumen -->
+        <div style="display:flex;align-items:center;gap:1.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.6rem;padding:1.25rem 1.5rem;margin-bottom:1.75rem;flex-wrap:wrap">
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:2.75rem;font-weight:800;color:${scoreColor};line-height:1">${score}</div>
+            <div style="font-size:.68rem;color:#94a3b8;margin-top:.2rem;font-weight:600;letter-spacing:.05em">SCORE / 100</div>
+          </div>
+          <div style="width:1px;height:3rem;background:#e2e8f0;flex-shrink:0"></div>
+          <div style="flex:1;min-width:180px">
+            <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.65rem">${countBadges}</div>
+            <div style="font-size:.8rem;color:#64748b">Objetivos: ${seedsHtml}</div>
+          </div>
+        </div>
+
+        <!-- Hallazgos -->
+        ${d.findings && d.findings.length ? `
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;color:#94a3b8;margin-bottom:.65rem">HALLAZGOS (${d.findings.length})</div>
+        ${findingsHtml}` : '<div style="color:#94a3b8;text-align:center;padding:2rem">Sin hallazgos registrados.</div>'}
+
+
+      </div>
+    `;
+  }
+
+  // ── Publicar análisis para cliente ────────────────────────────────────────
+  let _publishType = null, _publishId = null;
+
+  async function openPublishModal(type, id, label) {
+    _publishType = type;
+    _publishId   = id;
+
+    // Analistas publican directamente en su propia organización sin modal
+    if (USER_ROLE === 'analyst') {
+      if (!USER_ORG_ID) {
+        alert('No tienes una organización asignada. Contacta con el administrador.');
+        return;
+      }
+      await _doPublish(USER_ORG_ID);
+      return;
+    }
+
+    document.getElementById('publish-modal-label').textContent = label;
+    document.getElementById('publish-org-select').innerHTML = '<option value="">Cargando...</option>';
+    document.getElementById('publish-modal').style.display  = 'flex';
+    try {
+      const r    = await fetch('/admin/orgs/list');
+      const orgs = await r.json();
+      const sel  = document.getElementById('publish-org-select');
+      sel.innerHTML = '<option value="">— Seleccionar organización —</option>';
+      orgs.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.nombre;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      document.getElementById('publish-org-select').innerHTML = '<option value="">Error cargando orgs</option>';
+    }
+  }
+
+  function closePublishModal() {
+    document.getElementById('publish-modal').style.display = 'none';
+    _publishType = null; _publishId = null;
+  }
+
+  async function _doPublish(org_id) {
+    try {
+      const r = await fetch('/admin/publish', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ type: _publishType, analysis_id: _publishId, org_id: parseInt(org_id) }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        closePublishModal();
+        if (typeof showToast === 'function') showToast('Informe publicado para el cliente', 'success', 4000);
+        loadReports();
+      } else {
+        alert('Error: ' + (d.error || 'desconocido'));
+      }
+    } catch(e) {
+      alert('Error de red: ' + e);
+    }
+  }
+
+  async function confirmPublish() {
+    const org_id = document.getElementById('publish-org-select').value;
+    if (!org_id) { alert('Selecciona una organización'); return; }
+    const btn = document.getElementById('publish-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generando PDF...';
+    try {
+      await _doPublish(org_id);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Publicar';
+    }
+  }
+
   </script>
+
+<!-- Visor de informe web -->
+<div id="report-viewer-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:#f8fafc;flex-direction:column;overflow-y:auto">
+  <div id="report-viewer-body"></div>
+</div>
+
+<!-- Modal publicar análisis -->
+<div id="publish-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:.75rem;padding:1.75rem;width:min(420px,90vw);box-shadow:0 20px 60px rgba(0,0,0,.15)">
+    <div style="font-size:1.05rem;font-weight:700;color:#0f172a;margin-bottom:.25rem">Publicar para cliente</div>
+    <div id="publish-modal-label" style="font-size:.8rem;color:#94a3b8;margin-bottom:1.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <label style="font-size:.8rem;color:#475569;font-weight:600;display:block;margin-bottom:.4rem">Organización cliente</label>
+    <select id="publish-org-select" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;color:#0f172a;padding:.5rem .75rem;font-size:.9rem;margin-bottom:1.25rem">
+      <option value="">— Cargando —</option>
+    </select>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end">
+      <button onclick="closePublishModal()" style="background:none;border:1px solid #e2e8f0;border-radius:.4rem;color:#475569;font-size:.85rem;padding:.4rem 1rem;cursor:pointer">Cancelar</button>
+      <button id="publish-confirm-btn" onclick="confirmPublish()" style="background:#0f172a;border:none;border-radius:.4rem;color:#fff;font-size:.85rem;padding:.4rem 1rem;cursor:pointer;font-weight:600">Publicar</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

@@ -37,17 +37,19 @@
 
     .role-select { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); border-radius:.35rem; padding:.25rem .5rem; font-size:.8rem; color:inherit; cursor:pointer; }
 
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1000; align-items:center; justify-content:center; }
     .modal-overlay.open { display:flex; }
-    .modal { background:#1a1a2e; border:1px solid rgba(255,255,255,.1); border-radius:.75rem; padding:2rem; width:100%; max-width:480px; }
-    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; }
+    .modal { background:#f5f5f7; border:1px solid #d1d1d6; border-radius:.75rem; padding:2rem; width:100%; max-width:480px; color:#1a1a2e; }
+    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; color:#1a1a2e; }
     .modal-field { margin-bottom:1rem; }
-    .modal-field label { display:block; font-size:.8rem; opacity:.6; margin-bottom:.35rem; }
-    .modal-field input, .modal-field select { width:100%; padding:.5rem .75rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); border-radius:.35rem; color:inherit; font-size:.875rem; box-sizing:border-box; }
+    .modal-field label { display:block; font-size:.8rem; color:#555; margin-bottom:.35rem; }
+    .modal-field input, .modal-field select { width:100%; padding:.5rem .75rem; background:#fff; border:1px solid #c7c7cc; border-radius:.35rem; color:#1a1a2e; font-size:.875rem; box-sizing:border-box; }
+    .modal-field input:focus, .modal-field select:focus { outline:none; border-color:var(--accent,#7c6af7); box-shadow:0 0 0 3px rgba(124,106,247,.15); }
     .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
     .btn-primary { background:var(--accent,#7c6af7); border:none; color:#fff; padding:.5rem 1.25rem; border-radius:.4rem; font-size:.875rem; font-weight:600; cursor:pointer; }
     .btn-primary:hover { opacity:.85; }
-    .btn-cancel { background:transparent; border:1px solid rgba(255,255,255,.2); color:inherit; padding:.5rem 1rem; border-radius:.4rem; font-size:.875rem; cursor:pointer; }
+    .btn-cancel { background:#fff; border:1px solid #c7c7cc; color:#444; padding:.5rem 1rem; border-radius:.4rem; font-size:.875rem; cursor:pointer; }
+    .btn-cancel:hover { background:#ebebf0; }
 
     .flash { padding:.75rem 1rem; border-radius:.5rem; margin-bottom:1rem; font-size:.875rem; }
     .flash-err  { background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
@@ -64,10 +66,7 @@
   <div id="flash-area"></div>
 
   <div class="admin-section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-      <div class="admin-section-title" style="margin-bottom:0">Usuarios</div>
-      <button class="btn-sm" onclick="openModal()">+ Nuevo usuario</button>
-    </div>
+    <div class="admin-section-title">Usuarios</div>
 
     <table class="admin-table">
       <thead>
@@ -75,6 +74,7 @@
           <th>Nombre</th>
           <th>Email</th>
           <th>Rol</th>
+          <th>Organización</th>
           <th>Estado</th>
           <th>Último acceso</th>
           <th>Acciones</th>
@@ -90,6 +90,14 @@
               <option value="{{ ROLE_ADMIN }}"   {% if u.role == ROLE_ADMIN %}selected{% endif %}>Admin</option>
               <option value="{{ ROLE_ANALYST }}" {% if u.role == ROLE_ANALYST %}selected{% endif %}>Analista</option>
               <option value="{{ ROLE_CLIENT }}"  {% if u.role == ROLE_CLIENT %}selected{% endif %}>Cliente</option>
+            </select>
+          </td>
+          <td>
+            <select class="role-select" onchange="setOrg({{ u.id }}, this.value)">
+              <option value="">— Sin org —</option>
+              {% for o in orgs %}
+              <option value="{{ o.id }}" {% if u.org_id == o.id %}selected{% endif %}>{{ o.nombre }}</option>
+              {% endfor %}
             </select>
           </td>
           <td>
@@ -110,42 +118,150 @@
       </tbody>
     </table>
   </div>
+
+  <!-- ── Organizaciones ───────────────────────────────────────── -->
+  <div class="admin-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div class="admin-section-title" style="margin-bottom:0">Organizaciones</div>
+      <button class="btn-sm" onclick="openOrgModal()">+ Nueva organización</button>
+    </div>
+
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>NIF</th>
+          <th>País</th>
+          <th>Industria</th>
+          <th>Plan</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="orgs-tbody">
+        {% for o in orgs %}
+        <tr id="org-row-{{ o.id }}">
+          <td>{{ o.nombre }}</td>
+          <td style="font-family:monospace;font-size:.8rem">{{ o.nif }}</td>
+          <td style="opacity:.7">{{ o.pais or '—' }}</td>
+          <td style="opacity:.7">{{ o.industria or '—' }}</td>
+          <td><span class="role-badge role-analyst">{{ o.plan }}</span></td>
+          <td>
+            <span id="org-status-{{ o.id }}" class="{{ 'status-active' if o.is_active else 'status-inactive' }}">
+              {{ 'Activa' if o.is_active else 'Inactiva' }}
+            </span>
+          </td>
+          <td style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn-sm" onclick="openEditOrgModal({{ o.id }}, '{{ o.nombre|e }}', '{{ o.nif|e }}', '{{ (o.pais or '')|e }}', '{{ (o.industria or '')|e }}', '{{ (o.email_contacto or '')|e }}', '{{ (o.web or '')|e }}', '{{ o.plan }}')">Editar</button>
+            <button class="btn-sm btn-danger" id="org-toggle-btn-{{ o.id }}" onclick="toggleOrg({{ o.id }})">
+              {{ 'Desactivar' if o.is_active else 'Activar' }}
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Informes ─────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-title">Informes</div>
+
+    {% if reports %}
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Título</th>
+          <th>Analista</th>
+          <th>Organización</th>
+          <th>Visible para cliente</th>
+          <th>Fecha</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rep in reports %}
+        <tr id="rep-row-{{ rep.id }}">
+          <td>
+            <div style="font-weight:500">{{ rep.titulo }}</div>
+            {% if rep.descripcion %}<div style="font-size:.75rem;opacity:.5;margin-top:.2rem">{{ rep.descripcion[:80] }}{% if rep.descripcion|length > 80 %}…{% endif %}</div>{% endif %}
+          </td>
+          <td style="font-size:.8rem;opacity:.6">{{ rep.analyst.nombre_completo if rep.analyst else '—' }}</td>
+          <td>
+            <select class="role-select" onchange="setReportOrg({{ rep.id }}, this.value)">
+              <option value="">— Sin org —</option>
+              {% for o in orgs %}
+              <option value="{{ o.id }}" {% if rep.org_id == o.id %}selected{% endif %}>{{ o.nombre }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <span id="rep-vis-{{ rep.id }}" class="{{ 'status-active' if rep.is_visible else 'status-inactive' }}">
+              {{ '✓ Publicado' if rep.is_visible else '✗ Oculto' }}
+            </span>
+          </td>
+          <td style="font-size:.8rem;opacity:.5">{{ rep.created_at | localtime }}</td>
+          <td>
+            <button class="btn-sm" id="rep-vis-btn-{{ rep.id }}" onclick="toggleReportVisible({{ rep.id }})">
+              {{ 'Ocultar' if rep.is_visible else 'Publicar' }}
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="opacity:.45;font-size:.875rem">No hay informes generados todavía.</p>
+    {% endif %}
+  </div>
 </div>
 
-<!-- Modal nuevo usuario -->
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <div class="modal-title">Nuevo usuario</div>
-    <div class="modal-field">
-      <label>Nombre *</label>
-      <input type="text" id="m-nombre" placeholder="Juan">
-    </div>
-    <div class="modal-field">
-      <label>Apellido *</label>
-      <input type="text" id="m-apellido" placeholder="García">
-    </div>
-    <div class="modal-field">
-      <label>Email *</label>
-      <input type="email" id="m-email" placeholder="juan@empresa.com">
-    </div>
-    <div class="modal-field">
-      <label>Keycloak ID *</label>
-      <input type="text" id="m-kcid" placeholder="UUID del usuario en Keycloak">
-    </div>
-    <div class="modal-field">
-      <label>Rol</label>
-      <select id="m-role">
-        <option value="{{ ROLE_CLIENT }}">Cliente</option>
-        <option value="{{ ROLE_ANALYST }}">Analista</option>
-        <option value="{{ ROLE_ADMIN }}">Admin</option>
-      </select>
+<!-- Modal nueva organización -->
+<div class="modal-overlay" id="org-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title" id="org-modal-title">Nueva organización</div>
+    <input type="hidden" id="om-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="modal-field">
+        <label>Nombre *</label>
+        <input type="text" id="om-nombre" placeholder="Empresa S.L.">
+      </div>
+      <div class="modal-field">
+        <label>NIF *</label>
+        <input type="text" id="om-nif" placeholder="B12345678">
+      </div>
+      <div class="modal-field">
+        <label>País</label>
+        <input type="text" id="om-pais" placeholder="España">
+      </div>
+      <div class="modal-field">
+        <label>Industria</label>
+        <input type="text" id="om-industria" placeholder="Fintech">
+      </div>
+      <div class="modal-field">
+        <label>Email de contacto</label>
+        <input type="email" id="om-email" placeholder="contacto@empresa.com">
+      </div>
+      <div class="modal-field">
+        <label>Web</label>
+        <input type="text" id="om-web" placeholder="empresa.com">
+      </div>
+      <div class="modal-field">
+        <label>Plan</label>
+        <select id="om-plan">
+          <option value="basic">Basic</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" onclick="createUser()">Crear usuario</button>
+      <button class="btn-cancel" onclick="closeOrgModal()">Cancelar</button>
+      <button class="btn-primary" onclick="saveOrg()">Guardar</button>
     </div>
   </div>
 </div>
+
 
 <script>
 function flash(msg, type) {
@@ -165,6 +281,17 @@ async function setRole(uid, role) {
   flash('Rol actualizado', 'ok');
 }
 
+async function setOrg(uid, org_id) {
+  const r = await fetch(`/admin/users/${uid}/org`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({org_id: org_id || null})
+  });
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  flash('Organización actualizada', 'ok');
+}
+
 async function toggleUser(uid) {
   const r = await fetch(`/admin/users/${uid}/toggle`, {method: 'POST'});
   const d = await r.json();
@@ -177,31 +304,89 @@ async function toggleUser(uid) {
   flash(d.is_active ? 'Usuario activado' : 'Usuario desactivado', 'ok');
 }
 
-function openModal()  { document.getElementById('modal').classList.add('open'); }
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
+// ── Org modal ──────────────────────────────────────────────────
+function openOrgModal() {
+  document.getElementById('org-modal-title').textContent = 'Nueva organización';
+  document.getElementById('om-id').value = '';
+  ['om-nombre','om-nif','om-pais','om-industria','om-email','om-web'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('om-plan').value = 'basic';
+  document.getElementById('org-modal').classList.add('open');
+}
 
-async function createUser() {
+function openEditOrgModal(id, nombre, nif, pais, industria, email, web, plan) {
+  document.getElementById('org-modal-title').textContent = 'Editar organización';
+  document.getElementById('om-id').value = id;
+  document.getElementById('om-nombre').value = nombre;
+  document.getElementById('om-nif').value = nif;
+  document.getElementById('om-pais').value = pais;
+  document.getElementById('om-industria').value = industria;
+  document.getElementById('om-email').value = email;
+  document.getElementById('om-web').value = web;
+  document.getElementById('om-plan').value = plan;
+  document.getElementById('org-modal').classList.add('open');
+}
+
+function closeOrgModal() { document.getElementById('org-modal').classList.remove('open'); }
+
+async function saveOrg() {
+  const id = document.getElementById('om-id').value;
   const body = {
-    nombre:      document.getElementById('m-nombre').value.trim(),
-    apellido:    document.getElementById('m-apellido').value.trim(),
-    email:       document.getElementById('m-email').value.trim(),
-    keycloak_id: document.getElementById('m-kcid').value.trim(),
-    role:        document.getElementById('m-role').value,
+    nombre:        document.getElementById('om-nombre').value.trim(),
+    nif:           document.getElementById('om-nif').value.trim(),
+    pais:          document.getElementById('om-pais').value.trim(),
+    industria:     document.getElementById('om-industria').value.trim(),
+    email_contacto:document.getElementById('om-email').value.trim(),
+    web:           document.getElementById('om-web').value.trim(),
+    plan:          document.getElementById('om-plan').value,
   };
-  const r = await fetch('/admin/users', {
+  const url    = id ? `/admin/orgs/${id}` : '/admin/orgs';
+  const method = id ? 'PATCH' : 'POST';
+  const r = await fetch(url, {method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  flash(id ? 'Organización actualizada. Recarga para ver cambios.' : 'Organización creada. Recarga la página.', 'ok');
+  closeOrgModal();
+}
+
+async function toggleOrg(oid) {
+  const r = await fetch(`/admin/orgs/${oid}/toggle`, {method: 'POST'});
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  const sp  = document.getElementById(`org-status-${oid}`);
+  const btn = document.getElementById(`org-toggle-btn-${oid}`);
+  sp.textContent  = d.is_active ? 'Activa' : 'Inactiva';
+  sp.className    = d.is_active ? 'status-active' : 'status-inactive';
+  btn.textContent = d.is_active ? 'Desactivar' : 'Activar';
+  flash(d.is_active ? 'Organización activada' : 'Organización desactivada', 'ok');
+}
+
+document.getElementById('org-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeOrgModal();
+});
+
+// ── Informes ───────────────────────────────────────────────────
+async function setReportOrg(rid, org_id) {
+  const r = await fetch(`/admin/reports/${rid}/org`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify({org_id: org_id || null})
   });
   const d = await r.json();
   if (d.error) { flash(d.error, 'err'); return; }
-  flash('Usuario creado. Recarga la página para verlo.', 'ok');
-  closeModal();
+  flash('Organización del informe actualizada', 'ok');
 }
 
-document.getElementById('modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeModal();
-});
+async function toggleReportVisible(rid) {
+  const r = await fetch(`/admin/reports/${rid}/toggle-visible`, {method: 'POST'});
+  const d = await r.json();
+  if (d.error) { flash(d.error, 'err'); return; }
+  const sp  = document.getElementById(`rep-vis-${rid}`);
+  const btn = document.getElementById(`rep-vis-btn-${rid}`);
+  sp.textContent  = d.is_visible ? '✓ Publicado' : '✗ Oculto';
+  sp.className    = d.is_visible ? 'status-active' : 'status-inactive';
+  btn.textContent = d.is_visible ? 'Ocultar' : 'Publicar';
+  flash(d.is_visible ? 'Informe publicado — visible para el cliente' : 'Informe ocultado', 'ok');
+}
 </script>
 </body>
 </html>
