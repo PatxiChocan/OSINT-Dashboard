@@ -196,16 +196,8 @@ def save_analysis():
     if not data or data["status"] != "done":
         return jsonify({"error": "Pipeline no completado o no encontrado"}), 404
 
-    # Buscar user_id por email de sesión
-    user_id = None
-    email = session.get("user_email")
-    if email:
-        u = User.query.filter_by(email=email).first()
-        if u:
-            user_id = u.id
-
     analysis = PipelineAnalysis(
-        user_id  = user_id,
+        user_id  = session.get("user_id"),
         seeds    = data["seeds"],
         assets   = data["assets"],
         score    = data["score"],

@@ -915,6 +915,38 @@ def _harvester(pid, domain):
 # FASE 2 — IPs
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _parse_tls_weaknesses(pid, ip, port, script_output):
+    weak_protos  = _WEAK_PROTO_RE.findall(script_output)
+    weak_ciphers = _WEAK_CIPHER_RE.findall(script_output)
+
+    if weak_protos:
+        protos = ", ".join(sorted(set(p.upper() for p in weak_protos)))
+        _finding(pid, ip, "nmap", "high",
+                 f"Protocolo TLS débil soportado en {ip}:{port} ({protos})",
+                 f"El servicio en el puerto {port} acepta conexiones con protocolos obsoletos e inseguros: {protos}.\n"
+                 f"Estos protocolos tienen vulnerabilidades conocidas (POODLE, BEAST, DROWN) que permiten "
+                 f"descifrar el tráfico cifrado mediante ataques activos de red.",
+                 f"Deshabilita {protos} en la configuración TLS. Exige TLS 1.2 como mínimo y preferiblemente TLS 1.3.")
+
+    if weak_ciphers:
+        ciphers = ", ".join(sorted(set(c.upper() for c in weak_ciphers)))
+        _finding(pid, ip, "nmap", "high",
+                 f"Cifrados débiles soportados en {ip}:{port} ({ciphers})",
+                 f"El servicio en el puerto {port} acepta cipher suites consideradas inseguras: {ciphers}.\n"
+                 f"Cifrados como RC4, 3DES, NULL o EXPORT tienen vulnerabilidades criptográficas documentadas "
+                 f"que pueden permitir el descifrado del tráfico.",
+                 f"Elimina los cipher suites débiles de la configuración TLS. "
+                 f"Usa únicamente AES-GCM o ChaCha20-Poly1305 con ECDHE para forward secrecy.")
+
+    if "LOGJAM" in script_output.upper() or ("dh params" in script_output.lower() and "weak" in script_output.lower()):
+        _finding(pid, ip, "nmap", "high",
+                 f"Parámetros DH débiles en {ip}:{port} (posible LOGJAM)",
+                 f"Se detectaron parámetros Diffie-Hellman débiles en el puerto {port}.\n"
+                 f"El ataque LOGJAM permite a un atacante en posición privilegiada de red degradar "
+                 f"conexiones TLS a claves de exportación de 512 bits y descifrar el tráfico.",
+                 "Genera parámetros DH de al menos 2048 bits o migra a ECDHE para evitar este problema.")
+
+
 def _nmap(pid, ip):
     _log(pid, f"[Nmap] Escaneando {ip} — puertos, versiones y scripts...")
     try:
@@ -1682,7 +1714,8 @@ def _run(pid, seeds):
 
                 new_ips = set()
                 username_queue.extend(_whois(pid, seed))
-                new_ips.update(_dns(pid, seed))
+                dns_ips, _mx = _dns(pid, seed)
+                new_ips.update(dns_ips)
 
                 all_subs = set(_subfinder(pid, seed)) | set(_crtsh(pid, seed))
                 for sub in list(all_subs)[:10]:

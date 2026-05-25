@@ -191,6 +191,12 @@ def publish_analysis():
     org_id        = data.get("org_id")
     titulo        = (data.get("titulo") or "").strip()
 
+    # Analysts can only publish to their own organisation
+    if session.get("user_role") == ROLE_ANALYST:
+        org_id = session.get("org_id")
+        if not org_id:
+            return jsonify({"error": "No tienes una organización asignada. Contacta con el administrador."}), 403
+
     if not analysis_type or not analysis_id or not org_id:
         return jsonify({"error": "type, analysis_id y org_id son requeridos"}), 400
 
